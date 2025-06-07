@@ -2,8 +2,8 @@
 'use client';
 
 import type { TimeSeriesData } from '@/lib/types';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
+import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, ComposedChart } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart"
 import { format as formatDateFns, parseISO, getQuarter } from 'date-fns';
 
@@ -13,31 +13,35 @@ interface SampleOverviewChartProps {
 }
 
 const chartConfig = {
-  volume: {
+  paymentVolume: {
     label: "Payment Volume (sats)",
     color: "hsl(var(--chart-1))",
   },
+  transactionCount: {
+    label: "Transaction Count",
+    color: "hsl(var(--chart-2))",
+  }
 } satisfies ChartConfig
 
 const formatXAxisTick = (tickItem: string, aggregationPeriod: string) => {
   try {
-    const dateObj = parseISO(tickItem); // Assuming tickItem is 'YYYY-MM-DD'
-    switch (aggregationPeriod) {
+    const dateObj = parseISO(tickItem); 
+    switch (aggregationPeriod.toLowerCase()) {
       case 'day':
         return formatDateFns(dateObj, 'MMM d');
       case 'week':
-        return formatDateFns(dateObj, 'MMM d'); // Start of the week
+        return formatDateFns(dateObj, 'MMM d'); 
       case 'month':
-        return formatDateFns(dateObj, 'MMM yyyy');
+        return formatDateFns(dateObj, 'MMM yy');
       case 'quarter':
         const quarter = getQuarter(dateObj);
-        return `Q${quarter} ${formatDateFns(dateObj, 'yyyy')}`;
+        return `Q${quarter} ${formatDateFns(dateObj, 'yy')}`;
       default:
         return formatDateFns(dateObj, 'MMM d');
     }
   } catch (e) {
-    console.error("Error formatting date for X-axis:", tickItem, e);
-    return tickItem; // Fallback to original value
+    // console.error("Error formatting date for X-axis:", tickItem, e);
+    return tickItem; 
   }
 };
 
@@ -53,7 +57,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
   return (
     <div className="h-[300px] w-full">
       <ChartContainer config={chartConfig} className="w-full h-full">
-        <BarChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+        <ComposedChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="date" 
@@ -64,24 +68,71 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
             className="text-xs"
           />
           <YAxis 
+            yAxisId="left"
             tickLine={false} 
             axisLine={false} 
             tickMargin={8}
             tickFormatter={(value) => `${value / 1000}k`}
             className="text-xs"
+            domain={['auto', 'auto']}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            className="text-xs"
+            domain={['auto', 'auto']}
+             tickFormatter={(value) => value.toLocaleString()}
           />
           <ChartTooltip
             cursor={{fill: 'hsl(var(--accent) / 0.2)'}}
-            content={<ChartTooltipContent indicator="dot" />}
+            content={
+              <ChartTooltipContent 
+                indicator="dot" 
+                formatter={(value, name, props) => {
+                  const itemConfig = chartConfig[name as keyof typeof chartConfig];
+                  const formattedValue = name === 'paymentVolume' 
+                    ? `${(Number(value) / 1000).toFixed(1)}k sats`
+                    : Number(value).toLocaleString();
+                  return (
+                     <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: itemConfig?.color }} />
+                      <span>{itemConfig?.label}: <strong>{formattedValue}</strong></span>
+                    </div>
+                  );
+                }}
+                 labelFormatter={(label, payload) => {
+                  if (payload && payload.length > 0 && payload[0].payload.date) {
+                    return <div className="font-medium">{formatXAxisTick(payload[0].payload.date, aggregationPeriod)}</div>;
+                  }
+                  return label;
+                }}
+              />
+            }
           />
+          <ChartLegend content={<ChartLegendContent />} />
           <Bar
-            dataKey="value"
+            yAxisId="left"
+            dataKey="paymentVolume"
             name="Payment Volume (sats)"
-            fill="var(--color-volume)"
+            fill="var(--color-paymentVolume)"
             radius={[4, 4, 0, 0]}
           />
-        </BarChart>
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="transactionCount"
+            name="Transaction Count"
+            stroke="var(--color-transactionCount)"
+            strokeWidth={2}
+            dot={{ r: 3, fill: 'var(--color-transactionCount)' }}
+            activeDot={{r: 5}}
+          />
+        </ComposedChart>
       </ChartContainer>
     </div>
   );
 }
+

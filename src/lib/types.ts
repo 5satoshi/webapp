@@ -1,3 +1,4 @@
+
 export interface KeyMetric {
   id: string;
   title: string;
@@ -30,7 +31,8 @@ export interface AlertSetting {
 
 export interface TimeSeriesData {
   date: string; // Should be in 'YYYY-MM-DD' format
-  value: number;
+  paymentVolume: number; // Renamed from 'value'
+  transactionCount?: number;
   [key: string]: any; // For multiple lines in a chart
 }
 
@@ -91,3 +93,4 @@ export type AiStructuredInput = {
   networkSubsumptionMetricsData: string; // JSON string or descriptive text
   timingPatternsHeatmapData: string; // JSON string or descriptive text
 };
+
