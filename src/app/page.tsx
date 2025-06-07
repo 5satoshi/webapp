@@ -12,7 +12,8 @@ import {
   fetchPeriodForwardingSummary,
   fetchPeriodChannelActivity
 } from '@/services/nodeService';
-// Removed: import { summarizeRecentActivity, type SummarizeRecentActivityInput } from '@/ai/flows/summarize-recent-activity-flow';
+import type { KeyMetric } from '@/lib/types';
+
 
 export default async function OverviewPage({ 
   searchParams 
@@ -72,7 +73,7 @@ export default async function OverviewPage({
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <CardTitle className="font-headline">Historical Payment Volume</CardTitle>
+            <CardTitle className="font-headline">Historical Payment Volume & Period Activity</CardTitle>
             <Tabs value={currentAggregation} className="w-full sm:w-auto">
               <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                 {aggregationPeriodOptions.map(option => (
@@ -84,17 +85,9 @@ export default async function OverviewPage({
             </Tabs>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6"> {/* Added space-y-6 for spacing */}
           <SampleOverviewChart data={historicalPaymentVolume} aggregationPeriod={currentAggregation} />
-        </CardContent>
-      </Card>
-      
-      {/* New section for period-specific metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline">Activity in Last {currentAggregationLabel.charAt(0).toUpperCase() + currentAggregationLabel.slice(1)}</CardTitle>
-        </CardHeader>
-        <CardContent>
+          
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {periodMetrics.map((metric) => (
               <KeyMetricsCard key={metric.id} metric={metric} />
@@ -102,7 +95,7 @@ export default async function OverviewPage({
           </div>
         </CardContent>
       </Card>
-
+      
     </div>
   );
 }
