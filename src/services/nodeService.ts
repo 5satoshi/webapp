@@ -57,12 +57,14 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
 }
 
 // Map c-lightning channel states to UI-friendly statuses
-function mapChannelStatus(state: string): Channel['status'] {
+function mapChannelStatus(state: string | null | undefined): Channel['status'] {
   if (!state) return 'inactive';
   // Based on https://lightning.readthedocs.io/lightning-listpeers.7.html#states
   switch (state.toUpperCase()) {
     case 'OPENINGD':
     case 'CHANNELD_AWAITING_LOCKIN':
+    case 'DUALOPEND_OPEN_INIT': // From listpeers
+    case 'DUALOPEND_AWAITING_LOCKIN': // From listpeers
       return 'pending';
     case 'CHANNELD_NORMAL':
       return 'active';
@@ -72,9 +74,7 @@ function mapChannelStatus(state: string): Channel['status'] {
     case 'AWAITING_UNILATERAL':
     case 'FUNDING_SPEND_SEEN':
     case 'ONCHAIN':
-    case 'DUALOPEND_OPEN_INIT':
-    case 'DUALOPEND_AWAITING_LOCKIN':
-      return 'inactive'; // Could be 'closing' or 'closed' - simplified to 'inactive'
+      return 'inactive'; 
     default:
       console.warn(`Unknown channel state: ${state}, defaulting to inactive.`);
       return 'inactive';
@@ -104,13 +104,11 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
-  // Query 'peers' table for active channels
   const activeChannelsQuery = `
     SELECT COUNT(*) as active_channels
     FROM \`${projectId}.${datasetId}.peers\` 
     WHERE state = 'CHANNELD_NORMAL' 
   `;
-  // Query 'peers' table for connected peers with active channels
   const connectedPeersQuery = `
     SELECT COUNT(DISTINCT id) as connected_peers 
     FROM \`${projectId}.${datasetId}.peers\` 
@@ -165,23 +163,49 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   }
 }
 
-export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> {
+export async function fetchHistoricalPaymentVolume(timescale: string = '30d'): Promise<TimeSeriesData[]> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalPaymentVolume. Returning empty time series.");
     return [];
   }
-  console.log(`Fetching historical payment volume from BigQuery...`);
+  console.log(`Fetching historical payment volume from BigQuery for timescale: ${timescale}...`);
+
+  let intervalClause = "";
+  let dateGroupingExpression = "DATE(received_time)";
+
+  switch (timescale) {
+    case '7d':
+      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)";
+      break;
+    case '30d':
+      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)";
+      break;
+    case '90d':
+      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)";
+      break;
+    case '1y':
+      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 YEAR)";
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK)";
+      break;
+    case 'all':
+      // No interval clause for 'all', fetch all data
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK)"; // Group by week for 'all' to manage data points
+      break;
+    default:
+      console.warn(`Unsupported timescale: ${timescale}, defaulting to 30d.`);
+      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)";
+  }
 
   const query = `
     SELECT
-      DATE(received_time) AS day,
+      ${dateGroupingExpression} AS date_group,
       SUM(out_msat) AS total_volume_msat
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
       AND received_time IS NOT NULL
-      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-    GROUP BY day
-    ORDER BY day ASC
+      ${intervalClause}
+    GROUP BY date_group
+    ORDER BY date_group ASC
   `;
   
   try {
@@ -191,25 +215,26 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
     console.log("Raw historicalPaymentVolume rows:", JSON.stringify(rows, null, 2));
 
     if (!rows || rows.length === 0) {
-        console.log("No historical payment volume data returned from BigQuery.");
+        console.log("No historical payment volume data returned from BigQuery for timescale:", timescale);
         return [];
     }
 
     const formattedRows = rows.map(row => {
-      if (!row || row.day === null || row.day === undefined) {
-        console.warn("Skipping row with null/undefined date in historical payment volume:", JSON.stringify(row));
+      if (!row || row.date_group === null || row.date_group === undefined) {
+        console.warn("Skipping row with null/undefined date_group in historical payment volume:", JSON.stringify(row));
         return null; 
       }
       return {
-        date: formatDateFromBQ(row.day), 
+        date: formatDateFromBQ(row.date_group), 
         value: Math.floor(Number(row.total_volume_msat || 0) / 1000), 
       };
     }).filter(item => item !== null);
-
+    
+    console.log(`Formatted historical payment volume for ${timescale}:`, JSON.stringify(formattedRows, null, 2));
     return formattedRows as TimeSeriesData[];
 
   } catch (error) {
-    console.error("Error fetching historical payment volume from BigQuery:", error);
+    console.error(`Error fetching historical payment volume for timescale ${timescale} from BigQuery:`, error);
     return []; 
   }
 }
@@ -219,7 +244,7 @@ export async function fetchChannels(): Promise<Channel[]> {
     console.error("BigQuery client not initialized or datasetId missing for fetchChannels. Returning empty channel list.");
     return [];
   }
-  console.log(`Fetching channels from BigQuery 'peers' table using new schema...`);
+  console.log(`Fetching channels from BigQuery 'peers' table...`);
 
   const query = `
     SELECT
@@ -229,7 +254,6 @@ export async function fetchChannels(): Promise<Channel[]> {
       msatoshi_total,
       msatoshi_to_us,
       state                -- Channel state
-      -- last_update -- Not available in the provided schema directly for the channel
     FROM \`${projectId}.${datasetId}.peers\`
     ORDER BY state, id
   `;
@@ -253,9 +277,10 @@ export async function fetchChannels(): Promise<Channel[]> {
       const localBalanceSats = Math.floor(msatToUs / 1000);
       const remoteBalanceSats = Math.floor((msatTotal - msatToUs) / 1000);
       
-      const channelId = (row.funding_txid && row.funding_outnum !== null) 
+      // Create a unique channel ID from funding_txid and funding_outnum if available
+      const channelId = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
                         ? `${row.funding_txid}:${row.funding_outnum}` 
-                        : `unknown-channel-${row.id}-${Math.random().toString(36).substring(7)}`;
+                        : `peer-${row.id}-${Math.random().toString(36).substring(7)}`; // Fallback if no funding info
 
       return {
         id: channelId, 
@@ -266,7 +291,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         status: mapChannelStatus(row.state),
         uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, // Placeholder
         historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, // Placeholder
-        lastUpdate: new Date().toISOString().split('T')[0], // Placeholder for last_update
+        lastUpdate: new Date().toISOString(), // Placeholder for last_update
       };
     });
 
@@ -275,3 +300,5 @@ export async function fetchChannels(): Promise<Channel[]> {
     return []; 
   }
 }
+
+    

@@ -1,14 +1,26 @@
+
+import Link from 'next/link';
 import { PageTitle } from '@/components/ui/page-title';
 import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card';
 import { SampleOverviewChart } from '@/components/dashboard/overview/sample-overview-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { timescaleOptions } from '@/lib/mock-data'; // timescaleOptions can still come from mock for UI
+import { timescaleOptions } from '@/lib/mock-data'; 
 import { fetchKeyMetrics, fetchHistoricalPaymentVolume } from '@/services/nodeService';
 
-export default async function OverviewPage() {
+export default async function OverviewPage({ 
+  searchParams 
+}: { 
+  searchParams?: { timescale?: string } 
+}) {
+  
+  let currentTimescale = searchParams?.timescale || '30d';
+  if (!timescaleOptions.some(opt => opt.value === currentTimescale)) {
+    currentTimescale = '30d'; // Default to '30d' if invalid timescale is provided
+  }
+
   const keyMetrics = await fetchKeyMetrics();
-  const historicalPaymentVolume = await fetchHistoricalPaymentVolume();
+  const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentTimescale);
 
   return (
     <div className="space-y-6">
@@ -24,10 +36,12 @@ export default async function OverviewPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle className="font-headline">Historical Payment Volume</CardTitle>
-            <Tabs defaultValue={timescaleOptions[1].value} className="w-full sm:w-auto">
+            <Tabs value={currentTimescale} className="w-full sm:w-auto">
               <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:grid-cols-5">
                 {timescaleOptions.map(option => (
-                  <TabsTrigger key={option.value} value={option.value}>{option.label}</TabsTrigger>
+                  <TabsTrigger key={option.value} value={option.value} asChild>
+                    <Link href={`/?timescale=${option.value}`}>{option.label}</Link>
+                  </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
@@ -59,7 +73,7 @@ export default async function OverviewPage() {
           <CardContent>
             <p className="text-muted-foreground">Frequently accessed actions or documentation.</p>
             <ul className="mt-2 space-y-1 text-sm list-disc list-inside">
-              <li><a href="/channels" className="text-primary hover:underline">Manage Channels</a></li>
+              <li><Link href="/channels" className="text-primary hover:underline">Manage Channels</Link></li>
               <li><a href="#" className="text-primary hover:underline">Adjust Fee Policy</a></li>
               <li><a href="#" className="text-primary hover:underline">View Node Logs</a></li>
             </ul>
@@ -69,3 +83,5 @@ export default async function OverviewPage() {
     </div>
   );
 }
+
+    
