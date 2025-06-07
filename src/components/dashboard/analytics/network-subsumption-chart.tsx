@@ -1,0 +1,74 @@
+'use client';
+
+import type { NetworkSubsumptionData } from '@/lib/types';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import type { ChartConfig } from "@/components/ui/chart";
+
+interface NetworkSubsumptionChartProps {
+  data: NetworkSubsumptionData[];
+}
+
+const chartConfig = {
+  micro: { label: "Micro (200 sats)", color: "hsl(var(--chart-1))" },
+  common: { label: "Common (50k sats)", color: "hsl(var(--chart-2))" },
+  macro: { label: "Macro (4M sats)", color: "hsl(var(--chart-3))" },
+} satisfies ChartConfig;
+
+export function NetworkSubsumptionChart({ data }: NetworkSubsumptionChartProps) {
+  if (!data || data.length === 0) {
+    return <div className="text-center text-muted-foreground p-4 h-[300px] flex items-center justify-center">No subsumption data available.</div>;
+  }
+
+  return (
+    <div className="h-[300px] w-full">
+      <ChartContainer config={chartConfig} className="w-full h-full">
+        <LineChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+          <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            className="text-xs"
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={(value) => `${value}%`}
+            className="text-xs"
+          />
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent 
+                indicator="line" 
+                labelFormatter={(_, payload) => {
+                  if (payload && payload.length > 0) {
+                    return <div className="font-medium">{new Date(payload[0].payload.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>;
+                  }
+                  return null;
+                }}
+                formatter={(value, name) => (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color }} />
+                      <span>{chartConfig[name as keyof typeof chartConfig]?.label}: <strong>{value}%</strong></span>
+                    </div>
+                    {name === "micro" && <p className="text-xs text-muted-foreground pt-1">Subsumption: How often this node is the cheapest route for a given payment size.</p>}
+                  </>
+                )}
+              />
+            }
+          />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Line type="monotone" dataKey="micro" stroke="var(--color-micro)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="common" stroke="var(--color-common)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="macro" stroke="var(--color-macro)" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ChartContainer>
+    </div>
+  );
+}
