@@ -2,9 +2,8 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, UserCircle } from 'lucide-react';
-import { useTheme } from 'next-themes'; // Assuming next-themes is or will be installed for theme toggling
-import React, { useEffect, useState } from 'react';
+import { UserCircle } from 'lucide-react'; // Removed Sun, Moon, useTheme
+import React from 'react'; // Removed useEffect, useState
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,28 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function MainHeader() {
-  // const { theme, setTheme } = useTheme(); // Placeholder for theme toggle functionality
-  const [currentTheme, setCurrentTheme] = useState('dark');
-
-  useEffect(() => {
-    // Basic theme detection, ideally use next-themes
-    if (document.documentElement.classList.contains('dark')) {
-      setCurrentTheme('dark');
-    } else {
-      setCurrentTheme('light');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    if (currentTheme === 'dark') {
-      document.documentElement.classList.remove('dark');
-      setCurrentTheme('light');
-    } else {
-      document.documentElement.classList.add('dark');
-      setCurrentTheme('dark');
-    }
-  };
-
+  // Theme toggling logic removed to enforce light mode.
+  // The theme is now controlled by globals.css and the absence of 'dark' class on <html>
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -45,9 +24,7 @@ export function MainHeader() {
          {/* Could add breadcrumbs or page title here dynamically if needed */}
       </div>
       <div className="ml-auto flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-          {currentTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
+        {/* Theme toggle button removed */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">

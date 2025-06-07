@@ -4,19 +4,19 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 0 0% 100%; /* Light background */
+    --foreground: 240 10% 3.9%; /* Dark text */
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 277 70% 36%; /* New Purple: #6a1b9a */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 34 100% 50%; /* New Orange: #ff8f00 */
+    --primary: 277 70% 36%; /* New Primary: Purple #6a1b9a */
+    --primary-foreground: 0 0% 98%; /* White text for purple */
+    --secondary: 34 100% 50%; /* New Secondary: Orange #ff8f00 */
     --secondary-foreground: 0 0% 10%; /* Dark text for orange */
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
-    --accent: 288 48% 60%; /* Original Electric Purple */
+    --accent: 288 48% 60%; /* Original Electric Purple - can be adjusted if needed */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
@@ -28,55 +28,21 @@
     --chart-1: 277 70% 36%; /* New Primary - Purple */
     --chart-2: 34 100% 50%; /* New Secondary - Orange */
     --chart-3: 288 48% 60%; /* Original Accent - Electric Purple */
-    --chart-4: 34 100% 50%; /* New CTA Orange (#ff8f00) */
+    --chart-4: 34 100% 50%; /* CTA Orange (#ff8f00) - same as secondary */
     --chart-5: 210 40% 96.1%; /* A light blue/gray for contrast */
 
     --sidebar-background: 240 4.8% 95.9%; /* Light gray for light mode sidebar */
     --sidebar-foreground: 240 10% 3.9%; /* Dark text */
-    --sidebar-primary: 277 70% 36%; /* New primary */
+    --sidebar-primary: 277 70% 36%; /* New primary for sidebar */
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 288 48% 60%; /* Original accent */
-    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-accent: 34 100% 50%; /* Orange as accent in sidebar */
+    --sidebar-accent-foreground: 0 0% 10%;
     --sidebar-border: 240 5.9% 90%; /* Consistent with page border */
     --sidebar-ring: 277 70% 40%; /* Based on new primary */
   }
 
-  .dark {
-    --background: 0 0% 13%; /* #212121 Dark Gray */
-    --foreground: 0 0% 98%; /* Near white */
-    --card: 0 0% 16%; /* Slightly lighter than background */
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 10%; /* Darker for popovers */
-    --popover-foreground: 0 0% 98%;
-    --primary: 277 70% 40%; /* Dark Mode Purple, slightly lighter than light mode primary */
-    --primary-foreground: 0 0% 98%; 
-    --secondary: 34 100% 55%; /* Dark Mode Orange, slightly lighter */
-    --secondary-foreground: 0 0% 10%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 60%; /* Lighter gray for muted text */
-    --accent: 288 48% 65%; /* Dark Mode Accent, slightly lighter */
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 72% 51%; 
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 25%; 
-    --input: 0 0% 20%; 
-    --ring: 277 70% 45%; /* Ring based on primary for dark */
-
-    --chart-1: 277 70% 50%; 
-    --chart-2: 34 100% 60%; 
-    --chart-3: 288 48% 65%; 
-    --chart-4: 34 100% 60%; 
-    --chart-5: 210 30% 50%; 
-    
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 80%;
-    --sidebar-primary: 277 70% 40%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 288 48% 65%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 277 70% 45%;
-  }
+  /* Remove .dark class overrides to default to light mode */
+  /* .dark definitions are removed to enforce light mode */
 }
 
 @layer base {

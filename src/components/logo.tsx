@@ -6,7 +6,7 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
 
   return (
     <div className="flex items-center gap-2 text-primary">
-      <Zap size={iconSize} className="text-cta-orange" />
+      <Zap size={iconSize} className="text-secondary" /> {/* Use secondary for Zap icon color */}
       <span className={`font-headline font-semibold ${textSizeClass}`}>
         5satoshi
       </span>

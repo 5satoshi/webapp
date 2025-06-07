@@ -32,6 +32,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* Example: <link href="https://fonts.googleapis.com/css2?family=Inter&family=Space+Grotesk&display=swap" rel="stylesheet" /> */}
       </head>
+      {/* Ensure no 'dark' class is applied here for default light mode */}
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
         <AppShell>
           {children}

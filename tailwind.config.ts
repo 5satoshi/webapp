@@ -3,7 +3,7 @@ import type {Config} from 'tailwindcss';
 const { fontFamily } = require("tailwindcss/defaultTheme")
 
 export default {
-  darkMode: ['class'],
+  darkMode: ['class'], // Keep this for potential future use, but we won't apply 'dark' class to html
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -29,11 +29,11 @@ export default {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
-        primary: {
+        primary: { // Purple: #6a1b9a
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
         },
-        secondary: {
+        secondary: { // Orange: #ff8f00
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
         },
@@ -74,7 +74,7 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
-        'cta-orange': '#ff8f00', /* New Orange HSL(34, 100%, 50%) */
+        'cta-orange': 'hsl(var(--secondary))', // Use secondary for cta-orange
       },
       borderRadius: {
         lg: 'var(--radius)',
