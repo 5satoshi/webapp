@@ -32,11 +32,8 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
   let dateToFormat: Date;
 
   if (typeof (timestamp as { value: string }).value === 'string') {
-    // Handles BigQueryTimestamp, BigQueryDate, BigQueryDatetime, BigQueryTime objects
     const bqValue = (timestamp as { value: string }).value;
-    // Check if it's just a date string (YYYY-MM-DD)
     if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) {
-        // For BigQuery DATE type, append a time to make it a valid Date constructor input
         dateToFormat = new Date(bqValue + 'T00:00:00');
     } else {
         dateToFormat = new Date(bqValue);
@@ -86,20 +83,19 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
+  // Updated to query 'peers' table for active channels
   const activeChannelsQuery = `
     SELECT COUNT(*) as active_channels
-    FROM \`${projectId}.${datasetId}.channels\`
+    FROM \`${projectId}.${datasetId}.peers\` 
     WHERE active = TRUE
   `;
+  // Updated to query 'peers' table for connected peers, assuming 'destination' is the peer_id column
   const connectedPeersQuery = `
-    SELECT COUNT(DISTINCT peer_id) as connected_peers 
-    FROM \`${projectId}.${datasetId}.channels\` 
+    SELECT COUNT(DISTINCT destination) as connected_peers 
+    FROM \`${projectId}.${datasetId}.peers\` 
     WHERE active = TRUE
   `;
-  // Note: The connected_peers query above assumes peers involved in active channels are "connected"
-  // If you have a separate 'peers' table with a 'connected' status, that would be more accurate.
-  // For now, using the distinct peer IDs from active channels as a proxy.
-
+  
   try {
     console.log("Executing paymentsQuery:", paymentsQuery);
     const [paymentsJob] = await bigquery.createQueryJob({ query: paymentsQuery });
@@ -200,35 +196,37 @@ export async function fetchChannels(): Promise<Channel[]> {
     console.error("BigQuery client not initialized or datasetId missing for fetchChannels. Returning empty channel list.");
     return [];
   }
-  console.log(`Fetching channels from BigQuery based on new schema...`);
+  console.log(`Fetching channels from BigQuery 'peers' table...`);
 
-  // Query adapted to the new schema provided by the user
+  // Querying the 'peers' table. 
+  // ASSUMPTION: 'peers' table has 'short_channel_id', 'destination' (as peer_id), 
+  // 'amount_msat' (as capacity), 'active', and 'last_update'.
+  // PLEASE VERIFY these column names against your actual 'peers' table schema.
   const query = `
     SELECT
       short_channel_id, 
-      source,
-      destination, -- Assuming 'destination' is the peer node ID
-      amount_msat, -- Assuming this is channel capacity
+      destination, 
+      amount_msat, 
       active,
-      last_update -- DATETIME field for last update
-    FROM \`${projectId}.${datasetId}.channels\`
+      last_update 
+    FROM \`${projectId}.${datasetId}.peers\`
     ORDER BY active DESC, short_channel_id
   `;
 
   try {
-    console.log("Executing channels query:", query);
+    console.log("Executing channels query on 'peers' table:", query);
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
-    console.log("Raw channels rows from new schema:", JSON.stringify(rows, null, 2));
+    console.log("Raw channels rows from 'peers' table:", JSON.stringify(rows, null, 2));
 
     if (!rows || rows.length === 0) {
-        console.log("No channel data returned from BigQuery for new schema.");
+        console.log("No channel data returned from BigQuery 'peers' table.");
         return [];
     }
 
     return rows.map(row => {
       const capacitySats = Math.floor(Number(row.amount_msat || 0) / 1000);
-      // Placeholder for local/remote balance as it's not in the provided schema
+      // Placeholder for local/remote balance as it's not in the assumed schema for 'peers' table
       const localBalanceSats = Math.floor(capacitySats / 2);
       const remoteBalanceSats = capacitySats - localBalanceSats;
       
@@ -238,13 +236,13 @@ export async function fetchChannels(): Promise<Channel[]> {
       let uptime = 0;
       let historicalPaymentSuccessRate = 0;
       if (status === 'active') {
-        uptime = 100; // Placeholder
-        historicalPaymentSuccessRate = 99; // Placeholder
+        uptime = 99; // Placeholder, adjust if actual data is available
+        historicalPaymentSuccessRate = 98; // Placeholder
       }
 
       return {
-        id: String(row.short_channel_id || `unknown-id-${Math.random()}`), 
-        peerNodeId: String(row.destination || 'unknown-peer-id'), // Assumption: destination is the peer
+        id: String(row.short_channel_id || `unknown-channel-id-${Math.random()}`), 
+        peerNodeId: String(row.destination || 'unknown-peer-id'), // ASSUMPTION: 'destination' is the peer's pubkey
         capacity: capacitySats,
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
@@ -256,7 +254,7 @@ export async function fetchChannels(): Promise<Channel[]> {
     });
 
   } catch (error) {
-    console.error("Error fetching channels from BigQuery (new schema):", error);
+    console.error("Error fetching channels from BigQuery 'peers' table:", error);
     return []; 
   }
 }
