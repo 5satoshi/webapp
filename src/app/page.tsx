@@ -5,22 +5,22 @@ import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card
 import { SampleOverviewChart } from '@/components/dashboard/overview/sample-overview-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { timescaleOptions } from '@/lib/mock-data'; 
+import { aggregationPeriodOptions } from '@/lib/mock-data'; 
 import { fetchKeyMetrics, fetchHistoricalPaymentVolume } from '@/services/nodeService';
 
 export default async function OverviewPage({ 
   searchParams 
 }: { 
-  searchParams?: { timescale?: string } 
+  searchParams?: { aggregation?: string } 
 }) {
   
-  let currentTimescale = searchParams?.timescale || '30d';
-  if (!timescaleOptions.some(opt => opt.value === currentTimescale)) {
-    currentTimescale = '30d'; // Default to '30d' if invalid timescale is provided
+  let currentAggregation = searchParams?.aggregation || 'day'; // Default to 'day'
+  if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
+    currentAggregation = 'day'; // Default if invalid aggregation period is provided
   }
 
   const keyMetrics = await fetchKeyMetrics();
-  const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentTimescale);
+  const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
 
   return (
     <div className="space-y-6">
@@ -35,12 +35,12 @@ export default async function OverviewPage({
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <CardTitle className="font-headline">Historical Payment Volume</CardTitle>
-            <Tabs value={currentTimescale} className="w-full sm:w-auto">
-              <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:grid-cols-5">
-                {timescaleOptions.map(option => (
+            <CardTitle className="font-headline">Historical Payment Volume (Last 10 Periods)</CardTitle>
+            <Tabs value={currentAggregation} className="w-full sm:w-auto">
+              <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
+                {aggregationPeriodOptions.map(option => (
                   <TabsTrigger key={option.value} value={option.value} asChild>
-                    <Link href={`/?timescale=${option.value}`}>{option.label}</Link>
+                    <Link href={`/?aggregation=${option.value}`}>{option.label}</Link>
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -83,5 +83,3 @@ export default async function OverviewPage({
     </div>
   );
 }
-
-    

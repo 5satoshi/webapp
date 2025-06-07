@@ -1,3 +1,4 @@
+
 import type {
   KeyMetric,
   Channel,
@@ -128,6 +129,14 @@ export const mockAiInput: AiStructuredInput = {
   timingPatternsHeatmapData: "Highest traffic intensity observed on weekdays between 10:00-12:00 UTC and 14:00-17:00 UTC. Weekend traffic is generally lower but shows a small peak on Saturday afternoons."
 };
 
+export const aggregationPeriodOptions = [
+  { value: 'day', label: 'Days' },
+  { value: 'week', label: 'Weeks' },
+  { value: 'month', label: 'Months' },
+  { value: 'quarter', label: 'Quarters' },
+];
+
+// Original timescaleOptions, kept for reference or other charts if needed
 export const timescaleOptions = [
   { value: '7d', label: '7 Days' },
   { value: '30d', label: '30 Days' },

@@ -3,7 +3,7 @@
 
 import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
-import { format } from 'date-fns';
+import { format, startOfWeek, startOfMonth, startOfQuarter } from 'date-fns';
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
@@ -29,15 +29,14 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
 
   if (typeof (timestamp as { value: string }).value === 'string') {
     const bqValue = (timestamp as { value: string }).value;
-    // Check if it's already just a date string like 'YYYY-MM-DD' from DATE()
     if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) {
-        dateToFormat = new Date(bqValue + 'T00:00:00Z'); // Assume UTC if only date
+        dateToFormat = new Date(bqValue + 'T00:00:00Z'); 
     } else {
-        dateToFormat = new Date(bqValue); // Assume full timestamp string
+        dateToFormat = new Date(bqValue); 
     }
   } else if (typeof timestamp === 'string') {
      if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
-        dateToFormat = new Date(timestamp + 'T00:00:00Z'); // Assume UTC
+        dateToFormat = new Date(timestamp + 'T00:00:00Z'); 
     } else {
         dateToFormat = new Date(timestamp);
     }
@@ -56,18 +55,22 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
   return format(dateToFormat, 'yyyy-MM-dd');
 }
 
-// Map c-lightning channel states to UI-friendly statuses
 function mapChannelStatus(state: string | null | undefined): Channel['status'] {
   if (!state) return 'inactive';
   // Based on https://lightning.readthedocs.io/lightning-listpeers.7.html#states
-  switch (state.toUpperCase()) {
+  // And common c-lightning states
+  const normalizedState = state.toUpperCase();
+  switch (normalizedState) {
+    // Pending states
     case 'OPENINGD':
     case 'CHANNELD_AWAITING_LOCKIN':
-    case 'DUALOPEND_OPEN_INIT': // From listpeers
-    case 'DUALOPEND_AWAITING_LOCKIN': // From listpeers
+    case 'DUALOPEND_OPEN_INIT':
+    case 'DUALOPEND_AWAITING_LOCKIN':
       return 'pending';
+    // Active states
     case 'CHANNELD_NORMAL':
       return 'active';
+    // Inactive/Closing states
     case 'CHANNELD_SHUTTING_DOWN':
     case 'CLOSINGD_SIGEXCHANGE':
     case 'CLOSINGD_COMPLETE':
@@ -76,10 +79,17 @@ function mapChannelStatus(state: string | null | undefined): Channel['status'] {
     case 'ONCHAIN':
       return 'inactive'; 
     default:
+      // If state is not recognized but implies an open channel, consider it active.
+      // This is a fallback, ideally all states should be mapped.
+      if (normalizedState.includes("CHANNELD") || normalizedState.includes("DUALOPEND")) {
+        console.warn(`Partially recognized channel state: ${state}, defaulting to active.`);
+        return 'active';
+      }
       console.warn(`Unknown channel state: ${state}, defaulting to inactive.`);
       return 'inactive';
   }
 }
+
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   if (!bigquery || !datasetId) {
@@ -112,7 +122,7 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   const connectedPeersQuery = `
     SELECT COUNT(DISTINCT id) as connected_peers 
     FROM \`${projectId}.${datasetId}.peers\` 
-    WHERE state = 'CHANNELD_NORMAL'
+    WHERE state = 'CHANNELD_NORMAL' 
   `;
   
   try {
@@ -163,37 +173,28 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   }
 }
 
-export async function fetchHistoricalPaymentVolume(timescale: string = '30d'): Promise<TimeSeriesData[]> {
+export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = 'day'): Promise<TimeSeriesData[]> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalPaymentVolume. Returning empty time series.");
     return [];
   }
-  console.log(`Fetching historical payment volume from BigQuery for timescale: ${timescale}...`);
+  console.log(`Fetching historical payment volume from BigQuery, aggregated by ${aggregationPeriod}, last 10 periods...`);
 
-  let intervalClause = "";
-  let dateGroupingExpression = "DATE(received_time)";
-
-  switch (timescale) {
-    case '7d':
-      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)";
-      break;
-    case '30d':
-      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)";
-      break;
-    case '90d':
-      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)";
-      break;
-    case '1y':
-      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 YEAR)";
+  let dateGroupingExpression = "";
+  switch (aggregationPeriod.toLowerCase()) {
+    case 'week':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK)";
       break;
-    case 'all':
-      // No interval clause for 'all', fetch all data
-      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK)"; // Group by week for 'all' to manage data points
+    case 'month':
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
       break;
+    case 'quarter':
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), QUARTER)";
+      break;
+    case 'day':
     default:
-      console.warn(`Unsupported timescale: ${timescale}, defaulting to 30d.`);
-      intervalClause = "AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)";
+      dateGroupingExpression = "DATE(received_time)";
+      break;
   }
 
   const query = `
@@ -203,23 +204,23 @@ export async function fetchHistoricalPaymentVolume(timescale: string = '30d'): P
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
       AND received_time IS NOT NULL
-      ${intervalClause}
     GROUP BY date_group
-    ORDER BY date_group ASC
+    ORDER BY date_group DESC
+    LIMIT 10
   `;
   
   try {
-    console.log("Executing historicalPaymentVolume query:", query);
+    console.log(`Executing historicalPaymentVolume query for ${aggregationPeriod}:`, query);
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
-    console.log("Raw historicalPaymentVolume rows:", JSON.stringify(rows, null, 2));
+    console.log(`Raw historicalPaymentVolume rows for ${aggregationPeriod}:`, JSON.stringify(rows, null, 2));
 
     if (!rows || rows.length === 0) {
-        console.log("No historical payment volume data returned from BigQuery for timescale:", timescale);
+        console.log(`No historical payment volume data returned from BigQuery for aggregation: ${aggregationPeriod}`);
         return [];
     }
 
-    const formattedRows = rows.map(row => {
+    const formattedAndSortedRows = rows.map(row => {
       if (!row || row.date_group === null || row.date_group === undefined) {
         console.warn("Skipping row with null/undefined date_group in historical payment volume:", JSON.stringify(row));
         return null; 
@@ -228,13 +229,14 @@ export async function fetchHistoricalPaymentVolume(timescale: string = '30d'): P
         date: formatDateFromBQ(row.date_group), 
         value: Math.floor(Number(row.total_volume_msat || 0) / 1000), 
       };
-    }).filter(item => item !== null);
+    }).filter(item => item !== null)
+      .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime()); // Sort ascending for chart
     
-    console.log(`Formatted historical payment volume for ${timescale}:`, JSON.stringify(formattedRows, null, 2));
-    return formattedRows as TimeSeriesData[];
+    console.log(`Formatted and sorted historical payment volume for ${aggregationPeriod}:`, JSON.stringify(formattedAndSortedRows, null, 2));
+    return formattedAndSortedRows as TimeSeriesData[];
 
   } catch (error) {
-    console.error(`Error fetching historical payment volume for timescale ${timescale} from BigQuery:`, error);
+    console.error(`Error fetching historical payment volume for aggregation ${aggregationPeriod} from BigQuery:`, error);
     return []; 
   }
 }
@@ -254,6 +256,7 @@ export async function fetchChannels(): Promise<Channel[]> {
       msatoshi_total,
       msatoshi_to_us,
       state                -- Channel state
+      -- last_update is not in the provided schema for peers, will use current time.
     FROM \`${projectId}.${datasetId}.peers\`
     ORDER BY state, id
   `;
@@ -277,21 +280,21 @@ export async function fetchChannels(): Promise<Channel[]> {
       const localBalanceSats = Math.floor(msatToUs / 1000);
       const remoteBalanceSats = Math.floor((msatTotal - msatToUs) / 1000);
       
-      // Create a unique channel ID from funding_txid and funding_outnum if available
-      const channelId = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
+      const channelIdString = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
                         ? `${row.funding_txid}:${row.funding_outnum}` 
-                        : `peer-${row.id}-${Math.random().toString(36).substring(7)}`; // Fallback if no funding info
+                        : `peer-${row.id}-${Math.random().toString(36).substring(7)}`;
 
       return {
-        id: channelId, 
+        id: channelIdString, 
         peerNodeId: String(row.id || 'unknown-peer-id'),
         capacity: capacitySats,
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
         status: mapChannelStatus(row.state),
-        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, // Placeholder
-        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, // Placeholder
-        lastUpdate: new Date().toISOString(), // Placeholder for last_update
+        // Placeholders as these are not directly available in the peers table schema provided
+        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, 
+        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, 
+        lastUpdate: new Date().toISOString(), 
       };
     });
 
@@ -300,5 +303,3 @@ export async function fetchChannels(): Promise<Channel[]> {
     return []; 
   }
 }
-
-    
