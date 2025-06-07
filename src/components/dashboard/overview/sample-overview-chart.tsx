@@ -1,9 +1,9 @@
+
 'use client';
 
 import type { TimeSeriesData } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart"
 
 interface SampleOverviewChartProps {
@@ -29,13 +29,7 @@ export function SampleOverviewChart({ data }: SampleOverviewChartProps) {
   return (
     <div className="h-[300px] w-full">
       <ChartContainer config={chartConfig} className="w-full h-full">
-        <AreaChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-          <defs>
-            <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--color-volume)" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="var(--color-volume)" stopOpacity={0.1}/>
-            </linearGradient>
-          </defs>
+        <BarChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="date" 
@@ -53,18 +47,16 @@ export function SampleOverviewChart({ data }: SampleOverviewChartProps) {
             className="text-xs"
           />
           <ChartTooltip
-            cursor={false}
+            cursor={{fill: 'hsl(var(--accent) / 0.2)'}}
             content={<ChartTooltipContent indicator="dot" />}
           />
-          <Area
+          <Bar
             dataKey="value"
             name="Payment Volume (sats)"
-            type="monotone"
-            fill="url(#colorVolume)"
-            stroke="var(--color-volume)"
-            stackId="a"
+            fill="var(--color-volume)"
+            radius={[4, 4, 0, 0]} // Optional: rounds the top corners of the bars
           />
-        </AreaChart>
+        </BarChart>
       </ChartContainer>
     </div>
   );

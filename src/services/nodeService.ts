@@ -60,6 +60,7 @@ function mapChannelStatus(state: string | null | undefined): Channel['status'] {
   // Based on https://lightning.readthedocs.io/lightning-listpeers.7.html#states
   // And common c-lightning states
   const normalizedState = state.toUpperCase();
+  console.log(`Mapping channel state: ${normalizedState}`);
   switch (normalizedState) {
     // Pending states
     case 'OPENINGD':
@@ -79,8 +80,6 @@ function mapChannelStatus(state: string | null | undefined): Channel['status'] {
     case 'ONCHAIN':
       return 'inactive'; 
     default:
-      // If state is not recognized but implies an open channel, consider it active.
-      // This is a fallback, ideally all states should be mapped.
       if (normalizedState.includes("CHANNELD") || normalizedState.includes("DUALOPEND")) {
         console.warn(`Partially recognized channel state: ${state}, defaulting to active.`);
         return 'active';
@@ -178,7 +177,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
     console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalPaymentVolume. Returning empty time series.");
     return [];
   }
-  console.log(`Fetching historical payment volume from BigQuery, aggregated by ${aggregationPeriod}, last 10 periods...`);
+  console.log(`Fetching historical payment volume from BigQuery, aggregated by ${aggregationPeriod}, last 20 periods...`);
 
   let dateGroupingExpression = "";
   switch (aggregationPeriod.toLowerCase()) {
@@ -206,7 +205,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
       AND received_time IS NOT NULL
     GROUP BY date_group
     ORDER BY date_group DESC
-    LIMIT 10
+    LIMIT 20 
   `;
   
   try {
@@ -230,7 +229,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
         value: Math.floor(Number(row.total_volume_msat || 0) / 1000), 
       };
     }).filter(item => item !== null)
-      .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime()); // Sort ascending for chart
+      .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime()); 
     
     console.log(`Formatted and sorted historical payment volume for ${aggregationPeriod}:`, JSON.stringify(formattedAndSortedRows, null, 2));
     return formattedAndSortedRows as TimeSeriesData[];
@@ -250,13 +249,12 @@ export async function fetchChannels(): Promise<Channel[]> {
 
   const query = `
     SELECT
-      id,                  -- Peer's public key
-      funding_txid,
-      funding_outnum,
-      msatoshi_total,
-      msatoshi_to_us,
+      id,                  -- Peer's public key (as peerNodeId)
+      funding_txid,        -- Part of channel_id
+      funding_outnum,      -- Part of channel_id
+      msatoshi_total,      -- For capacity
+      msatoshi_to_us,      -- For localBalance
       state                -- Channel state
-      -- last_update is not in the provided schema for peers, will use current time.
     FROM \`${projectId}.${datasetId}.peers\`
     ORDER BY state, id
   `;
@@ -280,9 +278,10 @@ export async function fetchChannels(): Promise<Channel[]> {
       const localBalanceSats = Math.floor(msatToUs / 1000);
       const remoteBalanceSats = Math.floor((msatTotal - msatToUs) / 1000);
       
+      // Create a unique channel ID if funding_txid and funding_outnum are present
       const channelIdString = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
                         ? `${row.funding_txid}:${row.funding_outnum}` 
-                        : `peer-${row.id}-${Math.random().toString(36).substring(7)}`;
+                        : `peer-${row.id}-${Math.random().toString(36).substring(7)}`; // Fallback ID
 
       return {
         id: channelIdString, 
@@ -291,10 +290,9 @@ export async function fetchChannels(): Promise<Channel[]> {
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
         status: mapChannelStatus(row.state),
-        // Placeholders as these are not directly available in the peers table schema provided
-        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, 
-        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, 
-        lastUpdate: new Date().toISOString(), 
+        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, // Placeholder
+        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, // Placeholder
+        lastUpdate: new Date().toISOString(), // Placeholder, as not in schema
       };
     });
 
