@@ -12,6 +12,7 @@ import {
   fetchPeriodForwardingSummary,
   fetchPeriodChannelActivity
 } from '@/services/nodeService';
+import { summarizeRecentActivity, type SummarizeRecentActivityInput } from '@/ai/flows/summarize-recent-activity-flow';
 
 export default async function OverviewPage({ 
   searchParams 
@@ -28,8 +29,31 @@ export default async function OverviewPage({
   const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
   const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation);
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
-
   const currentAggregationLabel = aggregationPeriodOptions.find(opt => opt.value === currentAggregation)?.label.toLowerCase() || 'period';
+
+  let recentActivitySummaryText: string;
+  let recentActivityFetchError = false;
+
+  try {
+    const aiSummaryInput: SummarizeRecentActivityInput = {
+      aggregationPeriodLabel: currentAggregationLabel,
+      maxPaymentForwardedSats: forwardingSummary.maxPaymentForwardedSats,
+      totalFeesEarnedSats: forwardingSummary.totalFeesEarnedSats,
+      paymentsForwardedCount: forwardingSummary.paymentsForwardedCount,
+      channelsOpenedCount: channelActivity.openedCount,
+      channelsClosedCount: channelActivity.closedCount,
+    };
+    const summaryResult = await summarizeRecentActivity(aiSummaryInput);
+    recentActivitySummaryText = summaryResult.summaryText;
+  } catch (error) {
+    console.error("Error generating recent activity summary with AI:", error);
+    recentActivitySummaryText = "Failed to load AI-powered activity summary. Basic information: " +
+      `Largest payment: ${forwardingSummary.maxPaymentForwardedSats.toLocaleString()} sats. ` +
+      `Fees earned: ${forwardingSummary.totalFeesEarnedSats.toLocaleString()} sats. ` +
+      `Payments forwarded: ${forwardingSummary.paymentsForwardedCount.toLocaleString()}. ` +
+      `Channels opened: ${channelActivity.openedCount}, closed: ${channelActivity.closedCount}.`;
+    recentActivityFetchError = true;
+  }
 
   return (
     <div className="space-y-6">
@@ -64,35 +88,12 @@ export default async function OverviewPage({
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Recent Activity</CardTitle>
+            <CardTitle className="font-headline">Recent Activity Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            {forwardingSummary || channelActivity ? (
-              <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                <li>
-                  Largest payment forwarded in the last {currentAggregationLabel}: 
-                  <strong> {(forwardingSummary.maxPaymentForwardedSats || 0) > 0 ? forwardingSummary.maxPaymentForwardedSats.toLocaleString() + ' sats' : 'None'}</strong>
-                </li>
-                <li>
-                  Total fees earned in the last {currentAggregationLabel}: 
-                  <strong> {(forwardingSummary.totalFeesEarnedSats || 0).toLocaleString()} sats</strong>
-                </li>
-                <li>
-                  Payments forwarded in the last {currentAggregationLabel}: 
-                  <strong> {(forwardingSummary.paymentsForwardedCount || 0).toLocaleString()}</strong>
-                </li>
-                <li>
-                  Channels opened in the last {currentAggregationLabel}: 
-                  <strong> {(channelActivity.openedCount || 0).toLocaleString()}</strong>
-                </li>
-                <li>
-                  Channels closed in the last {currentAggregationLabel}: 
-                  <strong> {(channelActivity.closedCount || 0).toLocaleString()}</strong>
-                </li>
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">No recent activity data available for this period, or an error occurred.</p>
-            )}
+            <p className={`text-sm ${recentActivityFetchError ? 'text-orange-600' : 'text-muted-foreground'}`}>
+              {recentActivitySummaryText}
+            </p>
           </CardContent>
         </Card>
         <Card>
