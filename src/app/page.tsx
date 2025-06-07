@@ -6,7 +6,12 @@ import { SampleOverviewChart } from '@/components/dashboard/overview/sample-over
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data'; 
-import { fetchKeyMetrics, fetchHistoricalPaymentVolume } from '@/services/nodeService';
+import { 
+  fetchKeyMetrics, 
+  fetchHistoricalPaymentVolume,
+  fetchPeriodForwardingSummary,
+  fetchPeriodChannelActivity
+} from '@/services/nodeService';
 
 export default async function OverviewPage({ 
   searchParams 
@@ -14,13 +19,17 @@ export default async function OverviewPage({
   searchParams?: { aggregation?: string } 
 }) {
   
-  let currentAggregation = searchParams?.aggregation || 'day'; // Default to 'day'
+  let currentAggregation = searchParams?.aggregation || 'day'; 
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'day'; // Default if invalid aggregation period is provided
+    currentAggregation = 'day'; 
   }
 
   const keyMetrics = await fetchKeyMetrics();
   const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
+  const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation);
+  const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
+
+  const currentAggregationLabel = aggregationPeriodOptions.find(opt => opt.value === currentAggregation)?.label.toLowerCase() || 'period';
 
   return (
     <div className="space-y-6">
@@ -58,12 +67,32 @@ export default async function OverviewPage({
             <CardTitle className="font-headline">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Display a feed of recent node activities or important events here.</p>
-            <ul className="mt-2 space-y-1 text-sm">
-              <li>Channel opened with 02_new_peer_node_id (Capacity: 2M sats)</li>
-              <li>Successfully forwarded payment of 500k sats</li>
-              <li>Node uptime back to 100% after brief maintenance</li>
-            </ul>
+            {forwardingSummary || channelActivity ? (
+              <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                <li>
+                  Largest payment forwarded in the last {currentAggregationLabel}: 
+                  <strong> {(forwardingSummary.maxPaymentForwardedSats || 0) > 0 ? forwardingSummary.maxPaymentForwardedSats.toLocaleString() + ' sats' : 'None'}</strong>
+                </li>
+                <li>
+                  Total fees earned in the last {currentAggregationLabel}: 
+                  <strong> {(forwardingSummary.totalFeesEarnedSats || 0).toLocaleString()} sats</strong>
+                </li>
+                <li>
+                  Payments forwarded in the last {currentAggregationLabel}: 
+                  <strong> {(forwardingSummary.paymentsForwardedCount || 0).toLocaleString()}</strong>
+                </li>
+                <li>
+                  Channels opened in the last {currentAggregationLabel}: 
+                  <strong> {(channelActivity.openedCount || 0).toLocaleString()}</strong>
+                </li>
+                <li>
+                  Channels closed in the last {currentAggregationLabel}: 
+                  <strong> {(channelActivity.closedCount || 0).toLocaleString()}</strong>
+                </li>
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">No recent activity data available for this period, or an error occurred.</p>
+            )}
           </CardContent>
         </Card>
         <Card>

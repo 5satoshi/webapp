@@ -3,7 +3,7 @@
 
 import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
-import { format, startOfWeek, startOfMonth, startOfQuarter, subDays, subWeeks, subMonths, subQuarters } from 'date-fns';
+import { format, startOfWeek, startOfMonth, startOfQuarter, endOfDay, endOfWeek, endOfMonth, endOfQuarter } from 'date-fns';
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
@@ -140,34 +140,24 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   `;
   
   try {
-    // console.log("Executing paymentsQuery:", paymentsQuery);
     const [paymentsJob] = await bigquery.createQueryJob({ query: paymentsQuery });
     const [[paymentsResult]] = await paymentsJob.getQueryResults();
-    // console.log("Raw paymentsResult:", JSON.stringify(paymentsResult));
-
-    // console.log("Executing feesQuery:", feesQuery);
+    
     const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
     const [[feesResult]] = await feesJob.getQueryResults();
-    // console.log("Raw feesResult:", JSON.stringify(feesResult));
 
-    // console.log("Executing activeChannelsQuery:", activeChannelsQuery);
     const [activeChannelsJob] = await bigquery.createQueryJob({ query: activeChannelsQuery });
     const [[activeChannelsResult]] = await activeChannelsJob.getQueryResults();
-    // console.log("Raw activeChannelsResult:", JSON.stringify(activeChannelsResult));
     
-    // console.log("Executing connectedPeersQuery:", connectedPeersQuery);
     const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
     const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
-    // console.log("Raw connectedPeersResult:", JSON.stringify(connectedPeersResult));
-    
+        
     const totalPayments = Number(paymentsResult?.total_payments || 0);
     const totalFeesMsat = Number(feesResult?.total_fees_msat || 0);
     const activeChannels = Number(activeChannelsResult?.active_channels || 0);
     const connectedPeers = Number(connectedPeersResult?.connected_peers || 0);
 
     const totalFeesSats = Math.floor(totalFeesMsat / 1000);
-
-    // console.log("Processed Key Metrics:", { totalPayments, totalFeesSats, activeChannels, connectedPeers });
 
     return [
       { id: 'payments', title: 'Total Payments Processed', value: totalPayments.toLocaleString(), iconName: 'Zap' },
@@ -192,12 +182,11 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
     console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalPaymentVolume. Returning empty time series.");
     return [];
   }
-  // console.log(`Fetching historical payment volume from BigQuery, aggregated by ${aggregationPeriod}, last 20 periods...`);
 
   let dateGroupingExpression = "";
   switch (aggregationPeriod.toLowerCase()) {
     case 'week':
-      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))"; // Explicitly start week on Monday
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))";
       break;
     case 'month':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
@@ -225,10 +214,8 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
   `;
   
   try {
-    // console.log(`Executing historicalPaymentVolume query for ${aggregationPeriod}:`, query);
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
-    // console.log(`Raw historicalPaymentVolume rows for ${aggregationPeriod}:`, JSON.stringify(rows, null, 2));
 
     if (!rows || rows.length === 0) {
         console.log(`No historical payment volume data returned from BigQuery for aggregation: ${aggregationPeriod}`);
@@ -242,13 +229,12 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
       }
       return {
         date: formatDateFromBQ(row.date_group), 
-        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, // Convert msats to BTC (1 BTC = 100,000,000 sats = 100,000,000,000 msats)
+        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, 
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
       .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime()); 
     
-    // console.log(`Formatted and sorted historical payment volume for ${aggregationPeriod}:`, JSON.stringify(formattedAndSortedRows, null, 2));
     return formattedAndSortedRows as TimeSeriesData[];
 
   } catch (error) {
@@ -262,11 +248,10 @@ export async function fetchChannels(): Promise<Channel[]> {
     console.error("BigQuery client not initialized or datasetId missing for fetchChannels. Returning empty channel list.");
     return [];
   }
-  // console.log(`Fetching channels from BigQuery 'peers' table...`);
 
   const query = `
     SELECT
-      id,                  -- Peer's public key (as peerNodeId)
+      id,
       funding_txid,        
       funding_outnum,      
       msatoshi_total,      
@@ -277,10 +262,8 @@ export async function fetchChannels(): Promise<Channel[]> {
   `;
 
   try {
-    // console.log("Executing channels query on 'peers' table:", query);
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
-    // console.log("Raw channels rows from 'peers' table:", JSON.stringify(rows, null, 2));
 
     if (!rows || rows.length === 0) {
         console.log("No channel data returned from BigQuery 'peers' table.");
@@ -297,7 +280,8 @@ export async function fetchChannels(): Promise<Channel[]> {
       
       const channelIdString = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
                         ? `${row.funding_txid}:${row.funding_outnum}` 
-                        : `peer-${row.id}-${Math.random().toString(36).substring(7)}`; 
+                        : `peer-${row.id || 'unknown'}-${Math.random().toString(36).substring(2, 9)}`;
+
 
       return {
         id: channelIdString, 
@@ -318,3 +302,140 @@ export async function fetchChannels(): Promise<Channel[]> {
   }
 }
 
+function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
+  const now = new Date();
+  let startOfPeriod: Date;
+  let endOfPeriod: Date = endOfDay(now); // Default to end of current day
+
+  switch (aggregationPeriod.toLowerCase()) {
+    case 'day':
+      startOfPeriod = now; // Start of current day (beginning of day)
+      // endOfPeriod is already end of current day
+      break;
+    case 'week':
+      startOfPeriod = startOfWeek(now, { weekStartsOn: 1 }); // Assuming week starts on Monday
+      endOfPeriod = endOfWeek(now, { weekStartsOn: 1 });
+      break;
+    case 'month':
+      startOfPeriod = startOfMonth(now);
+      endOfPeriod = endOfMonth(now);
+      break;
+    case 'quarter':
+      startOfPeriod = startOfQuarter(now);
+      endOfPeriod = endOfQuarter(now);
+      break;
+    default: 
+      startOfPeriod = now; // Default to current day
+      break;
+  }
+  // Format for BigQuery TIMESTAMP
+  return { 
+    startDate: format(startOfPeriod, "yyyy-MM-dd'T'00:00:00"), 
+    endDate: format(endOfPeriod, "yyyy-MM-dd'T'23:59:59") 
+  };
+}
+
+export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; paymentsForwardedCount: number; }> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchPeriodForwardingSummary.");
+    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, paymentsForwardedCount: 0 };
+  }
+  
+  const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
+  // console.log(`Fetching forwarding summary for period: ${startDate} to ${endDate}`);
+
+  const query = `
+    SELECT
+      MAX(out_msat) as max_payment_msat,
+      SUM(fee_msat) as total_fees_msat,
+      COUNT(*) as payments_count
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+      AND received_time >= TIMESTAMP(@startDate)
+      AND received_time <= TIMESTAMP(@endDate)
+  `;
+
+  const options = {
+    query: query,
+    params: { startDate: startDate, endDate: endDate }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+    // console.log("Raw forwarding summary rows:", JSON.stringify(rows));
+    const result = rows[0] || {};
+
+    return {
+      maxPaymentForwardedSats: Math.floor(Number(result.max_payment_msat || 0) / 1000),
+      totalFeesEarnedSats: Math.floor(Number(result.total_fees_msat || 0) / 1000),
+      paymentsForwardedCount: Number(result.payments_count || 0),
+    };
+  } catch (error) {
+    logBigQueryError(`fetchPeriodForwardingSummary (aggregation: ${aggregationPeriod})`, error);
+    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, paymentsForwardedCount: 0 };
+  }
+}
+
+export async function fetchPeriodChannelActivity(aggregationPeriod: string): Promise<{ openedCount: number; closedCount: number; }> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchPeriodChannelActivity.");
+    return { openedCount: 0, closedCount: 0 };
+  }
+
+  const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
+  // console.log(`Fetching channel activity for period: ${startDate} to ${endDate}`);
+
+
+  const openingOrActiveStates = [
+    'OPENINGD', 'CHANNELD_AWAITING_LOCKIN', 'DUALOPEND_OPEN_INIT', 
+    'DUALOPEND_AWAITING_LOCKIN', 'CHANNELD_NORMAL', 'DUALOPEND_NORMAL'
+  ];
+  const closingOrClosedStates = [
+    'CHANNELD_SHUTTING_DOWN', 'CLOSINGD_SIGEXCHANGE', 'CLOSINGD_COMPLETE', 
+    'AWAITING_UNILATERAL', 'FUNDING_SPEND_SEEN', 'ONCHAIN', 'CLOSED'
+  ];
+
+  const query = `
+    WITH ChannelStateChangesInPeriod AS (
+      SELECT
+        p.id as peer_id, 
+        p.funding_txid,
+        p.funding_outnum,
+        change.timestamp as change_timestamp,
+        change.new_state
+      FROM
+        \`${projectId}.${datasetId}.peers\` p,
+        UNNEST(p.state_changes) AS change
+      WHERE change.timestamp >= TIMESTAMP(@startDate) AND change.timestamp <= TIMESTAMP(@endDate)
+    )
+    SELECT
+      (SELECT COUNT(DISTINCT CONCAT(csc.funding_txid, ':', CAST(csc.funding_outnum AS STRING))) FROM ChannelStateChangesInPeriod csc WHERE csc.new_state IN UNNEST(@openingOrActiveStates)) as opened_count,
+      (SELECT COUNT(DISTINCT CONCAT(csc.funding_txid, ':', CAST(csc.funding_outnum AS STRING))) FROM ChannelStateChangesInPeriod csc WHERE csc.new_state IN UNNEST(@closingOrClosedStates)) as closed_count
+  `;
+  
+  const options = {
+    query: query,
+    params: { 
+      startDate: startDate, 
+      endDate: endDate,
+      openingOrActiveStates: openingOrActiveStates,
+      closingOrClosedStates: closingOrClosedStates
+    }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+    // console.log("Raw channel activity rows:", JSON.stringify(rows));
+    const result = rows[0] || {};
+    
+    return {
+      openedCount: Number(result.opened_count || 0),
+      closedCount: Number(result.closed_count || 0),
+    };
+  } catch (error) {
+    logBigQueryError(`fetchPeriodChannelActivity (aggregation: ${aggregationPeriod})`, error);
+    return { openedCount: 0, closedCount: 0 };
+  }
+}
