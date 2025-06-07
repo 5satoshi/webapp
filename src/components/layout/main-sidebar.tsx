@@ -12,9 +12,8 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { LayoutDashboard, Users, BarChart3, Lightbulb, Bell, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Lightbulb, Bell } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -52,22 +51,7 @@ export function MainSidebar() {
       </SidebarContent>
       <Separator className="my-2" />
       <SidebarFooter className="p-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <Link href="/settings" passHref legacyBehavior>
-              <SidebarMenuButton tooltip="Settings" className="w-full justify-start">
-                <Settings className="h-5 w-5" />
-                <span>Settings</span>
-              </SidebarMenuButton>
-            </Link>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-             <SidebarMenuButton tooltip="Logout" className="w-full justify-start">
-                <LogOut className="h-5 w-5" />
-                <span>Logout</span>
-              </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {/* Settings and Logout items removed */}
       </SidebarFooter>
     </Sidebar>
   );
