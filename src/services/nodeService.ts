@@ -3,7 +3,7 @@
 
 import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
-import { format, startOfWeek, startOfMonth, startOfQuarter, endOfDay, endOfWeek, endOfMonth, endOfQuarter } from 'date-fns';
+import { format, startOfWeek, startOfMonth, startOfQuarter, endOfDay, endOfWeek, endOfMonth, endOfQuarter, parseISO } from 'date-fns';
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
@@ -24,7 +24,6 @@ function logBigQueryError(context: string, error: any) {
   if (error.message.includes("Could not refresh access token")) {
     console.error("This 'Could not refresh access token' error often indicates an issue with the service account credentials (GOOGLE_APPLICATION_CREDENTIALS), its permissions (IAM roles for BigQuery), or that the BigQuery API is not enabled for the project.");
   }
-  // console.error('Full Error Stack:', error.stack);
 }
 
 
@@ -37,7 +36,6 @@ try {
 }
 
 function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | string | Date | { value: string }): string {
-  // console.log("formatDateFromBQ received:", JSON.stringify(timestamp));
   if (!timestamp) {
     console.warn("formatDateFromBQ received null or undefined timestamp. Returning today's date as fallback.");
     return format(new Date(), 'yyyy-MM-dd');
@@ -47,16 +45,16 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
 
   if (typeof (timestamp as { value: string }).value === 'string') {
     const bqValue = (timestamp as { value: string }).value;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) { // Matches 'YYYY-MM-DD'
-        dateToFormat = new Date(bqValue + 'T00:00:00Z'); // Assume UTC if only date
+    if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) { 
+        dateToFormat = parseISO(bqValue + 'T00:00:00Z'); // Assume UTC if only date
     } else {
-        dateToFormat = new Date(bqValue); // Standard ISO string
+        dateToFormat = parseISO(bqValue); // Standard ISO string
     }
   } else if (typeof timestamp === 'string') {
-     if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) { // Matches 'YYYY-MM-DD'
-        dateToFormat = new Date(timestamp + 'T00:00:00Z'); // Assume UTC
+     if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) { 
+        dateToFormat = parseISO(timestamp + 'T00:00:00Z'); // Assume UTC
     } else {
-        dateToFormat = new Date(timestamp);
+        dateToFormat = parseISO(timestamp);
     }
   } else if (timestamp instanceof Date) {
     dateToFormat = timestamp;
@@ -76,30 +74,25 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
 function mapChannelStatus(state: string | null | undefined): Channel['status'] {
   if (!state) return 'inactive';
   const normalizedState = state.toUpperCase();
-  // console.log(`Mapping channel state: ${normalizedState}`);
   switch (normalizedState) {
-    // Active states from c-lightning listpeers RPC
-    case 'CHANNELD_NORMAL': // Normal operational state
-    case 'DUALOPEND_NORMAL': // Normal state for dual-funded channels
+    case 'CHANNELD_NORMAL': 
+    case 'DUALOPEND_NORMAL': 
       return 'active';
-    // Pending states
-    case 'OPENINGD': // Channel opening negotiation not yet complete
-    case 'CHANNELD_AWAITING_LOCKIN': // Channel opened, waiting for lock-in on-chain
-    case 'DUALOPEND_OPEN_INIT': // Initial state for dual-funded channel opening
-    case 'DUALOPEND_AWAITING_LOCKIN': // Dual-funded channel opened, waiting for lock-in
+    case 'OPENINGD': 
+    case 'CHANNELD_AWAITING_LOCKIN': 
+    case 'DUALOPEND_OPEN_INIT': 
+    case 'DUALOPEND_AWAITING_LOCKIN': 
       return 'pending';
-    // Inactive/Closing states
-    case 'CHANNELD_SHUTTING_DOWN': // Channel is in the process of shutting down
-    case 'CLOSINGD_SIGEXCHANGE': // Closing, exchanging signatures
-    case 'CLOSINGD_COMPLETE': // Closing complete, waiting for on-chain settlement
-    case 'AWAITING_UNILATERAL': // Waiting for a unilateral close to resolve
-    case 'FUNDING_SPEND_SEEN': // A transaction spending the funding output has been seen
-    case 'ONCHAIN': // Channel is closed and settled on-chain
-    case 'DISCONNECTED': // Peer is disconnected
-    case 'CLOSED': // Generic closed state
+    case 'CHANNELD_SHUTTING_DOWN': 
+    case 'CLOSINGD_SIGEXCHANGE': 
+    case 'CLOSINGD_COMPLETE': 
+    case 'AWAITING_UNILATERAL': 
+    case 'FUNDING_SPEND_SEEN': 
+    case 'ONCHAIN': 
+    case 'DISCONNECTED': 
+    case 'CLOSED': 
       return 'inactive';
     default:
-      // console.warn(`Unknown channel state: ${state}, defaulting to inactive.`);
       return 'inactive';
   }
 }
@@ -115,8 +108,6 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
         { id: 'connected_peers', title: 'Connected Peers', value: 'N/A', iconName: 'Users' },
     ];
   }
-
-  // console.log(`Fetching key metrics from BigQuery...`);
 
   const paymentsQuery = `
     SELECT COUNT(*) as total_payments
@@ -218,13 +209,11 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
     const [rows] = await job.getQueryResults();
 
     if (!rows || rows.length === 0) {
-        console.log(`No historical payment volume data returned from BigQuery for aggregation: ${aggregationPeriod}`);
         return [];
     }
 
     const formattedAndSortedRows = rows.map(row => {
       if (!row || row.date_group === null || row.date_group === undefined) {
-        console.warn("Skipping row with null/undefined date_group in historical payment volume:", JSON.stringify(row));
         return null; 
       }
       return {
@@ -266,7 +255,6 @@ export async function fetchChannels(): Promise<Channel[]> {
     const [rows] = await job.getQueryResults();
 
     if (!rows || rows.length === 0) {
-        console.log("No channel data returned from BigQuery 'peers' table.");
         return [];
     }
 
@@ -290,9 +278,9 @@ export async function fetchChannels(): Promise<Channel[]> {
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
         status: mapChannelStatus(row.state),
-        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, // Placeholder
-        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, // Placeholder
-        lastUpdate: new Date().toISOString(), // Placeholder
+        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, 
+        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, 
+        lastUpdate: new Date().toISOString(), 
       };
     });
 
@@ -305,15 +293,14 @@ export async function fetchChannels(): Promise<Channel[]> {
 function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
   let startOfPeriod: Date;
-  let endOfPeriod: Date = endOfDay(now); // Default to end of current day
+  let endOfPeriod: Date = endOfDay(now); 
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'day':
-      startOfPeriod = now; // Start of current day (beginning of day)
-      // endOfPeriod is already end of current day
+      startOfPeriod = now; 
       break;
     case 'week':
-      startOfPeriod = startOfWeek(now, { weekStartsOn: 1 }); // Assuming week starts on Monday
+      startOfPeriod = startOfWeek(now, { weekStartsOn: 1 }); 
       endOfPeriod = endOfWeek(now, { weekStartsOn: 1 });
       break;
     case 'month':
@@ -325,10 +312,9 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
       endOfPeriod = endOfQuarter(now);
       break;
     default: 
-      startOfPeriod = now; // Default to current day
+      startOfPeriod = now; 
       break;
   }
-  // Format for BigQuery TIMESTAMP
   return { 
     startDate: format(startOfPeriod, "yyyy-MM-dd'T'00:00:00"), 
     endDate: format(endOfPeriod, "yyyy-MM-dd'T'23:59:59") 
@@ -342,7 +328,6 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
   }
   
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
-  // console.log(`Fetching forwarding summary for period: ${startDate} to ${endDate}`);
 
   const query = `
     SELECT
@@ -363,7 +348,6 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
   try {
     const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
-    // console.log("Raw forwarding summary rows:", JSON.stringify(rows));
     const result = rows[0] || {};
 
     return {
@@ -384,8 +368,6 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
   }
 
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
-  // console.log(`Fetching channel activity for period: ${startDate} to ${endDate}`);
-
 
   const openingOrActiveStates = [
     'OPENINGD', 'CHANNELD_AWAITING_LOCKIN', 'DUALOPEND_OPEN_INIT', 
@@ -402,12 +384,12 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
         p.id as peer_id, 
         p.funding_txid,
         p.funding_outnum,
-        change.timestamp as change_timestamp,
+        TIMESTAMP(change.timestamp) as change_timestamp, -- Cast to TIMESTAMP
         change.new_state
       FROM
         \`${projectId}.${datasetId}.peers\` p,
         UNNEST(p.state_changes) AS change
-      WHERE change.timestamp >= TIMESTAMP(@startDate) AND change.timestamp <= TIMESTAMP(@endDate)
+      WHERE TIMESTAMP(change.timestamp) >= TIMESTAMP(@startDate) AND TIMESTAMP(change.timestamp) <= TIMESTAMP(@endDate) -- Cast to TIMESTAMP
     )
     SELECT
       (SELECT COUNT(DISTINCT CONCAT(csc.funding_txid, ':', CAST(csc.funding_outnum AS STRING))) FROM ChannelStateChangesInPeriod csc WHERE csc.new_state IN UNNEST(@openingOrActiveStates)) as opened_count,
@@ -427,7 +409,6 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
   try {
     const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
-    // console.log("Raw channel activity rows:", JSON.stringify(rows));
     const result = rows[0] || {};
     
     return {
