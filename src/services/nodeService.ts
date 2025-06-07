@@ -1,3 +1,4 @@
+
 'use server';
 
 import type { KeyMetric, TimeSeriesData } from '@/lib/types';
@@ -25,6 +26,10 @@ if (projectId && datasetId) {
 // Helper to convert BigQueryTimestamp to 'YYYY-MM-DD' string
 function formatDateFromBQ(timestamp: BigQueryTimestamp | string | Date): string {
   if (typeof timestamp === 'string' || timestamp instanceof Date) {
+    // If it's already a string like 'YYYY-MM-DD' or a Date object
+     if (typeof timestamp === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+        return timestamp;
+    }
     return format(new Date(timestamp), 'yyyy-MM-dd');
   }
   // Assuming BigQueryTimestamp has a 'value' property which is a string like '2023-10-27T10:30:00.000Z'
@@ -134,19 +139,16 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
   }
 
   // --- Historical Payment Volume ---
-  // Assumes `forwardings` table with `received_time` (Unix timestamp) and `out_msatoshi` (forwarded amount in msat)
+  // Assumes `forwardings` table with `received_time` (TIMESTAMP) and `out_msatoshi` (forwarded amount in msat)
   // Fetches data for the last 30 days.
-  // IMPORTANT: `received_time` is assumed to be a UNIX timestamp (seconds). If it's a different format,
-  // the `TIMESTAMP_SECONDS(CAST(received_time AS INT64))` part needs adjustment.
-  // If `received_time` is already a TIMESTAMP type in BigQuery, you can use `DATE(received_time)`.
   const query = `
     SELECT
-      DATE(TIMESTAMP_SECONDS(CAST(received_time AS INT64))) AS day,
+      DATE(received_time) AS day,
       SUM(out_msatoshi) AS total_volume_msat
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
-      AND received_time IS NOT NULL # Ensure timestamp is not null
-      AND TIMESTAMP_SECONDS(CAST(received_time AS INT64)) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+      AND received_time IS NOT NULL
+      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
     GROUP BY day
     ORDER BY day ASC
   `;
@@ -156,7 +158,7 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
     const [rows] = await job.getQueryResults();
 
     return rows.map(row => ({
-      date: formatDateFromBQ(row.day), // row.day should be a BigQuery Date object or similar
+      date: formatDateFromBQ(row.day), 
       value: Math.floor(Number(row.total_volume_msat) / 1000), // Convert msat to sat
     }));
 
@@ -165,3 +167,4 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
     return []; // Return empty array on error
   }
 }
+
