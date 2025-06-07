@@ -139,12 +139,12 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
   }
 
   // --- Historical Payment Volume ---
-  // Assumes `forwardings` table with `received_time` (TIMESTAMP) and `out_msatoshi` (forwarded amount in msat)
+  // Assumes `forwardings` table with `received_time` (TIMESTAMP) and `out_msat` (forwarded amount in msat)
   // Fetches data for the last 30 days.
   const query = `
     SELECT
       DATE(received_time) AS day,
-      SUM(out_msatoshi) AS total_volume_msat
+      SUM(out_msat) AS total_volume_msat
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
       AND received_time IS NOT NULL
