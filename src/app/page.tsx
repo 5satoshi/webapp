@@ -30,34 +30,42 @@ export default async function OverviewPage({
   const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
   const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation);
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
-  const currentAggregationLabel = aggregationPeriodOptions.find(opt => opt.value === currentAggregation)?.label.toLowerCase() || 'period';
+  
+  const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
+  let singularAggregationLabel = 'Period'; // Default
+  if (selectedOption) {
+    // Creates singular form like "Day" from "Days"
+    singularAggregationLabel = selectedOption.label.endsWith('s') && selectedOption.label.length > 1 
+      ? selectedOption.label.slice(0, -1) 
+      : selectedOption.label;
+  }
 
 
   const periodMetrics: KeyMetric[] = [
     {
       id: 'max_payment_period',
-      title: `Max Payment Forwarded (last ${currentAggregationLabel})`,
+      title: `Max Payment Forwarded (last ${singularAggregationLabel})`,
       displayValue: (forwardingSummary.maxPaymentForwardedSats / 100000000).toFixed(3),
       unit: 'BTC',
       iconName: 'BarChart3',
     },
     {
       id: 'fees_earned_period',
-      title: `Fees Earned (last ${currentAggregationLabel})`,
+      title: `Fees Earned (last ${singularAggregationLabel})`,
       displayValue: forwardingSummary.totalFeesEarnedSats.toLocaleString(),
       unit: 'sats',
       iconName: 'Activity',
     },
     {
       id: 'payments_forwarded_period',
-      title: `Payments Forwarded (last ${currentAggregationLabel})`,
+      title: `Payments Forwarded (last ${singularAggregationLabel})`,
       displayValue: forwardingSummary.paymentsForwardedCount.toLocaleString(),
       unit: 'Payments',
       iconName: 'Zap',
     },
     {
       id: 'channel_changes_period',
-      title: `Channel Changes (last ${currentAggregationLabel})`,
+      title: `Channel Changes (last ${singularAggregationLabel})`,
       displayValue: `${channelActivity.openedCount} / ${channelActivity.closedCount}`,
       unit: 'Opened / Closed',
       iconName: 'Network',
