@@ -1,10 +1,12 @@
 import { PageTitle } from '@/components/ui/page-title';
 import { ChannelListTable } from '@/components/dashboard/channels/channel-list-table';
-import { mockChannels } from '@/lib/mock-data';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { fetchChannels } from '@/services/nodeService';
 
-export default function ChannelsPage() {
+export default async function ChannelsPage() {
+  const channels = await fetchChannels();
+
   return (
     <div className="space-y-6">
       <PageTitle title="Channel Management" description="Monitor and manage your Lightning Network channels.">
@@ -12,7 +14,7 @@ export default function ChannelsPage() {
           <PlusCircle className="mr-2 h-4 w-4" /> Open New Channel
         </Button>
       </PageTitle>
-      <ChannelListTable channels={mockChannels} />
+      <ChannelListTable channels={channels} />
     </div>
   );
 }

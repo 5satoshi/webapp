@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp } from '@google-cloud/bigquery';
 import { format } from 'date-fns';
 
@@ -168,3 +168,79 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
   }
 }
 
+// Maps c-lightning channel states to simplified statuses
+function mapChannelStatus(state: string): Channel['status'] {
+  // Based on c-lightning states
+  if (state === 'CHANNELD_NORMAL') {
+    return 'active';
+  }
+  if (['CHANNELD_AWAITING_LOCKIN', 'DUALOPEND_AWAITING_LOCKIN', 'OPENINGD'].includes(state)) {
+    return 'pending';
+  }
+  // Consider other states like 'CLOSINGD_SIGEXCHANGE', 'CLOSINGD_COMPLETE', 'ONCHAIN' as inactive
+  return 'inactive';
+}
+
+export async function fetchChannels(): Promise<Channel[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing. Returning empty channel list.");
+    return [];
+  }
+
+  // Assumes 'channels' table with c-lightning like fields
+  // 'id' here is assumed to be the unique channel identifier (e.g., channel_id hex)
+  // 'state' is the c-lightning channel state string
+  // 'msatoshi_total', 'msatoshi_to_us'
+  const query = `
+    SELECT
+      id, 
+      peer_id AS peerNodeId,
+      msatoshi_total,
+      msatoshi_to_us,
+      state,
+      -- Additional fields like short_channel_id could be queried if needed for display
+      FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', CURRENT_TIMESTAMP()) as retrieved_at 
+      -- last_update from the source would be better if available
+    FROM \`${projectId}.${datasetId}.channels\`
+    ORDER BY state, peer_id
+  `;
+
+  try {
+    const [job] = await bigquery.createQueryJob({ query: query });
+    const [rows] = await job.getQueryResults();
+
+    return rows.map(row => {
+      const status = mapChannelStatus(row.state);
+      const capacity = Math.floor(Number(row.msatoshi_total) / 1000);
+      const localBalance = Math.floor(Number(row.msatoshi_to_us) / 1000);
+      const remoteBalance = capacity - localBalance; // Simplified calculation
+
+      // Placeholders for uptime and success rate
+      let uptime = 0;
+      let historicalPaymentSuccessRate = 0;
+      if (status === 'active') {
+        uptime = 100; // Placeholder
+        historicalPaymentSuccessRate = 99; // Placeholder
+      } else if (status === 'pending') {
+        uptime = 50; // Placeholder
+      }
+
+
+      return {
+        id: row.id, // Ensure this is a string
+        peerNodeId: row.peerNodeId,
+        capacity: capacity,
+        localBalance: localBalance,
+        remoteBalance: remoteBalance,
+        status: status,
+        uptime: uptime, 
+        historicalPaymentSuccessRate: historicalPaymentSuccessRate,
+        lastUpdate: row.retrieved_at, // Using retrieval time as placeholder for lastUpdate
+      };
+    });
+
+  } catch (error) {
+    console.error("Error fetching channels from BigQuery:", error);
+    return []; // Return empty array on error
+  }
+}
