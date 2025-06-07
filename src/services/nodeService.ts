@@ -5,54 +5,54 @@ import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp } from '@google-cloud/bigquery';
 import { format } from 'date-fns';
 
-// Ensure these environment variables are set in your .env file or deployment environment
-const projectId = process.env.BIGQUERY_PROJECT_ID;
-const datasetId = process.env.BIGQUERY_DATASET_ID;
+const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
+const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
 
 let bigquery: BigQuery | undefined;
 
 if (projectId && datasetId) {
   try {
+    console.log(`Initializing BigQuery client with projectId: ${projectId}`);
     bigquery = new BigQuery({ projectId });
+    console.log("BigQuery client initialized successfully.");
   } catch (error) {
     console.error("Failed to initialize BigQuery client:", error);
-    // Depending on your error handling strategy, you might want to throw here
-    // or allow the app to continue with other services potentially failing.
   }
 } else {
-  console.warn("BIGQUERY_PROJECT_ID or BIGQUERY_DATASET_ID is not set. BigQuery functionality will be disabled.");
+  console.warn("BIGQUERY_PROJECT_ID or BIGQUERY_DATASET_ID is not set in environment variables. Using hardcoded fallback values. BigQuery functionality might be impaired if these are incorrect.");
 }
 
-// Helper to convert BigQueryTimestamp to 'YYYY-MM-DD' string
-function formatDateFromBQ(timestamp: BigQueryTimestamp | string | Date): string {
-  if (typeof timestamp === 'string' || timestamp instanceof Date) {
-    // If it's already a string like 'YYYY-MM-DD' or a Date object
-     if (typeof timestamp === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+function formatDateFromBQ(timestamp: BigQueryTimestamp | string | Date | { value: string }): string {
+  console.log("formatDateFromBQ received:", timestamp);
+  if (typeof timestamp === 'string') {
+    // If it's already a string like 'YYYY-MM-DD'
+    if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
         return timestamp;
     }
+    // Otherwise, assume it's a full timestamp string
     return format(new Date(timestamp), 'yyyy-MM-dd');
   }
-  // Assuming BigQueryTimestamp has a 'value' property which is a string like '2023-10-27T10:30:00.000Z'
-  // or a Date object. The exact structure might vary based on how BQ returns it.
-  // Adjust if necessary based on the actual type of `timestamp.value`.
-  if (timestamp && typeof timestamp.value === 'string') {
-     // If the value is already in YYYY-MM-DD format from a DATE type in BQ
-    if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp.value)) {
-        return timestamp.value;
-    }
-    // Otherwise, parse it as a full timestamp
-    return format(new Date(timestamp.value), 'yyyy-MM-dd');
+  if (timestamp instanceof Date) {
+    return format(timestamp, 'yyyy-MM-dd');
   }
-  // Fallback for unexpected format
-  console.warn("Unexpected BigQueryTimestamp format:", timestamp);
-  return format(new Date(), 'yyyy-MM-dd'); // Default to today if formatting fails
+  // Handling BigQueryTimestamp or similar objects with a 'value' property
+  if (timestamp && typeof (timestamp as { value: string }).value === 'string') {
+    const dateValue = (timestamp as { value: string }).value;
+     // If the value is already in YYYY-MM-DD format from a DATE type in BQ
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        return dateValue;
+    }
+    // Otherwise, parse it as a full timestamp string
+    return format(new Date(dateValue), 'yyyy-MM-dd');
+  }
+  console.warn("Unexpected date format in formatDateFromBQ. Received:", timestamp, "Returning today's date as fallback.");
+  return format(new Date(), 'yyyy-MM-dd');
 }
 
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing. Returning empty metrics.");
-    // Fallback to empty or mock data if BigQuery is not configured
+    console.error("BigQuery client not initialized or datasetId missing for fetchKeyMetrics. Returning empty metrics.");
     return [
         { id: 'payments', title: 'Total Payments Processed', value: 'N/A', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 'N/A', iconName: 'Activity' },
@@ -61,33 +61,23 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     ];
   }
 
-  // --- Total Payments Processed ---
-  // Assumes `forwardings` table with `status` column ('settled', 'failed', etc.)
+  console.log(`Fetching key metrics from BigQuery: ${projectId}.${datasetId}`);
+
   const paymentsQuery = `
     SELECT COUNT(*) as total_payments
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
-
-  // --- Forwarding Fees Earned (sats) ---
-  // Assumes `forwardings` table with `fee_msat` column (in millisatoshis)
   const feesQuery = `
     SELECT SUM(fee_msat) as total_fees_msat
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
-
-  // --- Active Channels ---
-  // Assumes `channels` table with `state` column (e.g., 'CHANNELD_NORMAL' for active in c-lightning)
-  // Adjust 'CHANNELD_NORMAL' if your active state has a different name.
   const activeChannelsQuery = `
     SELECT COUNT(*) as active_channels
     FROM \`${projectId}.${datasetId}.channels\`
     WHERE state = 'CHANNELD_NORMAL'
   `;
-  
-  // --- Connected Peers ---
-  // Assumes `peers` table with `connected` column (boolean)
   const connectedPeersQuery = `
     SELECT COUNT(*) as connected_peers
     FROM \`${projectId}.${datasetId}.peers\`
@@ -95,34 +85,44 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   `;
 
   try {
+    console.log("Executing paymentsQuery:", paymentsQuery);
     const [paymentsJob] = await bigquery.createQueryJob({ query: paymentsQuery });
-    const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
-    const [activeChannelsJob] = await bigquery.createQueryJob({ query: activeChannelsQuery });
-    const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
-
     const [[paymentsResult]] = await paymentsJob.getQueryResults();
-    const [[feesResult]] = await feesJob.getQueryResults();
-    const [[activeChannelsResult]] = await activeChannelsJob.getQueryResults();
-    const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
-    
-    const totalPayments = paymentsResult?.total_payments || 0;
-    const totalFeesMsat = feesResult?.total_fees_msat || 0;
-    const activeChannels = activeChannelsResult?.active_channels || 0;
-    const connectedPeers = connectedPeersResult?.connected_peers || 0;
+    console.log("Raw paymentsResult:", paymentsResult);
 
-    // Convert fees from msat to sat
-    const totalFeesSats = Math.floor(Number(totalFeesMsat) / 1000);
+    console.log("Executing feesQuery:", feesQuery);
+    const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
+    const [[feesResult]] = await feesJob.getQueryResults();
+    console.log("Raw feesResult:", feesResult);
+
+    console.log("Executing activeChannelsQuery:", activeChannelsQuery);
+    const [activeChannelsJob] = await bigquery.createQueryJob({ query: activeChannelsQuery });
+    const [[activeChannelsResult]] = await activeChannelsJob.getQueryResults();
+    console.log("Raw activeChannelsResult:", activeChannelsResult);
+    
+    console.log("Executing connectedPeersQuery:", connectedPeersQuery);
+    const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
+    const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
+    console.log("Raw connectedPeersResult:", connectedPeersResult);
+    
+    const totalPayments = Number(paymentsResult?.total_payments || 0);
+    const totalFeesMsat = Number(feesResult?.total_fees_msat || 0);
+    const activeChannels = Number(activeChannelsResult?.active_channels || 0);
+    const connectedPeers = Number(connectedPeersResult?.connected_peers || 0);
+
+    const totalFeesSats = Math.floor(totalFeesMsat / 1000);
+
+    console.log("Processed Key Metrics:", { totalPayments, totalFeesSats, activeChannels, connectedPeers });
 
     return [
-      { id: 'payments', title: 'Total Payments Processed', value: Number(totalPayments), iconName: 'Zap' },
+      { id: 'payments', title: 'Total Payments Processed', value: totalPayments, iconName: 'Zap' },
       { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: totalFeesSats, iconName: 'Activity' },
-      { id: 'active_channels', title: 'Active Channels', value: Number(activeChannels), iconName: 'Network' },
-      { id: 'connected_peers', title: 'Connected Peers', value: Number(connectedPeers), iconName: 'Users' },
+      { id: 'active_channels', title: 'Active Channels', value: activeChannels, iconName: 'Network' },
+      { id: 'connected_peers', title: 'Connected Peers', value: connectedPeers, iconName: 'Users' },
     ];
 
   } catch (error) {
     console.error("Error fetching key metrics from BigQuery:", error);
-    // Return mock or placeholder data in case of error
     return [
         { id: 'payments', title: 'Total Payments Processed', value: 'Error', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 'Error', iconName: 'Activity' },
@@ -134,13 +134,11 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
 
 export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing. Returning empty time series.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalPaymentVolume. Returning empty time series.");
     return [];
   }
+  console.log(`Fetching historical payment volume from BigQuery: ${projectId}.${datasetId}`);
 
-  // --- Historical Payment Volume ---
-  // Assumes `forwardings` table with `received_time` (TIMESTAMP) and `out_msat` (forwarded amount in msat)
-  // Fetches data for the last 30 days.
   const query = `
     SELECT
       DATE(received_time) AS day,
@@ -154,43 +152,45 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
   `;
   
   try {
+    console.log("Executing historicalPaymentVolume query:", query);
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
+    console.log("Raw historicalPaymentVolume rows:", JSON.stringify(rows, null, 2));
+
+    if (!rows || rows.length === 0) {
+        console.log("No historical payment volume data returned from BigQuery.");
+        return [];
+    }
 
     return rows.map(row => ({
       date: formatDateFromBQ(row.day), 
-      value: Math.floor(Number(row.total_volume_msat) / 1000), // Convert msat to sat
+      value: Math.floor(Number(row.total_volume_msat || 0) / 1000), 
     }));
 
   } catch (error) {
     console.error("Error fetching historical payment volume from BigQuery:", error);
-    return []; // Return empty array on error
+    return []; 
   }
 }
 
-// Maps c-lightning channel states to simplified statuses
 function mapChannelStatus(state: string): Channel['status'] {
-  // Based on c-lightning states
+  if (!state) return 'inactive'; // Default if state is null or undefined
   if (state === 'CHANNELD_NORMAL') {
     return 'active';
   }
   if (['CHANNELD_AWAITING_LOCKIN', 'DUALOPEND_AWAITING_LOCKIN', 'OPENINGD'].includes(state)) {
     return 'pending';
   }
-  // Consider other states like 'CLOSINGD_SIGEXCHANGE', 'CLOSINGD_COMPLETE', 'ONCHAIN' as inactive
   return 'inactive';
 }
 
 export async function fetchChannels(): Promise<Channel[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing. Returning empty channel list.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchChannels. Returning empty channel list.");
     return [];
   }
+  console.log(`Fetching channels from BigQuery: ${projectId}.${datasetId}`);
 
-  // Assumes 'channels' table with c-lightning like fields
-  // 'id' here is assumed to be the unique channel identifier (e.g., channel_id hex)
-  // 'state' is the c-lightning channel state string
-  // 'msatoshi_total', 'msatoshi_to_us'
   const query = `
     SELECT
       id, 
@@ -198,49 +198,54 @@ export async function fetchChannels(): Promise<Channel[]> {
       msatoshi_total,
       msatoshi_to_us,
       state,
-      -- Additional fields like short_channel_id could be queried if needed for display
       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', CURRENT_TIMESTAMP()) as retrieved_at 
-      -- last_update from the source would be better if available
     FROM \`${projectId}.${datasetId}.channels\`
     ORDER BY state, peer_id
   `;
 
   try {
+    console.log("Executing channels query:", query);
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
+    console.log("Raw channels rows:", JSON.stringify(rows, null, 2));
+
+    if (!rows || rows.length === 0) {
+        console.log("No channel data returned from BigQuery.");
+        return [];
+    }
 
     return rows.map(row => {
       const status = mapChannelStatus(row.state);
-      const capacity = Math.floor(Number(row.msatoshi_total) / 1000);
-      const localBalance = Math.floor(Number(row.msatoshi_to_us) / 1000);
-      const remoteBalance = capacity - localBalance; // Simplified calculation
+      const capacity = Math.floor(Number(row.msatoshi_total || 0) / 1000);
+      const localBalance = Math.floor(Number(row.msatoshi_to_us || 0) / 1000);
+      const remoteBalance = capacity - localBalance; 
 
-      // Placeholders for uptime and success rate
       let uptime = 0;
       let historicalPaymentSuccessRate = 0;
       if (status === 'active') {
-        uptime = 100; // Placeholder
-        historicalPaymentSuccessRate = 99; // Placeholder
+        uptime = 100; 
+        historicalPaymentSuccessRate = 99; 
       } else if (status === 'pending') {
-        uptime = 50; // Placeholder
+        uptime = 50; 
       }
 
-
       return {
-        id: row.id, // Ensure this is a string
-        peerNodeId: row.peerNodeId,
+        id: String(row.id || 'unknown-id'), 
+        peerNodeId: String(row.peerNodeId || 'unknown-peer-id'),
         capacity: capacity,
         localBalance: localBalance,
         remoteBalance: remoteBalance,
         status: status,
         uptime: uptime, 
         historicalPaymentSuccessRate: historicalPaymentSuccessRate,
-        lastUpdate: row.retrieved_at, // Using retrieval time as placeholder for lastUpdate
+        lastUpdate: row.retrieved_at || new Date().toISOString(),
       };
     });
 
   } catch (error) {
     console.error("Error fetching channels from BigQuery:", error);
-    return []; // Return empty array on error
+    return []; 
   }
 }
+
+    
