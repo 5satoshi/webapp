@@ -14,7 +14,7 @@ interface SampleOverviewChartProps {
 
 const chartConfig = {
   paymentVolume: {
-    label: "Payment Volume (sats)",
+    label: "Payment Volume (BTC)", // Updated label
     color: "hsl(var(--chart-1))",
   },
   transactionCount: {
@@ -57,7 +57,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
   return (
     <div className="h-[300px] w-full">
       <ChartContainer config={chartConfig} className="w-full h-full">
-        <ComposedChart data={data} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+        <ComposedChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
           <XAxis 
             dataKey="date" 
@@ -72,7 +72,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
             tickLine={false} 
             axisLine={false} 
             tickMargin={8}
-            tickFormatter={(value) => `${value / 1000}k`}
+            tickFormatter={(value) => `${Number(value).toFixed(5)}`} // Format for BTC
             className="text-xs"
             domain={['auto', 'auto']}
           />
@@ -94,7 +94,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
                 formatter={(value, name, props) => {
                   const itemConfig = chartConfig[name as keyof typeof chartConfig];
                   const formattedValue = name === 'paymentVolume' 
-                    ? `${(Number(value) / 1000).toFixed(1)}k sats`
+                    ? `${Number(value).toFixed(6)} BTC` // Format for BTC in tooltip
                     : Number(value).toLocaleString();
                   return (
                      <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
           <Bar
             yAxisId="left"
             dataKey="paymentVolume"
-            name="Payment Volume (sats)"
+            name="Payment Volume (BTC)" // Updated name
             fill="var(--color-paymentVolume)"
             radius={[4, 4, 0, 0]}
           />

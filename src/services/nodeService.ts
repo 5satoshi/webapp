@@ -78,28 +78,27 @@ function mapChannelStatus(state: string | null | undefined): Channel['status'] {
   const normalizedState = state.toUpperCase();
   // console.log(`Mapping channel state: ${normalizedState}`);
   switch (normalizedState) {
-    // Active states
-    case 'CHANNELD_NORMAL':
+    // Active states from c-lightning listpeers RPC
+    case 'CHANNELD_NORMAL': // Normal operational state
+    case 'DUALOPEND_NORMAL': // Normal state for dual-funded channels
       return 'active';
     // Pending states
-    case 'OPENINGD':
-    case 'CHANNELD_AWAITING_LOCKIN':
-    case 'DUALOPEND_OPEN_INIT':
-    case 'DUALOPEND_AWAITING_LOCKIN':
-       return 'pending';
+    case 'OPENINGD': // Channel opening negotiation not yet complete
+    case 'CHANNELD_AWAITING_LOCKIN': // Channel opened, waiting for lock-in on-chain
+    case 'DUALOPEND_OPEN_INIT': // Initial state for dual-funded channel opening
+    case 'DUALOPEND_AWAITING_LOCKIN': // Dual-funded channel opened, waiting for lock-in
+      return 'pending';
     // Inactive/Closing states
-    case 'CHANNELD_SHUTTING_DOWN':
-    case 'CLOSINGD_SIGEXCHANGE':
-    case 'CLOSINGD_COMPLETE':
-    case 'AWAITING_UNILATERAL':
-    case 'FUNDING_SPEND_SEEN':
-    case 'ONCHAIN':
-      return 'inactive'; 
+    case 'CHANNELD_SHUTTING_DOWN': // Channel is in the process of shutting down
+    case 'CLOSINGD_SIGEXCHANGE': // Closing, exchanging signatures
+    case 'CLOSINGD_COMPLETE': // Closing complete, waiting for on-chain settlement
+    case 'AWAITING_UNILATERAL': // Waiting for a unilateral close to resolve
+    case 'FUNDING_SPEND_SEEN': // A transaction spending the funding output has been seen
+    case 'ONCHAIN': // Channel is closed and settled on-chain
+    case 'DISCONNECTED': // Peer is disconnected
+    case 'CLOSED': // Generic closed state
+      return 'inactive';
     default:
-      if (normalizedState.includes("CHANNELD") || normalizedState.includes("DUALOPEND")) {
-        // console.warn(`Partially recognized channel state: ${state}, defaulting to active.`);
-        return 'active'; // Default to active if it seems like an operational channeld state
-      }
       // console.warn(`Unknown channel state: ${state}, defaulting to inactive.`);
       return 'inactive';
   }
@@ -132,12 +131,12 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   const activeChannelsQuery = `
     SELECT COUNT(*) as active_channels
     FROM \`${projectId}.${datasetId}.peers\` 
-    WHERE state = 'CHANNELD_NORMAL' 
+    WHERE state = 'CHANNELD_NORMAL' OR state = 'DUALOPEND_NORMAL'
   `;
   const connectedPeersQuery = `
     SELECT COUNT(DISTINCT id) as connected_peers 
     FROM \`${projectId}.${datasetId}.peers\` 
-    WHERE state = 'CHANNELD_NORMAL' 
+    WHERE state = 'CHANNELD_NORMAL' OR state = 'DUALOPEND_NORMAL'
   `;
   
   try {
@@ -243,7 +242,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
       }
       return {
         date: formatDateFromBQ(row.date_group), 
-        paymentVolume: Math.floor(Number(row.total_volume_msat || 0) / 1000), 
+        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, // Convert msats to BTC (1 BTC = 100,000,000 sats = 100,000,000,000 msats)
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
