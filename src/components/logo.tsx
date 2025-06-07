@@ -8,7 +8,7 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     <div className="flex items-center gap-2 text-primary">
       <Zap size={iconSize} className="text-cta-orange" />
       <span className={`font-headline font-semibold ${textSizeClass}`}>
-        Lightning Stats
+        5satoshi
       </span>
     </div>
   );

@@ -15,7 +15,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Lightning Stats Dashboard',
+  title: '5satoshi - lightning node insights',
   description: 'Monitor and optimize your Lightning Network node.',
 };
 
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         {/* Google Fonts links are kept for compatibility with guidelines if needed, but Next/Font is preferred */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

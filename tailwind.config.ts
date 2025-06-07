@@ -74,7 +74,7 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
-        'cta-orange': '#FF9800', /* hsl(36, 100%, 50%) */
+        'cta-orange': '#ff8f00', /* New Orange HSL(34, 100%, 50%) */
       },
       borderRadius: {
         lg: 'var(--radius)',
