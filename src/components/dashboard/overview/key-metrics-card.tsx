@@ -26,33 +26,44 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
   const isPositiveTrend = hasTrend && metric.trend! >= 0;
 
   return (
-    <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground font-body">
+    <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
+      {/* Title Section: target 3 lines max. text-sm line-height is ~1.4rem. 3 lines ~4.2rem. */}
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 min-h-[4.2rem]">
+        <CardTitle className="text-sm font-medium text-muted-foreground font-body mr-2 line-clamp-3">
           {metric.title}
         </CardTitle>
-        <IconComponent className="h-5 w-5 text-muted-foreground" />
+        <IconComponent className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold font-headline text-foreground">{metric.displayValue}</div>
-        {metric.unit && (
-          <p className="text-sm text-muted-foreground pt-1 font-body">{metric.unit}</p>
-        )}
-        {hasTrend && (
-          <p className={cn(
-            "text-xs text-muted-foreground flex items-center gap-1 pt-1",
-            isPositiveTrend ? "text-green-500" : "text-red-500"
-          )}>
-            {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-            {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
-          </p>
-        )}
-        {metric.description && !metric.unit && ( // Only show description if unit isn't already taking its place for brevity
-            <p className="text-xs text-muted-foreground pt-1">{metric.description}</p>
-        )}
-         {metric.description && metric.unit && ( // If both unit and description exist, show description slightly smaller
-            <p className="text-xs text-muted-foreground pt-1">{metric.description}</p>
-        )}
+      
+      <CardContent className="flex flex-col pt-0 flex-grow">
+        {/* Number Section: target 1 line. text-3xl line-height ~2.25rem. */}
+        <div className="min-h-[2.75rem] flex items-center"> 
+          <div className="text-3xl font-bold font-headline text-foreground">{metric.displayValue}</div>
+        </div>
+        
+        {/* Unit/Description/Trend Section: target 2 lines total. text-sm line-height ~1.4rem * 2 = 2.8rem. */}
+        <div className="min-h-[2.8rem] pt-1 space-y-0.5 flex flex-col justify-start">
+          {metric.unit && (
+            <p className="text-sm text-muted-foreground font-body truncate">
+              {metric.unit}
+            </p>
+          )}
+          {hasTrend && (
+            <p className={cn(
+              "text-xs text-muted-foreground flex items-center gap-1 truncate",
+              isPositiveTrend ? "text-green-500" : "text-red-500"
+            )}>
+              {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
+            </p>
+          )}
+          {/* Show description if it won't cause more than two effective lines with unit & trend */}
+          {metric.description && (!metric.unit || !hasTrend) && (
+            <p className="text-xs text-muted-foreground truncate">
+              {metric.description}
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
