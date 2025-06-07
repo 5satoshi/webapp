@@ -3,7 +3,13 @@
 
 import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
-import { format, startOfWeek, startOfMonth, startOfQuarter, endOfDay, endOfWeek, endOfMonth, endOfQuarter, parseISO } from 'date-fns';
+import { 
+  format, 
+  startOfWeek, startOfMonth, startOfQuarter, 
+  endOfDay, endOfWeek, endOfMonth, endOfQuarter, 
+  parseISO, 
+  subDays, subWeeks, subMonths, subQuarters, startOfDay
+} from 'date-fns';
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
@@ -218,7 +224,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
       }
       return {
         date: formatDateFromBQ(row.date_group), 
-        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, 
+        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, // msat to BTC
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
@@ -293,26 +299,33 @@ export async function fetchChannels(): Promise<Channel[]> {
 function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
   let startOfPeriod: Date;
-  let endOfPeriod: Date = endOfDay(now); 
+  let endOfPeriod: Date;
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'day':
-      startOfPeriod = now; 
+      const yesterday = subDays(now, 1);
+      startOfPeriod = startOfDay(yesterday);
+      endOfPeriod = endOfDay(yesterday);
       break;
     case 'week':
-      startOfPeriod = startOfWeek(now, { weekStartsOn: 1 }); 
-      endOfPeriod = endOfWeek(now, { weekStartsOn: 1 });
+      const dayInLastWeek = subWeeks(now, 1);
+      startOfPeriod = startOfWeek(dayInLastWeek, { weekStartsOn: 1 }); // Assuming Monday start
+      endOfPeriod = endOfWeek(dayInLastWeek, { weekStartsOn: 1 });
       break;
     case 'month':
-      startOfPeriod = startOfMonth(now);
-      endOfPeriod = endOfMonth(now);
+      const dayInLastMonth = subMonths(now, 1);
+      startOfPeriod = startOfMonth(dayInLastMonth);
+      endOfPeriod = endOfMonth(dayInLastMonth);
       break;
     case 'quarter':
-      startOfPeriod = startOfQuarter(now);
-      endOfPeriod = endOfQuarter(now);
+      const dayInLastQuarter = subQuarters(now, 1);
+      startOfPeriod = startOfQuarter(dayInLastQuarter);
+      endOfPeriod = endOfQuarter(dayInLastQuarter);
       break;
-    default: 
-      startOfPeriod = now; 
+    default: // Fallback to 'day' logic (yesterday) if an unknown period is passed
+      const yesterdayDefault = subDays(now, 1);
+      startOfPeriod = startOfDay(yesterdayDefault);
+      endOfPeriod = endOfDay(yesterdayDefault);
       break;
   }
   return { 
@@ -384,12 +397,12 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
         p.id as peer_id, 
         p.funding_txid,
         p.funding_outnum,
-        TIMESTAMP(change.timestamp) as change_timestamp, -- Cast to TIMESTAMP
+        TIMESTAMP(change.timestamp) as change_timestamp, 
         change.new_state
       FROM
         \`${projectId}.${datasetId}.peers\` p,
         UNNEST(p.state_changes) AS change
-      WHERE TIMESTAMP(change.timestamp) >= TIMESTAMP(@startDate) AND TIMESTAMP(change.timestamp) <= TIMESTAMP(@endDate) -- Cast to TIMESTAMP
+      WHERE TIMESTAMP(change.timestamp) >= TIMESTAMP(@startDate) AND TIMESTAMP(change.timestamp) <= TIMESTAMP(@endDate)
     )
     SELECT
       (SELECT COUNT(DISTINCT CONCAT(csc.funding_txid, ':', CAST(csc.funding_outnum AS STRING))) FROM ChannelStateChangesInPeriod csc WHERE csc.new_state IN UNNEST(@openingOrActiveStates)) as opened_count,
@@ -420,3 +433,6 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
     return { openedCount: 0, closedCount: 0 };
   }
 }
+
+
+    
