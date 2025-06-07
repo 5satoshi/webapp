@@ -14,7 +14,7 @@ interface SampleOverviewChartProps {
 
 const chartConfig = {
   paymentVolume: {
-    label: "Payment Volume (BTC)", // Updated label
+    label: "Payment Volume (BTC)",
     color: "hsl(var(--chart-1))",
   },
   transactionCount: {
@@ -72,7 +72,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
             tickLine={false} 
             axisLine={false} 
             tickMargin={8}
-            tickFormatter={(value) => `${Number(value).toFixed(5)}`} // Format for BTC
+            tickFormatter={(value) => `${Number(value).toFixed(2)}`} // Format for BTC, 2 decimal places
             className="text-xs"
             domain={['auto', 'auto']}
           />
@@ -116,7 +116,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
           <Bar
             yAxisId="left"
             dataKey="paymentVolume"
-            name="Payment Volume (BTC)" // Updated name
+            name="Payment Volume (BTC)"
             fill="var(--color-paymentVolume)"
             radius={[4, 4, 0, 0]}
           />
@@ -135,4 +135,3 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
     </div>
   );
 }
-
