@@ -46,7 +46,13 @@ export default async function OverviewPage({
     const summaryResult = await summarizeRecentActivity(aiSummaryInput);
     recentActivitySummaryText = summaryResult.summaryText;
   } catch (error) {
-    console.error("Error generating recent activity summary with AI:", error);
+    console.error("Error generating recent activity summary with AI. Details:");
+    if (error instanceof Error) {
+      console.error("Message:", error.message);
+      console.error("Stack:", error.stack);
+    } else {
+      console.error("Raw error object:", JSON.stringify(error, null, 2));
+    }
     recentActivitySummaryText = "Failed to load AI-powered activity summary. Basic information: " +
       `Largest payment: ${forwardingSummary.maxPaymentForwardedSats.toLocaleString()} sats. ` +
       `Fees earned: ${forwardingSummary.totalFeesEarnedSats.toLocaleString()} sats. ` +
