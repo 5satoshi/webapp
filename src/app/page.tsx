@@ -12,7 +12,7 @@ import {
   fetchPeriodForwardingSummary,
   fetchPeriodChannelActivity
 } from '@/services/nodeService';
-import { summarizeRecentActivity, type SummarizeRecentActivityInput } from '@/ai/flows/summarize-recent-activity-flow';
+// Removed: import { summarizeRecentActivity, type SummarizeRecentActivityInput } from '@/ai/flows/summarize-recent-activity-flow';
 
 export default async function OverviewPage({ 
   searchParams 
@@ -31,35 +31,33 @@ export default async function OverviewPage({
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
   const currentAggregationLabel = aggregationPeriodOptions.find(opt => opt.value === currentAggregation)?.label.toLowerCase() || 'period';
 
-  let recentActivitySummaryText: string;
-  let recentActivityFetchError = false;
 
-  try {
-    const aiSummaryInput: SummarizeRecentActivityInput = {
-      aggregationPeriodLabel: currentAggregationLabel,
-      maxPaymentForwardedSats: forwardingSummary.maxPaymentForwardedSats,
-      totalFeesEarnedSats: forwardingSummary.totalFeesEarnedSats,
-      paymentsForwardedCount: forwardingSummary.paymentsForwardedCount,
-      channelsOpenedCount: channelActivity.openedCount,
-      channelsClosedCount: channelActivity.closedCount,
-    };
-    const summaryResult = await summarizeRecentActivity(aiSummaryInput);
-    recentActivitySummaryText = summaryResult.summaryText;
-  } catch (error) {
-    console.error("Error generating recent activity summary with AI. Details:");
-    if (error instanceof Error) {
-      console.error("Message:", error.message);
-      console.error("Stack:", error.stack);
-    } else {
-      console.error("Raw error object:", JSON.stringify(error, null, 2));
-    }
-    recentActivitySummaryText = "Failed to load AI-powered activity summary. Basic information: " +
-      `Largest payment: ${forwardingSummary.maxPaymentForwardedSats.toLocaleString()} sats. ` +
-      `Fees earned: ${forwardingSummary.totalFeesEarnedSats.toLocaleString()} sats. ` +
-      `Payments forwarded: ${forwardingSummary.paymentsForwardedCount.toLocaleString()}. ` +
-      `Channels opened: ${channelActivity.openedCount}, closed: ${channelActivity.closedCount}.`;
-    recentActivityFetchError = true;
-  }
+  const periodMetrics: KeyMetric[] = [
+    {
+      id: 'max_payment_period',
+      title: `Max Payment Forwarded (last ${currentAggregationLabel})`,
+      value: `${forwardingSummary.maxPaymentForwardedSats.toLocaleString()} sats`,
+      iconName: 'BarChart3',
+    },
+    {
+      id: 'fees_earned_period',
+      title: `Fees Earned (last ${currentAggregationLabel})`,
+      value: `${forwardingSummary.totalFeesEarnedSats.toLocaleString()} sats`,
+      iconName: 'Activity',
+    },
+    {
+      id: 'payments_forwarded_period',
+      title: `Payments Forwarded (last ${currentAggregationLabel})`,
+      value: forwardingSummary.paymentsForwardedCount.toLocaleString(),
+      iconName: 'Zap',
+    },
+    {
+      id: 'channel_changes_period',
+      title: `Channel Changes (last ${currentAggregationLabel})`,
+      value: `${channelActivity.openedCount} Opened / ${channelActivity.closedCount} Closed`,
+      iconName: 'Network',
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -91,31 +89,20 @@ export default async function OverviewPage({
         </CardContent>
       </Card>
       
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Recent Activity Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-sm ${recentActivityFetchError ? 'text-orange-600' : 'text-muted-foreground'}`}>
-              {recentActivitySummaryText}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Quick Links</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Frequently accessed actions or documentation.</p>
-            <ul className="mt-2 space-y-1 text-sm list-disc list-inside">
-              <li><Link href="/channels" className="text-primary hover:underline">Manage Channels</Link></li>
-              <li><a href="#" className="text-primary hover:underline">Adjust Fee Policy</a></li>
-              <li><a href="#" className="text-primary hover:underline">View Node Logs</a></li>
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+      {/* New section for period-specific metrics */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">Activity in Last {currentAggregationLabel.charAt(0).toUpperCase() + currentAggregationLabel.slice(1)}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {periodMetrics.map((metric) => (
+              <KeyMetricsCard key={metric.id} metric={metric} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
