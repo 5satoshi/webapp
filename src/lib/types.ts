@@ -2,7 +2,7 @@ export interface KeyMetric {
   id: string;
   title: string;
   value: string | number;
-  icon: React.ElementType;
+  iconName: 'Zap' | 'Activity' | 'Clock' | 'Network' | 'BarChart3' | 'PieChart' | 'LineChart'; // Changed from icon: React.ElementType
   description?: string;
   trend?: number; // Optional: for showing percentage change
 }

@@ -12,13 +12,13 @@ import type {
   HeatmapCell,
   AiStructuredInput,
 } from './types';
-import { Zap, Activity, Users, Network, Bell, TrendingUp, TrendingDown, Clock, BarChart3, PieChart, LineChart } from 'lucide-react';
+// Icons are no longer directly in mock data for KeyMetric, but iconName strings are used.
 
 export const mockKeyMetrics: KeyMetric[] = [
-  { id: 'payments', title: 'Total Payments Processed', value: 12560, icon: Zap, trend: 5.2 },
-  { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 853020, icon: Activity, trend: 12.1 },
-  { id: 'uptime', title: 'Node Uptime', value: '99.98%', icon: Clock, trend: 0.01 },
-  { id: 'channels', title: 'Active Channels', value: 78, icon: Network, trend: -2 },
+  { id: 'payments', title: 'Total Payments Processed', value: 12560, iconName: 'Zap', trend: 5.2 },
+  { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 853020, iconName: 'Activity', trend: 12.1 },
+  { id: 'uptime', title: 'Node Uptime', value: '99.98%', iconName: 'Clock', trend: 0.01 },
+  { id: 'channels', title: 'Active Channels', value: 78, iconName: 'Network', trend: -2 },
 ];
 
 export const mockChannels: Channel[] = [
@@ -116,10 +116,10 @@ for (let day = 0; day < daysOfWeek; day++) {
 }
 
 export const mockAiInput: AiStructuredInput = {
-  totalPaymentsProcessed: mockKeyMetrics.find(m => m.id === 'payments')?.value as number || 0,
-  forwardingFeesEarned: mockKeyMetrics.find(m => m.id === 'fees')?.value as number || 0,
-  nodeUptime: parseFloat( (mockKeyMetrics.find(m => m.id === 'uptime')?.value as string)?.replace('%','')) || 99,
-  numberOfChannels: mockKeyMetrics.find(m => m.id === 'channels')?.value as number || 0,
+  totalPaymentsProcessed: 12560, // From mockKeyMetrics
+  forwardingFeesEarned: 853020, // From mockKeyMetrics
+  nodeUptime: 99.98, // From mockKeyMetrics
+  numberOfChannels: 78, // From mockKeyMetrics
   historicalRoutingData: "Over the past month, the node routed 15,000 payments with an average success rate of 97.5%. Peak routing times were weekdays 14:00-17:00 UTC. Average fee per successful route: 3.5 sats.",
   feeDistributionData: "Current median remote channel fee: 150ppm, local channel fee: 50ppm. 80% of revenue comes from remote channels. Trend shows increasing remote fees over last 3 months.",
   routingActivityData: "Monthly routing count peaked at 5,200 in July, current month at 4,800. Daily routing volume averages 500,000 sats, with spikes up to 1.5M sats on high-activity days.",

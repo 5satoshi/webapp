@@ -1,14 +1,25 @@
 import type { KeyMetric } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TrendingUp, TrendingDown, Zap, Activity, Clock, Network, BarChart3, PieChart, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type React from 'react';
 
 interface KeyMetricsCardProps {
   metric: KeyMetric;
 }
 
+const iconMap: Record<KeyMetric['iconName'], React.ElementType> = {
+  Zap,
+  Activity,
+  Clock,
+  Network,
+  BarChart3,
+  PieChart,
+  LineChart,
+};
+
 export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
-  const Icon = metric.icon;
+  const IconComponent = iconMap[metric.iconName] || Activity; // Default to Activity if no icon found
   const hasTrend = typeof metric.trend === 'number';
   const isPositiveTrend = hasTrend && metric.trend! >= 0;
 
@@ -18,7 +29,7 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
         <CardTitle className="text-sm font-medium text-muted-foreground font-body">
           {metric.title}
         </CardTitle>
-        <Icon className="h-5 w-5 text-muted-foreground" />
+        <IconComponent className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
       <CardContent>
         <div className="text-3xl font-bold font-headline text-foreground">{metric.value}</div>

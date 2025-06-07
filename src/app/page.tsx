@@ -1,18 +1,21 @@
 import { PageTitle } from '@/components/ui/page-title';
 import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card';
 import { SampleOverviewChart } from '@/components/dashboard/overview/sample-overview-chart';
-import { mockKeyMetrics, mockHistoricalPaymentVolume } from '@/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { timescaleOptions } from '@/lib/mock-data';
+import { timescaleOptions } from '@/lib/mock-data'; // timescaleOptions can still come from mock for UI
+import { fetchKeyMetrics, fetchHistoricalPaymentVolume } from '@/services/nodeService';
 
-export default function OverviewPage() {
+export default async function OverviewPage() {
+  const keyMetrics = await fetchKeyMetrics();
+  const historicalPaymentVolume = await fetchHistoricalPaymentVolume();
+
   return (
     <div className="space-y-6">
       <PageTitle title="Node Overview" description="Key performance indicators and trends for your Lightning node." />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {mockKeyMetrics.map((metric) => (
+        {keyMetrics.map((metric) => (
           <KeyMetricsCard key={metric.id} metric={metric} />
         ))}
       </div>
@@ -31,12 +34,10 @@ export default function OverviewPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Render chart based on selected tab or pass data to SampleOverviewChart */}
-          <SampleOverviewChart data={mockHistoricalPaymentVolume} />
+          <SampleOverviewChart data={historicalPaymentVolume} />
         </CardContent>
       </Card>
       
-      {/* Add more sections or charts for the overview page as needed */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -44,7 +45,6 @@ export default function OverviewPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">Display a feed of recent node activities or important events here.</p>
-            {/* Example: List of recent channel openings, successful large forwards, etc. */}
             <ul className="mt-2 space-y-1 text-sm">
               <li>Channel opened with 02_new_peer_node_id (Capacity: 2M sats)</li>
               <li>Successfully forwarded payment of 500k sats</li>
@@ -59,7 +59,7 @@ export default function OverviewPage() {
           <CardContent>
             <p className="text-muted-foreground">Frequently accessed actions or documentation.</p>
             <ul className="mt-2 space-y-1 text-sm list-disc list-inside">
-              <li><a href="#" className="text-primary hover:underline">Manage Channels</a></li>
+              <li><a href="/channels" className="text-primary hover:underline">Manage Channels</a></li>
               <li><a href="#" className="text-primary hover:underline">Adjust Fee Policy</a></li>
               <li><a href="#" className="text-primary hover:underline">View Node Logs</a></li>
             </ul>
