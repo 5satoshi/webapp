@@ -61,9 +61,13 @@ const summarizeRecentActivityFlow = ai.defineFlow(
   async input => {
     const {output} = await prompt(input);
     if (!output || !output.summaryText) {
+      console.error('AI prompt for summarizeRecentActivityFlow returned null, undefined, or empty summaryText.');
+      console.error('Input to prompt:', JSON.stringify(input, null, 2));
+      console.error('Raw output from prompt (if any):', JSON.stringify(output, null, 2));
       // Fallback in case the LLM returns nothing or an unexpected structure
       return { summaryText: "Could not generate an activity summary at this time. Please check back later." };
     }
     return output;
   }
 );
+
