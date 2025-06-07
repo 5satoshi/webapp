@@ -2,7 +2,7 @@ export interface KeyMetric {
   id: string;
   title: string;
   value: string | number;
-  iconName: 'Zap' | 'Activity' | 'Clock' | 'Network' | 'BarChart3' | 'PieChart' | 'LineChart'; // Changed from icon: React.ElementType
+  iconName: 'Zap' | 'Activity' | 'Clock' | 'Network' | 'BarChart3' | 'PieChart' | 'LineChart' | 'Users'; // Added 'Users'
   description?: string;
   trend?: number; // Optional: for showing percentage change
 }
@@ -29,7 +29,7 @@ export interface AlertSetting {
 }
 
 export interface TimeSeriesData {
-  date: string;
+  date: string; // Should be in 'YYYY-MM-DD' format
   value: number;
   [key: string]: any; // For multiple lines in a chart
 }
@@ -82,7 +82,7 @@ export interface Recommendation {
 export type AiStructuredInput = {
   totalPaymentsProcessed: number;
   forwardingFeesEarned: number;
-  nodeUptime: number;
+  nodeUptime: number; // This might be harder to get from BQ, consider if this is still the best metric name
   numberOfChannels: number;
   historicalRoutingData: string; // JSON string or descriptive text
   feeDistributionData: string; // JSON string or descriptive text

@@ -1,6 +1,6 @@
 import type { KeyMetric } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Zap, Activity, Clock, Network, BarChart3, PieChart, LineChart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, Activity, Users, Network, BarChart3, PieChart, LineChart, Clock } from 'lucide-react'; // Added Users, Clock
 import { cn } from '@/lib/utils';
 import type React from 'react';
 
@@ -11,11 +11,12 @@ interface KeyMetricsCardProps {
 const iconMap: Record<KeyMetric['iconName'], React.ElementType> = {
   Zap,
   Activity,
-  Clock,
+  Clock, // Kept Clock in case it's used elsewhere, or for future Uptime
   Network,
   BarChart3,
   PieChart,
   LineChart,
+  Users, // Added Users for Connected Peers
 };
 
 export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {

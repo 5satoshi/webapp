@@ -1,56 +1,167 @@
 'use server';
 
 import type { KeyMetric, TimeSeriesData } from '@/lib/types';
+import { BigQuery, type BigQueryTimestamp } from '@google-cloud/bigquery';
+import { format } from 'date-fns';
 
-// Simulate API delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Ensure these environment variables are set in your .env file or deployment environment
+const projectId = process.env.BIGQUERY_PROJECT_ID;
+const datasetId = process.env.BIGQUERY_DATASET_ID;
+
+let bigquery: BigQuery | undefined;
+
+if (projectId && datasetId) {
+  try {
+    bigquery = new BigQuery({ projectId });
+  } catch (error) {
+    console.error("Failed to initialize BigQuery client:", error);
+    // Depending on your error handling strategy, you might want to throw here
+    // or allow the app to continue with other services potentially failing.
+  }
+} else {
+  console.warn("BIGQUERY_PROJECT_ID or BIGQUERY_DATASET_ID is not set. BigQuery functionality will be disabled.");
+}
+
+// Helper to convert BigQueryTimestamp to 'YYYY-MM-DD' string
+function formatDateFromBQ(timestamp: BigQueryTimestamp | string | Date): string {
+  if (typeof timestamp === 'string' || timestamp instanceof Date) {
+    return format(new Date(timestamp), 'yyyy-MM-dd');
+  }
+  // Assuming BigQueryTimestamp has a 'value' property which is a string like '2023-10-27T10:30:00.000Z'
+  // or a Date object. The exact structure might vary based on how BQ returns it.
+  // Adjust if necessary based on the actual type of `timestamp.value`.
+  if (timestamp && typeof timestamp.value === 'string') {
+     // If the value is already in YYYY-MM-DD format from a DATE type in BQ
+    if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp.value)) {
+        return timestamp.value;
+    }
+    // Otherwise, parse it as a full timestamp
+    return format(new Date(timestamp.value), 'yyyy-MM-dd');
+  }
+  // Fallback for unexpected format
+  console.warn("Unexpected BigQueryTimestamp format:", timestamp);
+  return format(new Date(), 'yyyy-MM-dd'); // Default to today if formatting fails
+}
+
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
-  await delay(500); // Simulate network latency
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing. Returning empty metrics.");
+    // Fallback to empty or mock data if BigQuery is not configured
+    return [
+        { id: 'payments', title: 'Total Payments Processed', value: 'N/A', iconName: 'Zap' },
+        { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 'N/A', iconName: 'Activity' },
+        { id: 'active_channels', title: 'Active Channels', value: 'N/A', iconName: 'Network' },
+        { id: 'connected_peers', title: 'Connected Peers', value: 'N/A', iconName: 'Users' },
+    ];
+  }
 
-  // In a real application, you would fetch this data from your API:
-  // const response = await fetch('/api/node/key-metrics');
-  // if (!response.ok) {
-  //   throw new Error('Failed to fetch key metrics');
-  // }
-  // const data = await response.json();
-  // return data;
+  // --- Total Payments Processed ---
+  // Assumes `forwardings` table with `status` column ('settled', 'failed', etc.)
+  const paymentsQuery = `
+    SELECT COUNT(*) as total_payments
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+  `;
 
-  // Returning mock-like data for now
-  console.log("Fetching key metrics from server service...");
-  return [
-    { id: 'payments', title: 'Total Payments Processed', value: 12560, iconName: 'Zap', trend: 5.2 },
-    { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 853020, iconName: 'Activity', trend: 12.1 },
-    { id: 'uptime', title: 'Node Uptime', value: '99.98%', iconName: 'Clock', trend: 0.01 },
-    { id: 'channels', title: 'Active Channels', value: 78, iconName: 'Network', trend: -2 },
-  ];
+  // --- Forwarding Fees Earned (sats) ---
+  // Assumes `forwardings` table with `fee_msat` column (in millisatoshis)
+  const feesQuery = `
+    SELECT SUM(fee_msat) as total_fees_msat
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+  `;
+
+  // --- Active Channels ---
+  // Assumes `channels` table with `state` column (e.g., 'CHANNELD_NORMAL' for active in c-lightning)
+  // Adjust 'CHANNELD_NORMAL' if your active state has a different name.
+  const activeChannelsQuery = `
+    SELECT COUNT(*) as active_channels
+    FROM \`${projectId}.${datasetId}.channels\`
+    WHERE state = 'CHANNELD_NORMAL'
+  `;
+  
+  // --- Connected Peers ---
+  // Assumes `peers` table with `connected` column (boolean)
+  const connectedPeersQuery = `
+    SELECT COUNT(*) as connected_peers
+    FROM \`${projectId}.${datasetId}.peers\`
+    WHERE connected = TRUE
+  `;
+
+  try {
+    const [paymentsJob] = await bigquery.createQueryJob({ query: paymentsQuery });
+    const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
+    const [activeChannelsJob] = await bigquery.createQueryJob({ query: activeChannelsQuery });
+    const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
+
+    const [[paymentsResult]] = await paymentsJob.getQueryResults();
+    const [[feesResult]] = await feesJob.getQueryResults();
+    const [[activeChannelsResult]] = await activeChannelsJob.getQueryResults();
+    const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
+    
+    const totalPayments = paymentsResult?.total_payments || 0;
+    const totalFeesMsat = feesResult?.total_fees_msat || 0;
+    const activeChannels = activeChannelsResult?.active_channels || 0;
+    const connectedPeers = connectedPeersResult?.connected_peers || 0;
+
+    // Convert fees from msat to sat
+    const totalFeesSats = Math.floor(Number(totalFeesMsat) / 1000);
+
+    return [
+      { id: 'payments', title: 'Total Payments Processed', value: Number(totalPayments), iconName: 'Zap' },
+      { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: totalFeesSats, iconName: 'Activity' },
+      { id: 'active_channels', title: 'Active Channels', value: Number(activeChannels), iconName: 'Network' },
+      { id: 'connected_peers', title: 'Connected Peers', value: Number(connectedPeers), iconName: 'Users' },
+    ];
+
+  } catch (error) {
+    console.error("Error fetching key metrics from BigQuery:", error);
+    // Return mock or placeholder data in case of error
+    return [
+        { id: 'payments', title: 'Total Payments Processed', value: 'Error', iconName: 'Zap' },
+        { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 'Error', iconName: 'Activity' },
+        { id: 'active_channels', title: 'Active Channels', value: 'Error', iconName: 'Network' },
+        { id: 'connected_peers', title: 'Connected Peers', value: 'Error', iconName: 'Users' },
+    ];
+  }
 }
 
 export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> {
-  await delay(800); // Simulate network latency
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing. Returning empty time series.");
+    return [];
+  }
 
-  // In a real application, you would fetch this data from your API:
-  // const response = await fetch('/api/node/historical-payment-volume');
-  // if (!response.ok) {
-  //   throw new Error('Failed to fetch historical payment volume');
-  // }
-  // const data = await response.json();
-  // return data;
+  // --- Historical Payment Volume ---
+  // Assumes `forwardings` table with `received_time` (Unix timestamp) and `out_msatoshi` (forwarded amount in msat)
+  // Fetches data for the last 30 days.
+  // IMPORTANT: `received_time` is assumed to be a UNIX timestamp (seconds). If it's a different format,
+  // the `TIMESTAMP_SECONDS(CAST(received_time AS INT64))` part needs adjustment.
+  // If `received_time` is already a TIMESTAMP type in BigQuery, you can use `DATE(received_time)`.
+  const query = `
+    SELECT
+      DATE(TIMESTAMP_SECONDS(CAST(received_time AS INT64))) AS day,
+      SUM(out_msatoshi) AS total_volume_msat
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+      AND received_time IS NOT NULL # Ensure timestamp is not null
+      AND TIMESTAMP_SECONDS(CAST(received_time AS INT64)) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+    GROUP BY day
+    ORDER BY day ASC
+  `;
   
-  console.log("Fetching historical payment volume from server service...");
-  // Returning mock-like data for now
-  const generateTimeSeries = (days: number, startValue: number, fluctuation: number): TimeSeriesData[] => {
-    const data: TimeSeriesData[] = [];
-    let currentDate = new Date();
-    currentDate.setDate(currentDate.getDate() - days);
-    for (let i = 0; i < days; i++) {
-      data.push({
-        date: currentDate.toISOString().split('T')[0],
-        value: Math.max(0, startValue + (Math.random() - 0.5) * fluctuation * (i / 10)), // Adjusted fluctuation effect
-      });
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    return data;
-  };
-  return generateTimeSeries(30, 500000, 150000); // Increased fluctuation for more dynamic mock data
+  try {
+    const [job] = await bigquery.createQueryJob({ query: query });
+    const [rows] = await job.getQueryResults();
+
+    return rows.map(row => ({
+      date: formatDateFromBQ(row.day), // row.day should be a BigQuery Date object or similar
+      value: Math.floor(Number(row.total_volume_msat) / 1000), // Convert msat to sat
+    }));
+
+  } catch (error) {
+    console.error("Error fetching historical payment volume from BigQuery:", error);
+    return []; // Return empty array on error
+  }
 }
