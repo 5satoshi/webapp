@@ -5,21 +5,17 @@ import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { format } from 'date-fns';
 
-const projectId = process.env.BIGQUERY_PROJECT_ID;
-const datasetId = process.env.BIGQUERY_DATASET_ID;
+const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
+const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
 
 let bigquery: BigQuery | undefined;
 
-if (projectId && datasetId) {
-  try {
-    console.log(`Initializing BigQuery client with projectId: ${projectId}, datasetId: ${datasetId}`);
-    bigquery = new BigQuery({ projectId });
-    console.log("BigQuery client initialized successfully.");
-  } catch (error) {
-    console.error("Failed to initialize BigQuery client:", error);
-  }
-} else {
-  console.warn("BIGQUERY_PROJECT_ID or BIGQUERY_DATASET_ID is not set in environment variables. BigQuery functionality will be impaired.");
+try {
+  console.log(`Initializing BigQuery client with projectId: ${projectId}, datasetId: ${datasetId}`);
+  bigquery = new BigQuery({ projectId });
+  console.log("BigQuery client initialized successfully.");
+} catch (error) {
+  console.error("Failed to initialize BigQuery client:", error);
 }
 
 function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | string | Date | { value: string }): string {
@@ -33,32 +29,57 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
 
   if (typeof (timestamp as { value: string }).value === 'string') {
     const bqValue = (timestamp as { value: string }).value;
+    // Check if it's already just a date string like 'YYYY-MM-DD' from DATE()
     if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) {
-        dateToFormat = new Date(bqValue + 'T00:00:00');
+        dateToFormat = new Date(bqValue + 'T00:00:00Z'); // Assume UTC if only date
     } else {
-        dateToFormat = new Date(bqValue);
+        dateToFormat = new Date(bqValue); // Assume full timestamp string
     }
   } else if (typeof timestamp === 'string') {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
-        dateToFormat = new Date(timestamp + 'T00:00:00');
+     if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+        dateToFormat = new Date(timestamp + 'T00:00:00Z'); // Assume UTC
     } else {
         dateToFormat = new Date(timestamp);
     }
   } else if (timestamp instanceof Date) {
     dateToFormat = timestamp;
   } else {
-    console.warn("Unexpected date format in formatDateFromBQ. Received:", timestamp, "Returning today's date as fallback.");
+    console.warn("Unexpected date format in formatDateFromBQ. Received:", JSON.stringify(timestamp), "Returning today's date as fallback.");
     dateToFormat = new Date();
   }
   
   if (isNaN(dateToFormat.getTime())) {
-    console.warn("Failed to parse date in formatDateFromBQ. Original value:", timestamp, "Returning today's date as fallback.");
+    console.warn("Failed to parse date in formatDateFromBQ. Original value:", JSON.stringify(timestamp), "Returning today's date as fallback.");
     return format(new Date(), 'yyyy-MM-dd');
   }
   
   return format(dateToFormat, 'yyyy-MM-dd');
 }
 
+// Map c-lightning channel states to UI-friendly statuses
+function mapChannelStatus(state: string): Channel['status'] {
+  if (!state) return 'inactive';
+  // Based on https://lightning.readthedocs.io/lightning-listpeers.7.html#states
+  switch (state.toUpperCase()) {
+    case 'OPENINGD':
+    case 'CHANNELD_AWAITING_LOCKIN':
+      return 'pending';
+    case 'CHANNELD_NORMAL':
+      return 'active';
+    case 'CHANNELD_SHUTTING_DOWN':
+    case 'CLOSINGD_SIGEXCHANGE':
+    case 'CLOSINGD_COMPLETE':
+    case 'AWAITING_UNILATERAL':
+    case 'FUNDING_SPEND_SEEN':
+    case 'ONCHAIN':
+    case 'DUALOPEND_OPEN_INIT':
+    case 'DUALOPEND_AWAITING_LOCKIN':
+      return 'inactive'; // Could be 'closing' or 'closed' - simplified to 'inactive'
+    default:
+      console.warn(`Unknown channel state: ${state}, defaulting to inactive.`);
+      return 'inactive';
+  }
+}
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   if (!bigquery || !datasetId) {
@@ -83,17 +104,17 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
-  // Updated to query 'peers' table for active channels
+  // Query 'peers' table for active channels
   const activeChannelsQuery = `
     SELECT COUNT(*) as active_channels
     FROM \`${projectId}.${datasetId}.peers\` 
-    WHERE active = TRUE
+    WHERE state = 'CHANNELD_NORMAL' 
   `;
-  // Updated to query 'peers' table for connected peers, assuming 'destination' is the peer_id column
+  // Query 'peers' table for connected peers with active channels
   const connectedPeersQuery = `
-    SELECT COUNT(DISTINCT destination) as connected_peers 
+    SELECT COUNT(DISTINCT id) as connected_peers 
     FROM \`${projectId}.${datasetId}.peers\` 
-    WHERE active = TRUE
+    WHERE state = 'CHANNELD_NORMAL'
   `;
   
   try {
@@ -174,7 +195,7 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
         return [];
     }
 
-    return rows.map(row => {
+    const formattedRows = rows.map(row => {
       if (!row || row.day === null || row.day === undefined) {
         console.warn("Skipping row with null/undefined date in historical payment volume:", JSON.stringify(row));
         return null; 
@@ -183,7 +204,9 @@ export async function fetchHistoricalPaymentVolume(): Promise<TimeSeriesData[]> 
         date: formatDateFromBQ(row.day), 
         value: Math.floor(Number(row.total_volume_msat || 0) / 1000), 
       };
-    }).filter(item => item !== null) as TimeSeriesData[];
+    }).filter(item => item !== null);
+
+    return formattedRows as TimeSeriesData[];
 
   } catch (error) {
     console.error("Error fetching historical payment volume from BigQuery:", error);
@@ -196,21 +219,19 @@ export async function fetchChannels(): Promise<Channel[]> {
     console.error("BigQuery client not initialized or datasetId missing for fetchChannels. Returning empty channel list.");
     return [];
   }
-  console.log(`Fetching channels from BigQuery 'peers' table...`);
+  console.log(`Fetching channels from BigQuery 'peers' table using new schema...`);
 
-  // Querying the 'peers' table. 
-  // ASSUMPTION: 'peers' table has 'short_channel_id', 'destination' (as peer_id), 
-  // 'amount_msat' (as capacity), 'active', and 'last_update'.
-  // PLEASE VERIFY these column names against your actual 'peers' table schema.
   const query = `
     SELECT
-      short_channel_id, 
-      destination, 
-      amount_msat, 
-      active,
-      last_update 
+      id,                  -- Peer's public key
+      funding_txid,
+      funding_outnum,
+      msatoshi_total,
+      msatoshi_to_us,
+      state                -- Channel state
+      -- last_update -- Not available in the provided schema directly for the channel
     FROM \`${projectId}.${datasetId}.peers\`
-    ORDER BY active DESC, short_channel_id
+    ORDER BY state, id
   `;
 
   try {
@@ -225,31 +246,27 @@ export async function fetchChannels(): Promise<Channel[]> {
     }
 
     return rows.map(row => {
-      const capacitySats = Math.floor(Number(row.amount_msat || 0) / 1000);
-      // Placeholder for local/remote balance as it's not in the assumed schema for 'peers' table
-      const localBalanceSats = Math.floor(capacitySats / 2);
-      const remoteBalanceSats = capacitySats - localBalanceSats;
+      const msatTotal = Number(row.msatoshi_total || 0);
+      const msatToUs = Number(row.msatoshi_to_us || 0);
       
-      const status: Channel['status'] = row.active === true ? 'active' : 'inactive';
-
-      // Placeholders for uptime and success rate
-      let uptime = 0;
-      let historicalPaymentSuccessRate = 0;
-      if (status === 'active') {
-        uptime = 99; // Placeholder, adjust if actual data is available
-        historicalPaymentSuccessRate = 98; // Placeholder
-      }
+      const capacitySats = Math.floor(msatTotal / 1000);
+      const localBalanceSats = Math.floor(msatToUs / 1000);
+      const remoteBalanceSats = Math.floor((msatTotal - msatToUs) / 1000);
+      
+      const channelId = (row.funding_txid && row.funding_outnum !== null) 
+                        ? `${row.funding_txid}:${row.funding_outnum}` 
+                        : `unknown-channel-${row.id}-${Math.random().toString(36).substring(7)}`;
 
       return {
-        id: String(row.short_channel_id || `unknown-channel-id-${Math.random()}`), 
-        peerNodeId: String(row.destination || 'unknown-peer-id'), // ASSUMPTION: 'destination' is the peer's pubkey
+        id: channelId, 
+        peerNodeId: String(row.id || 'unknown-peer-id'),
         capacity: capacitySats,
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
-        status: status,
-        uptime: uptime, 
-        historicalPaymentSuccessRate: historicalPaymentSuccessRate,
-        lastUpdate: row.last_update ? formatDateFromBQ(row.last_update) : new Date().toISOString().split('T')[0],
+        status: mapChannelStatus(row.state),
+        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, // Placeholder
+        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, // Placeholder
+        lastUpdate: new Date().toISOString().split('T')[0], // Placeholder for last_update
       };
     });
 
