@@ -37,8 +37,8 @@ export default async function OverviewPage({
     {
       id: 'max_payment_period',
       title: `Max Payment Forwarded (last ${currentAggregationLabel})`,
-      displayValue: forwardingSummary.maxPaymentForwardedSats.toLocaleString(),
-      unit: 'sats',
+      displayValue: (forwardingSummary.maxPaymentForwardedSats / 100000000).toFixed(3),
+      unit: 'BTC',
       iconName: 'BarChart3',
     },
     {
