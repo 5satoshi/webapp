@@ -52,13 +52,13 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
   if (typeof (timestamp as { value: string }).value === 'string') {
     const bqValue = (timestamp as { value: string }).value;
     if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) { 
-        dateToFormat = parseISO(bqValue + 'T00:00:00Z'); // Assume UTC if only date
+        dateToFormat = parseISO(bqValue + 'T00:00:00Z'); 
     } else {
-        dateToFormat = parseISO(bqValue); // Standard ISO string
+        dateToFormat = parseISO(bqValue); 
     }
   } else if (typeof timestamp === 'string') {
      if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) { 
-        dateToFormat = parseISO(timestamp + 'T00:00:00Z'); // Assume UTC
+        dateToFormat = parseISO(timestamp + 'T00:00:00Z'); 
     } else {
         dateToFormat = parseISO(timestamp);
     }
@@ -108,10 +108,10 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchKeyMetrics. Returning N/A metrics.");
     return [
-        { id: 'payments', title: 'Total Payments Processed', value: 'N/A', iconName: 'Zap' },
-        { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 'N/A', iconName: 'Activity' },
-        { id: 'active_channels', title: 'Active Channels', value: 'N/A', iconName: 'Network' },
-        { id: 'connected_peers', title: 'Connected Peers', value: 'N/A', iconName: 'Users' },
+        { id: 'payments', title: 'Total Payments Processed', displayValue: 'N/A', unit: 'Payments', iconName: 'Zap' },
+        { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'N/A', unit: 'sats', iconName: 'Activity' },
+        { id: 'active_channels', title: 'Active Channels', displayValue: 'N/A', unit: 'Channels', iconName: 'Network' },
+        { id: 'connected_peers', title: 'Connected Peers', displayValue: 'N/A', unit: 'Peers', iconName: 'Users' },
     ];
   }
 
@@ -157,19 +157,19 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     const totalFeesSats = Math.floor(totalFeesMsat / 1000);
 
     return [
-      { id: 'payments', title: 'Total Payments Processed', value: totalPayments.toLocaleString(), iconName: 'Zap' },
-      { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: totalFeesSats.toLocaleString(), iconName: 'Activity' },
-      { id: 'active_channels', title: 'Active Channels', value: activeChannels.toLocaleString(), iconName: 'Network' },
-      { id: 'connected_peers', title: 'Connected Peers', value: connectedPeers.toLocaleString(), iconName: 'Users' },
+      { id: 'payments', title: 'Total Payments Processed', displayValue: totalPayments.toLocaleString(), unit: 'Payments', iconName: 'Zap' },
+      { id: 'fees', title: 'Forwarding Fees Earned', displayValue: totalFeesSats.toLocaleString(), unit: 'sats', iconName: 'Activity' },
+      { id: 'active_channels', title: 'Active Channels', displayValue: activeChannels.toLocaleString(), unit: 'Channels', iconName: 'Network' },
+      { id: 'connected_peers', title: 'Connected Peers', displayValue: connectedPeers.toLocaleString(), unit: 'Peers', iconName: 'Users' },
     ];
 
   } catch (error) {
     logBigQueryError("fetchKeyMetrics", error);
     return [
-        { id: 'payments', title: 'Total Payments Processed', value: 'Error', iconName: 'Zap' },
-        { id: 'fees', title: 'Forwarding Fees Earned (sats)', value: 'Error', iconName: 'Activity' },
-        { id: 'active_channels', title: 'Active Channels', value: 'Error', iconName: 'Network' },
-        { id: 'connected_peers', title: 'Connected Peers', value: 'Error', iconName: 'Users' },
+        { id: 'payments', title: 'Total Payments Processed', displayValue: 'Error', unit: 'Payments', iconName: 'Zap' },
+        { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'Error', unit: 'sats', iconName: 'Activity' },
+        { id: 'active_channels', title: 'Active Channels', displayValue: 'Error', unit: 'Channels', iconName: 'Network' },
+        { id: 'connected_peers', title: 'Connected Peers', displayValue: 'Error', unit: 'Peers', iconName: 'Users' },
     ];
   }
 }
@@ -224,7 +224,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
       }
       return {
         date: formatDateFromBQ(row.date_group), 
-        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, // msat to BTC
+        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, 
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
@@ -308,29 +308,29 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
       endOfPeriod = endOfDay(yesterday);
       break;
     case 'week':
-      const dayInLastWeek = subWeeks(now, 1);
-      startOfPeriod = startOfWeek(dayInLastWeek, { weekStartsOn: 1 }); // Assuming Monday start
-      endOfPeriod = endOfWeek(dayInLastWeek, { weekStartsOn: 1 });
+      const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }); // Monday of last week
+      startOfPeriod = lastWeekStart;
+      endOfPeriod = endOfWeek(lastWeekStart, { weekStartsOn: 1 }); // Sunday of last week
       break;
     case 'month':
-      const dayInLastMonth = subMonths(now, 1);
-      startOfPeriod = startOfMonth(dayInLastMonth);
-      endOfPeriod = endOfMonth(dayInLastMonth);
+      const lastMonthStart = startOfMonth(subMonths(now, 1));
+      startOfPeriod = lastMonthStart;
+      endOfPeriod = endOfMonth(lastMonthStart);
       break;
     case 'quarter':
-      const dayInLastQuarter = subQuarters(now, 1);
-      startOfPeriod = startOfQuarter(dayInLastQuarter);
-      endOfPeriod = endOfQuarter(dayInLastQuarter);
+      const lastQuarterStart = startOfQuarter(subQuarters(now, 1));
+      startOfPeriod = lastQuarterStart;
+      endOfPeriod = endOfQuarter(lastQuarterStart);
       break;
-    default: // Fallback to 'day' logic (yesterday) if an unknown period is passed
+    default: 
       const yesterdayDefault = subDays(now, 1);
       startOfPeriod = startOfDay(yesterdayDefault);
       endOfPeriod = endOfDay(yesterdayDefault);
       break;
   }
   return { 
-    startDate: format(startOfPeriod, "yyyy-MM-dd'T'00:00:00"), 
-    endDate: format(endOfPeriod, "yyyy-MM-dd'T'23:59:59") 
+    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ss"), 
+    endDate: format(endOfPeriod, "yyyy-MM-dd'T'HH:mm:ss") 
   };
 }
 
@@ -433,6 +433,3 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
     return { openedCount: 0, closedCount: 0 };
   }
 }
-
-
-    

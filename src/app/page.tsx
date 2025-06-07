@@ -37,25 +37,29 @@ export default async function OverviewPage({
     {
       id: 'max_payment_period',
       title: `Max Payment Forwarded (last ${currentAggregationLabel})`,
-      value: `${forwardingSummary.maxPaymentForwardedSats.toLocaleString()} sats`,
+      displayValue: forwardingSummary.maxPaymentForwardedSats.toLocaleString(),
+      unit: 'sats',
       iconName: 'BarChart3',
     },
     {
       id: 'fees_earned_period',
       title: `Fees Earned (last ${currentAggregationLabel})`,
-      value: `${forwardingSummary.totalFeesEarnedSats.toLocaleString()} sats`,
+      displayValue: forwardingSummary.totalFeesEarnedSats.toLocaleString(),
+      unit: 'sats',
       iconName: 'Activity',
     },
     {
       id: 'payments_forwarded_period',
       title: `Payments Forwarded (last ${currentAggregationLabel})`,
-      value: forwardingSummary.paymentsForwardedCount.toLocaleString(),
+      displayValue: forwardingSummary.paymentsForwardedCount.toLocaleString(),
+      unit: 'Payments',
       iconName: 'Zap',
     },
     {
       id: 'channel_changes_period',
       title: `Channel Changes (last ${currentAggregationLabel})`,
-      value: `${channelActivity.openedCount} Opened / ${channelActivity.closedCount} Closed`,
+      displayValue: `${channelActivity.openedCount} / ${channelActivity.closedCount}`,
+      unit: 'Opened / Closed',
       iconName: 'Network',
     },
   ];
@@ -85,7 +89,7 @@ export default async function OverviewPage({
             </Tabs>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6"> {/* Added space-y-6 for spacing */}
+        <CardContent className="space-y-6">
           <SampleOverviewChart data={historicalPaymentVolume} aggregationPeriod={currentAggregation} />
           
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

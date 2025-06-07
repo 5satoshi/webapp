@@ -2,20 +2,21 @@
 export interface KeyMetric {
   id: string;
   title: string;
-  value: string | number;
-  iconName: 'Zap' | 'Activity' | 'Clock' | 'Network' | 'BarChart3' | 'PieChart' | 'LineChart' | 'Users'; // Added 'Users'
+  displayValue: string; // Changed from 'value'
+  unit?: string;          // New optional field for units
+  iconName: 'Zap' | 'Activity' | 'Clock' | 'Network' | 'BarChart3' | 'PieChart' | 'LineChart' | 'Users';
   description?: string;
-  trend?: number; // Optional: for showing percentage change
+  trend?: number; 
 }
 
 export interface Channel {
   id: string;
   peerNodeId: string;
-  capacity: number; // in satoshis
-  localBalance: number; // in satoshis
-  remoteBalance: number; // in satoshis
-  uptime: number; // percentage
-  historicalPaymentSuccessRate: number; // percentage
+  capacity: number; 
+  localBalance: number; 
+  remoteBalance: number; 
+  uptime: number; 
+  historicalPaymentSuccessRate: number; 
   lastUpdate: string;
   status: 'active' | 'inactive' | 'pending';
 }
@@ -25,15 +26,15 @@ export interface AlertSetting {
   metric: string;
   threshold: number;
   condition: 'above' | 'below';
-  notificationChannel: 'email' | 'sms' | 'app'; // Simplified
+  notificationChannel: 'email' | 'sms' | 'app'; 
   isEnabled: boolean;
 }
 
 export interface TimeSeriesData {
-  date: string; // Should be in 'YYYY-MM-DD' format
-  paymentVolume: number; // Renamed from 'value'
+  date: string; 
+  paymentVolume: number; 
   transactionCount?: number;
-  [key: string]: any; // For multiple lines in a chart
+  [key: string]: any; 
 }
 
 export interface FeeDistributionData {
@@ -52,7 +53,7 @@ export interface DailyRoutingVolumeData {
 }
 
 export interface PaymentAmountDistributionData {
-  range: string; // e.g., "0-1k sats"
+  range: string; 
   frequency: number;
 }
 
@@ -63,15 +64,15 @@ export interface AveragePaymentValueData {
 
 export interface NetworkSubsumptionData {
   date: string;
-  micro: number; // percentage for 200 sats
-  common: number; // percentage for 50,000 sats
-  macro: number; // percentage for 4,000,000 sats
+  micro: number; 
+  common: number; 
+  macro: number; 
 }
 
 export interface HeatmapCell {
-  day: number; // 0 (Sun) - 6 (Sat) or 0 (Mon) - 6 (Sun)
-  hour: number; // 0-23
-  intensity: number; // 0-1, represents traffic intensity
+  day: number; 
+  hour: number; 
+  intensity: number; 
 }
 
 export interface Recommendation {
@@ -80,17 +81,16 @@ export interface Recommendation {
   priority: 'High' | 'Medium' | 'Low';
 }
 
-// AI Input Data for string fields
 export type AiStructuredInput = {
   totalPaymentsProcessed: number;
   forwardingFeesEarned: number;
-  nodeUptime: number; // This might be harder to get from BQ, consider if this is still the best metric name
+  nodeUptime: number; 
   numberOfChannels: number;
-  historicalRoutingData: string; // JSON string or descriptive text
-  feeDistributionData: string; // JSON string or descriptive text
-  routingActivityData: string; // JSON string or descriptive text
-  paymentAmountDistributionData: string; // JSON string or descriptive text
-  networkSubsumptionMetricsData: string; // JSON string or descriptive text
-  timingPatternsHeatmapData: string; // JSON string or descriptive text
+  historicalRoutingData: string; 
+  feeDistributionData: string; 
+  routingActivityData: string; 
+  paymentAmountDistributionData: string; 
+  networkSubsumptionMetricsData: string; 
+  timingPatternsHeatmapData: string; 
 };
 
