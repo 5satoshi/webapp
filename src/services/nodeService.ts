@@ -297,7 +297,6 @@ export async function fetchChannels(): Promise<Channel[]> {
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
         status: mapChannelStatus(row.state),
-        uptime: mapChannelStatus(row.state) === 'active' ? 100 : 90, 
         historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, 
         lastUpdate: new Date().toISOString(), 
       };

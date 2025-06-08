@@ -15,11 +15,10 @@ export interface KeyMetric {
 export interface Channel {
   id: string;
   peerNodeId: string;
-  peerAlias?: string; // Added peerAlias
+  peerAlias?: string; 
   capacity: number; 
   localBalance: number; 
   remoteBalance: number; 
-  uptime: number; 
   historicalPaymentSuccessRate: number; 
   lastUpdate: string;
   status: 'active' | 'inactive' | 'pending';

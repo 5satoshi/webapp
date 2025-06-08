@@ -75,7 +75,6 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                 <TableHead className="text-right">Capacity (sats)</TableHead>
                 <TableHead>Balance (Local/Remote %)</TableHead>
                 <TableHead className="text-right">Success Rate</TableHead>
-                <TableHead className="text-right">Uptime</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -83,7 +82,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
             <TableBody>
               {filteredChannels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     No channels found.
                   </TableCell>
                 </TableRow>
@@ -110,7 +109,6 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                         </div>
                       </TableCell>
                       <TableCell className="text-right">{channel.historicalPaymentSuccessRate}%</TableCell>
-                      <TableCell className="text-right">{channel.uptime}%</TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(channel.status)} className="capitalize">{channel.status}</Badge>
                       </TableCell>
