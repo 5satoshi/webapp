@@ -279,7 +279,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         SUM(total_forwards) as total_forwards
       FROM (
         SELECT
-          in_channel as scid,
+          in_channel as scid, -- Corrected column name
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
@@ -287,7 +287,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         GROUP BY in_channel
         UNION ALL
         SELECT
-          out_channel as scid,
+          out_channel as scid, -- Corrected column name
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
@@ -387,8 +387,8 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
     ),
     AggregatedForwardingStats AS (
         SELECT
-            MIN(received_time) AS first_tx_timestamp_bq,
-            MAX(COALESCE(resolved_time, received_time)) AS last_tx_timestamp_bq,
+            MIN(received_time) AS first_tx_timestamp_bq_val,
+            MAX(COALESCE(resolved_time, received_time)) AS last_tx_timestamp_bq_val,
             COUNTIF(status = 'settled') AS total_tx_count_val,
 
             SUM(IF(in_channel = @shortChannelId AND status = 'settled', 1, 0)) AS in_tx_count_successful_val,
@@ -401,18 +401,10 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
 
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
         FROM ForwardingsForChannel
-    ),
-    LatestChannelUpdatePolicy AS (
-      SELECT
-        u.fee_base_msat,
-        u.fee_proportional_millionths,
-        ROW_NUMBER() OVER(PARTITION BY u.short_channel_id ORDER BY u.timestamp DESC) as rn -- Assuming 'timestamp' column exists in 'updates'
-      FROM \`${projectId}.${datasetId}.updates\` u -- Querying the 'updates' table
-      WHERE u.short_channel_id = @shortChannelId
     )
     SELECT
-        afs.first_tx_timestamp_bq,
-        afs.last_tx_timestamp_bq,
+        afs.first_tx_timestamp_bq_val AS first_tx_timestamp_bq,
+        afs.last_tx_timestamp_bq_val AS last_tx_timestamp_bq,
         COALESCE(afs.total_tx_count_val, 0) as total_tx_count,
         
         COALESCE(afs.in_tx_count_successful_val, 0) as in_tx_count,
@@ -425,10 +417,15 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
 
         COALESCE(afs.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_on_this_channel_msat,
         
-        lcup.fee_base_msat as our_node_fee_base_msat,
-        lcup.fee_proportional_millionths as our_node_fee_ppm
-    FROM AggregatedForwardingStats afs
-    LEFT JOIN LatestChannelUpdatePolicy lcup ON lcup.rn = 1
+        p.updates.local.fee_base_msat as our_node_fee_base_msat,
+        p.updates.local.fee_proportional_millionths as our_node_fee_ppm
+    FROM 
+        \`${projectId}.${datasetId}.peers\` p
+    CROSS JOIN 
+        AggregatedForwardingStats afs
+    WHERE 
+        p.short_channel_id = @shortChannelId
+    LIMIT 1
   `;
 
   const options = {
@@ -716,3 +713,4 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
     return { latestShare: null, previousShare: null };
   }
 }
+
