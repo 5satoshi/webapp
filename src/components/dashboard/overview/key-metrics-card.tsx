@@ -2,6 +2,7 @@
 import type { KeyMetric } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Zap, Activity, Users, Network, BarChart3, PieChart, LineChart, Clock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type React from 'react';
 
@@ -31,9 +32,18 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       <div className="p-4 h-16 flex flex-col justify-start">
         <div className="flex flex-row items-start justify-between">
           <div className="flex-1 mr-2 space-y-0.5">
-            <h3 className="text-sm font-medium text-muted-foreground font-body line-clamp-1 leading-tight">
-              {metric.title}
-            </h3>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h3 className="text-sm font-medium text-muted-foreground font-body line-clamp-1 leading-tight">
+                    {metric.title}
+                  </h3>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{metric.title}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {/* Description is likely too much for h-16, keeping it minimal or relying on title */}
              {metric.description && (
               <p className="text-xs text-muted-foreground line-clamp-1 leading-tight">
