@@ -118,13 +118,13 @@ export interface ChannelDetails {
   inTxCount: number; // Successful incoming
   inTxVolumeSats: number;
   inSuccessRate: number;
-  peerFeePolicy: string | null; // Peer's advertised fee policy (base + ppm) for *their* outgoing direction on this channel
-
+  
   // Outgoing stats (from our node via this channel)
   outTxCount: number; // Successful outgoing
   outTxVolumeSats: number;
   outSuccessRate: number;
 
-  // Fees earned by our node
+  // Fees earned by our node & our node's policy for this channel
   totalFeesEarnedSats: number; // Total fees earned when this channel was the outgoing hop for our node
+  ourAdvertisedPolicy: string | null; // Our node's advertised fee policy for this channel (e.g., "X msat + Y ppm")
 }

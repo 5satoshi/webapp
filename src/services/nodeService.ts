@@ -402,13 +402,13 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
         FROM ForwardingsForChannel
     ),
-    PeerChannelInfo AS (
+    LatestChannelUpdatePolicy AS (
       SELECT
-        p.feerate_base_msat,
-        p.feerate_ppm
-      FROM \`${projectId}.${datasetId}.peers\` p
-      WHERE p.short_channel_id = @shortChannelId
-      LIMIT 1 
+        u.fee_base_msat,
+        u.fee_proportional_millionths,
+        ROW_NUMBER() OVER(PARTITION BY u.short_channel_id ORDER BY u.timestamp DESC) as rn -- Assuming 'timestamp' column exists in 'updates'
+      FROM \`${projectId}.${datasetId}.updates\` u -- Querying the 'updates' table
+      WHERE u.short_channel_id = @shortChannelId
     )
     SELECT
         afs.first_tx_timestamp_bq,
@@ -424,11 +424,11 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         IF(COALESCE(afs.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(afs.out_tx_count_successful_val, 0) * 100.0, COALESCE(afs.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
 
         COALESCE(afs.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_on_this_channel_msat,
-
-        pci.feerate_base_msat as peer_feerate_base_msat,
-        pci.feerate_ppm as peer_feerate_ppm
+        
+        lcup.fee_base_msat as our_node_fee_base_msat,
+        lcup.fee_proportional_millionths as our_node_fee_ppm
     FROM AggregatedForwardingStats afs
-    LEFT JOIN PeerChannelInfo pci ON TRUE 
+    LEFT JOIN LatestChannelUpdatePolicy lcup ON lcup.rn = 1
   `;
 
   const options = {
@@ -453,24 +453,23 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         inSuccessRate: 0,
         outSuccessRate: 0,
         totalFeesEarnedSats: 0,
-        peerFeePolicy: null,
+        ourAdvertisedPolicy: null,
       };
     }
     
     const result = rows[0];
 
-    const peerBaseMsat = result.peer_feerate_base_msat;
-    const peerPpm = result.peer_feerate_ppm;
-    let peerFeePolicyString: string | null = null;
+    const ourNodeBaseMsat = result.our_node_fee_base_msat;
+    const ourNodePpm = result.our_node_fee_ppm;
+    let ourPolicyString: string | null = null;
 
-    if (peerBaseMsat !== null && peerBaseMsat !== undefined && peerPpm !== null && peerPpm !== undefined) {
-        peerFeePolicyString = `${Number(peerBaseMsat).toLocaleString('en-US')} msat + ${Number(peerPpm).toLocaleString('en-US')} ppm`;
-    } else if (peerBaseMsat !== null && peerBaseMsat !== undefined) {
-        peerFeePolicyString = `${Number(peerBaseMsat).toLocaleString('en-US')} msat base`;
-    } else if (peerPpm !== null && peerPpm !== undefined) {
-        peerFeePolicyString = `${Number(peerPpm).toLocaleString('en-US')} ppm`;
+    if (ourNodeBaseMsat !== null && ourNodeBaseMsat !== undefined && ourNodePpm !== null && ourNodePpm !== undefined) {
+        ourPolicyString = `${Number(ourNodeBaseMsat).toLocaleString('en-US')} msat + ${Number(ourNodePpm).toLocaleString('en-US')} ppm`;
+    } else if (ourNodeBaseMsat !== null && ourNodeBaseMsat !== undefined) {
+        ourPolicyString = `${Number(ourNodeBaseMsat).toLocaleString('en-US')} msat base`;
+    } else if (ourNodePpm !== null && ourNodePpm !== undefined) {
+        ourPolicyString = `${Number(ourNodePpm).toLocaleString('en-US')} ppm`;
     }
-
 
     return {
       shortChannelId: shortChannelId,
@@ -484,7 +483,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
       inSuccessRate: parseFloat(Number(result.in_success_rate || 0).toFixed(2)),
       outSuccessRate: parseFloat(Number(result.out_success_rate || 0).toFixed(2)),
       totalFeesEarnedSats: Math.floor(Number(result.total_fees_earned_on_this_channel_msat || 0) / 1000),
-      peerFeePolicy: peerFeePolicyString,
+      ourAdvertisedPolicy: ourPolicyString,
     };
 
   } catch (error) {
