@@ -74,7 +74,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
             tickMargin={8}
             tickFormatter={(value) => `${Number(value).toFixed(2)}`} // Format for BTC, 2 decimal places
             className="text-xs"
-            domain={['auto', 'auto']}
+            domain={[0, 'auto']}
           />
           <YAxis
             yAxisId="right"
@@ -83,7 +83,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
             axisLine={false}
             tickMargin={8}
             className="text-xs"
-            domain={['auto', 'auto']}
+            domain={[0, 'auto']}
              tickFormatter={(value) => value.toLocaleString()}
           />
           <ChartTooltip
