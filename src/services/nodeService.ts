@@ -300,32 +300,29 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
   const now = new Date();
   let startOfPeriod: Date;
   let endOfPeriod: Date;
+  const yesterday = subDays(now, 1);
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day':
-      const yesterday = subDays(now, 1);
+    case 'day': // Yesterday
       startOfPeriod = startOfDay(yesterday);
       endOfPeriod = endOfDay(yesterday);
       break;
-    case 'week':
-      const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }); // Monday of last week
-      startOfPeriod = lastWeekStart;
-      endOfPeriod = endOfWeek(lastWeekStart, { weekStartsOn: 1 }); // Sunday of last week
+    case 'week': // Last 7 days, excluding today (i.e., 7 days ending yesterday)
+      endOfPeriod = endOfDay(yesterday);
+      startOfPeriod = startOfDay(subDays(yesterday, 6)); // 6 days before yesterday = 7 days total
       break;
-    case 'month':
-      const lastMonthStart = startOfMonth(subMonths(now, 1));
-      startOfPeriod = lastMonthStart;
-      endOfPeriod = endOfMonth(lastMonthStart);
+    case 'month': // Last 30 days, excluding today (i.e., 30 days ending yesterday)
+      endOfPeriod = endOfDay(yesterday);
+      startOfPeriod = startOfDay(subDays(yesterday, 29)); // 29 days before yesterday = 30 days total
       break;
-    case 'quarter':
-      const lastQuarterStart = startOfQuarter(subQuarters(now, 1));
-      startOfPeriod = lastQuarterStart;
-      endOfPeriod = endOfQuarter(lastQuarterStart);
+    case 'quarter': // Last 90 days, excluding today (i.e., 90 days ending yesterday)
+      endOfPeriod = endOfDay(yesterday);
+      startOfPeriod = startOfDay(subDays(yesterday, 89)); // 89 days before yesterday = 90 days total
       break;
     default: 
-      const yesterdayDefault = subDays(now, 1);
-      startOfPeriod = startOfDay(yesterdayDefault);
-      endOfPeriod = endOfDay(yesterdayDefault);
+      // Default to yesterday if an unknown aggregation period is provided
+      startOfPeriod = startOfDay(yesterday);
+      endOfPeriod = endOfDay(yesterday);
       break;
   }
   return { 
@@ -433,3 +430,4 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
     return { openedCount: 0, closedCount: 0 };
   }
 }
+
