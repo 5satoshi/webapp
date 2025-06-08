@@ -254,17 +254,46 @@ export async function fetchChannels(): Promise<Channel[]> {
         ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
       FROM \`${projectId}.${datasetId}.betweenness\`
       WHERE alias IS NOT NULL AND TRIM(alias) != ''
+    ),
+    ChannelForwardingStats AS (
+      SELECT
+        scid,
+        SUM(successful_forwards) as successful_forwards,
+        SUM(total_forwards) as total_forwards
+      FROM (
+        SELECT
+          in_channel_id as scid,
+          COUNTIF(status = 'settled') as successful_forwards,
+          COUNT(*) as total_forwards
+        FROM \`${projectId}.${datasetId}.forwardings\`
+        WHERE in_channel_id IS NOT NULL
+        GROUP BY in_channel_id
+        UNION ALL
+        SELECT
+          out_channel_id as scid,
+          COUNTIF(status = 'settled') as successful_forwards,
+          COUNT(*) as total_forwards
+        FROM \`${projectId}.${datasetId}.forwardings\`
+        WHERE out_channel_id IS NOT NULL
+        GROUP BY out_channel_id
+      )
+      WHERE scid IS NOT NULL
+      GROUP BY scid
     )
     SELECT
-      p.id,
+      p.id as peer_node_id,        
       p.funding_txid,        
-      p.funding_outnum,      
+      p.funding_outnum,
+      p.short_channel_id, -- Assuming this column exists in the 'peers' table for this channel
       p.msatoshi_total,      
       p.msatoshi_to_us,      
       p.state,
-      la.alias AS peer_alias             
+      la.alias AS peer_alias,
+      COALESCE(cfs.successful_forwards, 0) as successful_forwards_count,
+      COALESCE(cfs.total_forwards, 0) as total_forwards_count           
     FROM \`${projectId}.${datasetId}.peers\` p
     LEFT JOIN LatestAliases la ON p.id = la.nodeid AND la.rn = 1
+    LEFT JOIN ChannelForwardingStats cfs ON p.short_channel_id = cfs.scid
     ORDER BY p.state, p.id
   `;
 
@@ -288,7 +317,17 @@ export async function fetchChannels(): Promise<Channel[]> {
                         ? `${row.funding_txid}:${row.funding_outnum}` 
                         : `peer-${row.id || 'unknown'}-${Math.random().toString(36).substring(2, 9)}`;
 
+      const successfulForwards = Number(row.successful_forwards_count || 0);
+      const totalForwards = Number(row.total_forwards_count || 0);
+      const channelStatus = mapChannelStatus(row.state);
+      let successRate: number;
 
+      if (totalForwards > 0) {
+        successRate = parseFloat(((successfulForwards / totalForwards) * 100).toFixed(1));
+      } else {
+        successRate = channelStatus === 'active' ? 100 : 0;
+      }
+      
       return {
         id: channelIdString, 
         peerNodeId: String(row.id || 'unknown-peer-id'),
@@ -296,8 +335,8 @@ export async function fetchChannels(): Promise<Channel[]> {
         capacity: capacitySats,
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
-        status: mapChannelStatus(row.state),
-        historicalPaymentSuccessRate: mapChannelStatus(row.state) === 'active' ? 99 : 95, 
+        status: channelStatus,
+        historicalPaymentSuccessRate: successRate, 
         lastUpdate: new Date().toISOString(), 
       };
     });
