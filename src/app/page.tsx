@@ -111,7 +111,10 @@ export default async function OverviewPage({
 
   return (
     <div className="space-y-6">
-      <PageTitle title="Node Overview" description="Key performance indicators and trends for your Lightning node." />
+      <PageTitle 
+        title="Node Overview" 
+        description="Welcome to the 5satoshi Lightning Node dashboard. This platform offers a transparent view into our node's performance, operational strategy, and ongoing journey within the Lightning Network." 
+      />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {keyMetrics.map((metric) => (
@@ -150,9 +153,6 @@ export default async function OverviewPage({
           <CardTitle className="font-headline">About 5satoshi</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          <p className="text-muted-foreground">
-            Welcome to the 5satoshi Lightning Node dashboard. This platform offers a transparent view into our node's performance, operational strategy, and ongoing journey within the Lightning Network.
-          </p>
           <p>
             Operating since Spring 2019, 5satoshi began as an experimental endeavor. It has since matured into a mid-scale routing node, distinguished by its pursuit of alternative configurations that differ from those of large, central routing entities.
           </p>
