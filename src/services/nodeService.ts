@@ -306,13 +306,13 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
     case 'day': // Yesterday
       startOfPeriod = startOfDay(subDays(now, 1));
       break;
-    case 'week': // Last 7 full days (ending yesterday)
+    case 'week': // Last 7 full days ending yesterday
       startOfPeriod = startOfDay(subDays(now, 7));
       break;
-    case 'month': // Last 30 full days (ending yesterday)
+    case 'month': // Last 30 full days ending yesterday
       startOfPeriod = startOfDay(subDays(now, 30));
       break;
-    case 'quarter': // Last 90 full days (ending yesterday)
+    case 'quarter': // Last 90 full days ending yesterday
       startOfPeriod = startOfDay(subDays(now, 90));
       break;
     default: // Default to yesterday
@@ -438,15 +438,15 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
     SELECT rank
     FROM \`${projectId}.${datasetId}.betweenness\`
     WHERE nodeid = @nodeId AND type = 'common'
-    ORDER BY created_at DESC
+    ORDER BY timestamp DESC
     LIMIT 1
   `;
 
   const previousRankQuery = `
     SELECT rank
     FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @nodeId AND type = 'common' AND created_at < TIMESTAMP(@periodStartDate)
-    ORDER BY created_at DESC
+    WHERE nodeid = @nodeId AND type = 'common' AND timestamp < TIMESTAMP(@periodStartDate)
+    ORDER BY timestamp DESC
     LIMIT 1
   `;
 
