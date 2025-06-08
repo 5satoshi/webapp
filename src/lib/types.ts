@@ -119,4 +119,8 @@ export interface ChannelDetails {
   outTxVolumeSats: number;
   inSuccessRate: number;
   outSuccessRate: number;
+  totalFeesEarnedSats: number; // Total fees earned when this channel was the outgoing hop
+  avgOutboundFeePpm: number | null; // Avg fee rate (ppm) when this channel was outgoing
+  avgInboundFeePpm: number | null; // Avg fee rate (ppm) on forwards that used this channel as incoming
 }
+
