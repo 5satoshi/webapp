@@ -299,35 +299,29 @@ export async function fetchChannels(): Promise<Channel[]> {
 
 function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
+  const yesterday = endOfDay(subDays(now, 1)); // End of yesterday for all calculations
   let startOfPeriod: Date;
-  let endOfPeriod: Date;
-  const yesterday = endOfDay(subDays(now, 1)); // End of yesterday is the most recent point for "last N days"
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'day': // Yesterday
       startOfPeriod = startOfDay(subDays(now, 1));
-      endOfPeriod = yesterday;
       break;
-    case 'week': // Last 7 days, ending yesterday
-      startOfPeriod = startOfDay(subDays(now, 7)); 
-      endOfPeriod = yesterday;
+    case 'week': // Last 7 full days (ending yesterday)
+      startOfPeriod = startOfDay(subDays(now, 7));
       break;
-    case 'month': // Last 30 days, ending yesterday
+    case 'month': // Last 30 full days (ending yesterday)
       startOfPeriod = startOfDay(subDays(now, 30));
-      endOfPeriod = yesterday;
       break;
-    case 'quarter': // Last 90 days, ending yesterday
+    case 'quarter': // Last 90 full days (ending yesterday)
       startOfPeriod = startOfDay(subDays(now, 90));
-      endOfPeriod = yesterday;
       break;
-    default: 
+    default: // Default to yesterday
       startOfPeriod = startOfDay(subDays(now, 1));
-      endOfPeriod = yesterday;
       break;
   }
   return { 
     startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"), 
-    endDate: format(endOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX") 
+    endDate: format(yesterday, "yyyy-MM-dd'T'HH:mm:ssXXX") 
   };
 }
 
@@ -439,13 +433,11 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
 
   const nodeId = specificNodeId; 
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
-  // periodStartDateString is the start of the current N-day window.
-  // For previous rank, we need data *before* this timestamp.
 
   const latestRankQuery = `
     SELECT rank
     FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE id = @nodeId
+    WHERE nodeid = @nodeId AND type = 'common'
     ORDER BY created_at DESC
     LIMIT 1
   `;
@@ -453,7 +445,7 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
   const previousRankQuery = `
     SELECT rank
     FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE id = @nodeId AND created_at < TIMESTAMP(@periodStartDate)
+    WHERE nodeid = @nodeId AND type = 'common' AND created_at < TIMESTAMP(@periodStartDate)
     ORDER BY created_at DESC
     LIMIT 1
   `;
@@ -480,3 +472,4 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
     return { latestRank: null, previousRank: null };
   }
 }
+
