@@ -109,15 +109,15 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchKeyMetrics. Returning N/A metrics.");
     return [
-        { id: 'payments', title: 'Total Payments Processed', displayValue: 'N/A', unit: 'Payments', iconName: 'Zap' },
+        { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: 'N/A', unit: 'Forwards', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'N/A', unit: 'sats', iconName: 'Activity' },
-        { id: 'total_volume', title: 'Total Payment Volume', displayValue: 'N/A', unit: 'BTC', iconName: 'BarChart3' },
+        { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: 'N/A', unit: 'BTC', iconName: 'BarChart3' },
         { id: 'connected_peers', title: 'Connected Peers', displayValue: 'N/A', unit: 'Peers', iconName: 'Users' },
     ];
   }
 
-  const paymentsQuery = `
-    SELECT COUNT(*) as total_payments
+  const forwardsQuery = `
+    SELECT COUNT(*) as total_forwards
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
@@ -126,7 +126,7 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
-  const totalVolumeQuery = `
+  const totalForwardingVolumeQuery = `
     SELECT SUM(out_msat) as total_volume_msat
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
@@ -138,47 +138,47 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   `;
   
   try {
-    const [paymentsJob] = await bigquery.createQueryJob({ query: paymentsQuery });
-    const [[paymentsResult]] = await paymentsJob.getQueryResults();
+    const [forwardsJob] = await bigquery.createQueryJob({ query: forwardsQuery });
+    const [[forwardsResult]] = await forwardsJob.getQueryResults();
     
     const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
     const [[feesResult]] = await feesJob.getQueryResults();
 
-    const [totalVolumeJob] = await bigquery.createQueryJob({ query: totalVolumeQuery });
-    const [[totalVolumeResult]] = await totalVolumeJob.getQueryResults();
+    const [totalForwardingVolumeJob] = await bigquery.createQueryJob({ query: totalForwardingVolumeQuery });
+    const [[totalForwardingVolumeResult]] = await totalForwardingVolumeJob.getQueryResults();
     
     const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
     const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
         
-    const totalPayments = Number(paymentsResult?.total_payments || 0);
+    const totalForwards = Number(forwardsResult?.total_forwards || 0);
     const totalFeesMsat = Number(feesResult?.total_fees_msat || 0);
-    const totalVolumeMsat = Number(totalVolumeResult?.total_volume_msat || 0);
+    const totalForwardingVolumeMsat = Number(totalForwardingVolumeResult?.total_volume_msat || 0);
     const connectedPeers = Number(connectedPeersResult?.connected_peers || 0);
 
     const totalFeesSats = Math.floor(totalFeesMsat / 1000);
-    const totalVolumeBtc = totalVolumeMsat / 1000 / 100000000; // msat to sat, then sat to BTC
+    const totalForwardingVolumeBtc = totalForwardingVolumeMsat / 1000 / 100000000; // msat to sat, then sat to BTC
 
     return [
-      { id: 'payments', title: 'Total Payments Processed', displayValue: totalPayments.toLocaleString(), unit: 'Payments', iconName: 'Zap' },
+      { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: totalForwards.toLocaleString(), unit: 'Forwards', iconName: 'Zap' },
       { id: 'fees', title: 'Forwarding Fees Earned', displayValue: totalFeesSats.toLocaleString(), unit: 'sats', iconName: 'Activity' },
-      { id: 'total_volume', title: 'Total Payment Volume', displayValue: totalVolumeBtc.toFixed(4), unit: 'BTC', iconName: 'BarChart3' },
+      { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: totalForwardingVolumeBtc.toFixed(4), unit: 'BTC', iconName: 'BarChart3' },
       { id: 'connected_peers', title: 'Connected Peers', displayValue: connectedPeers.toLocaleString(), unit: 'Peers', iconName: 'Users' },
     ];
 
   } catch (error) {
     logBigQueryError("fetchKeyMetrics", error);
     return [
-        { id: 'payments', title: 'Total Payments Processed', displayValue: 'Error', unit: 'Payments', iconName: 'Zap' },
+        { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: 'Error', unit: 'Forwards', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'Error', unit: 'sats', iconName: 'Activity' },
-        { id: 'total_volume', title: 'Total Payment Volume', displayValue: 'Error', unit: 'BTC', iconName: 'BarChart3' },
+        { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: 'Error', unit: 'BTC', iconName: 'BarChart3' },
         { id: 'connected_peers', title: 'Connected Peers', displayValue: 'Error', unit: 'Peers', iconName: 'Users' },
     ];
   }
 }
 
-export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = 'day'): Promise<TimeSeriesData[]> {
+export async function fetchHistoricalForwardingVolume(aggregationPeriod: string = 'day'): Promise<TimeSeriesData[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalPaymentVolume. Returning empty time series.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalForwardingVolume. Returning empty time series.");
     return [];
   }
 
@@ -226,7 +226,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
       }
       return {
         date: formatDateFromBQ(row.date_group), 
-        paymentVolume: Number(row.total_volume_msat || 0) / 100000000000, 
+        forwardingVolume: Number(row.total_volume_msat || 0) / 100000000000, 
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
@@ -235,7 +235,7 @@ export async function fetchHistoricalPaymentVolume(aggregationPeriod: string = '
     return formattedAndSortedRows as TimeSeriesData[];
 
   } catch (error) {
-    logBigQueryError(`fetchHistoricalPaymentVolume (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchHistoricalForwardingVolume (aggregation: ${aggregationPeriod})`, error);
     return []; 
   }
 }
@@ -326,10 +326,10 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
   };
 }
 
-export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; paymentsForwardedCount: number; }> {
+export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; forwardsProcessedCount: number; }> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchPeriodForwardingSummary.");
-    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, paymentsForwardedCount: 0 };
+    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, forwardsProcessedCount: 0 };
   }
   
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
@@ -338,7 +338,7 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
     SELECT
       MAX(out_msat) as max_payment_msat,
       SUM(fee_msat) as total_fees_msat,
-      COUNT(*) as payments_count
+      COUNT(*) as forwards_count
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
       AND received_time >= TIMESTAMP(@startDate)
@@ -358,11 +358,11 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
     return {
       maxPaymentForwardedSats: Math.floor(Number(result.max_payment_msat || 0) / 1000),
       totalFeesEarnedSats: Math.floor(Number(result.total_fees_msat || 0) / 1000),
-      paymentsForwardedCount: Number(result.payments_count || 0),
+      forwardsProcessedCount: Number(result.forwards_count || 0),
     };
   } catch (error) {
     logBigQueryError(`fetchPeriodForwardingSummary (aggregation: ${aggregationPeriod})`, error);
-    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, paymentsForwardedCount: 0 };
+    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, forwardsProcessedCount: 0 };
   }
 }
 
@@ -521,3 +521,4 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
     return { latestShare: null, previousShare: null };
   }
 }
+

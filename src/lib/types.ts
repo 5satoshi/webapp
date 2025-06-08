@@ -9,7 +9,7 @@ export interface KeyMetric {
   trend?: number; 
   absoluteChange?: number;
   absoluteChangeDescription?: string;
-  absoluteChangeDirection?: 'higher_is_better' | 'lower_is_better'; // New property
+  absoluteChangeDirection?: 'higher_is_better' | 'lower_is_better';
 }
 
 export interface Channel {
@@ -35,7 +35,7 @@ export interface AlertSetting {
 
 export interface TimeSeriesData {
   date: string; 
-  paymentVolume: number; 
+  forwardingVolume: number; 
   transactionCount?: number;
   [key: string]: any; 
 }

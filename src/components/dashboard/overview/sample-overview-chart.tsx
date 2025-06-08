@@ -13,8 +13,8 @@ interface SampleOverviewChartProps {
 }
 
 const chartConfig = {
-  paymentVolume: {
-    label: "Payment Volume (BTC)",
+  forwardingVolume: {
+    label: "Forwarding Volume (BTC)",
     color: "hsl(var(--chart-1))",
   },
   transactionCount: {
@@ -93,7 +93,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
                 indicator="dot" 
                 formatter={(value, name, props) => {
                   const itemConfig = chartConfig[name as keyof typeof chartConfig];
-                  const formattedValue = name === 'paymentVolume' 
+                  const formattedValue = name === 'forwardingVolume' 
                     ? `${Number(value).toFixed(6)} BTC` // Format for BTC in tooltip
                     : Number(value).toLocaleString();
                   return (
@@ -115,9 +115,9 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
           <ChartLegend content={<ChartLegendContent />} />
           <Bar
             yAxisId="left"
-            dataKey="paymentVolume"
-            name="Payment Volume (BTC)"
-            fill="var(--color-paymentVolume)"
+            dataKey="forwardingVolume"
+            name="Forwarding Volume (BTC)"
+            fill="var(--color-forwardingVolume)"
             radius={[4, 4, 0, 0]}
           />
           <Line
@@ -135,3 +135,4 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
     </div>
   );
 }
+

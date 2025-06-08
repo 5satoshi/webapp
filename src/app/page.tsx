@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data'; 
 import { 
   fetchKeyMetrics, 
-  fetchHistoricalPaymentVolume,
+  fetchHistoricalForwardingVolume,
   fetchPeriodForwardingSummary,
   fetchPeriodChannelActivity,
   fetchBetweennessRank,
@@ -109,7 +109,7 @@ export default async function OverviewPage({
   }
 
   const keyMetrics = await fetchKeyMetrics();
-  const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
+  const historicalForwardingVolume = await fetchHistoricalForwardingVolume(currentAggregation);
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
@@ -171,12 +171,12 @@ export default async function OverviewPage({
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
     {
-      id: 'payments_forwarded_period',
-      title: `Payments Forwarded (last ${descriptiveLabel})`,
-      displayValue: (await fetchPeriodForwardingSummary(currentAggregation)).paymentsForwardedCount.toLocaleString(),
-      unit: 'Payments',
+      id: 'forwards_processed_period',
+      title: `Forwards Processed (last ${descriptiveLabel})`,
+      displayValue: (await fetchPeriodForwardingSummary(currentAggregation)).forwardsProcessedCount.toLocaleString(),
+      unit: 'Forwards',
       iconName: 'Zap',
-      description: `Total payments successfully forwarded in the last ${descriptiveLabel.toLowerCase()}.`,
+      description: `Total forwards successfully processed in the last ${descriptiveLabel.toLowerCase()}.`,
     },
     {
       id: 'channel_changes_period',
@@ -227,7 +227,7 @@ export default async function OverviewPage({
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <CardTitle className="font-headline">Historical Payment Volume & Period Activity</CardTitle>
+            <CardTitle className="font-headline">Historical Forwarding Volume & Period Activity</CardTitle>
             <Tabs value={currentAggregation} className="w-full sm:w-auto">
               <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                 {aggregationPeriodOptions.map(option => (
@@ -240,7 +240,7 @@ export default async function OverviewPage({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <SampleOverviewChart data={historicalPaymentVolume} aggregationPeriod={currentAggregation} />
+          <SampleOverviewChart data={historicalForwardingVolume} aggregationPeriod={currentAggregation} />
           
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {periodMetrics.map((metric) => (
