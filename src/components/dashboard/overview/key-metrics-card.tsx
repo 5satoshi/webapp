@@ -63,9 +63,9 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       </div>
 
       {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16, Centered Content */}
-      <div className="px-4 h-16 flex items-center justify-center gap-1">
+      <div className="px-4 h-16 flex items-center justify-center">
         {hasAbsoluteChange ? (
-          <>
+          <div className="flex items-center gap-1"> {/* Inner div for grouping icon and text */}
             {/* Icon, only if change is not zero */}
             {metric.absoluteChange !== 0 && (
               metric.absoluteChangeDirection === 'higher_is_better' ?
@@ -91,7 +91,7 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
               {' '}
               {metric.absoluteChangeDescription || "change"}
             </span>
-          </>
+          </div>
         ) : (
           <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
             {hasTrend ? (
