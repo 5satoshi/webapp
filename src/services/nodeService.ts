@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -299,23 +299,23 @@ export async function fetchChannels(): Promise<Channel[]> {
 
 function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
-  const yesterday = endOfDay(subDays(now, 1)); // End of yesterday for all calculations
+  const yesterday = endOfDay(subDays(now, 1)); 
   let startOfPeriod: Date;
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': // Yesterday
+    case 'day': 
       startOfPeriod = startOfDay(subDays(now, 1));
       break;
-    case 'week': // Last 7 full days ending yesterday
+    case 'week': 
       startOfPeriod = startOfDay(subDays(now, 7));
       break;
-    case 'month': // Last 30 full days ending yesterday
+    case 'month': 
       startOfPeriod = startOfDay(subDays(now, 30));
       break;
-    case 'quarter': // Last 90 full days ending yesterday
+    case 'quarter': 
       startOfPeriod = startOfDay(subDays(now, 90));
       break;
-    default: // Default to yesterday
+    default: 
       startOfPeriod = startOfDay(subDays(now, 1));
       break;
   }
@@ -456,14 +456,14 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
       params: { nodeId: nodeId }
     });
     const [[latestRankResult]] = await latestRankJob.getQueryResults();
-    const latestRank = latestRankResult?.rank !== undefined ? Number(latestRankResult.rank) : null;
+    const latestRank = latestRankResult?.rank !== undefined && latestRankResult?.rank !== null ? Number(latestRankResult.rank) : null;
 
     const [previousRankJob] = await bigquery.createQueryJob({
       query: previousRankQuery,
       params: { nodeId: nodeId, periodStartDate: periodStartDateString }
     });
     const [[previousRankResult]] = await previousRankJob.getQueryResults();
-    const previousRank = previousRankResult?.rank !== undefined ? Number(previousRankResult.rank) : null;
+    const previousRank = previousRankResult?.rank !== undefined && previousRankResult?.rank !== null ? Number(previousRankResult.rank) : null;
     
     return { latestRank, previousRank };
 
@@ -473,3 +473,50 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
   }
 }
 
+export async function fetchShortestPathShare(aggregationPeriod: string): Promise<ShortestPathShareData> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchShortestPathShare.");
+    return { latestShare: null, previousShare: null };
+  }
+
+  const nodeId = specificNodeId;
+  const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
+
+  const latestShareQuery = `
+    SELECT shortest_path_share
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE nodeid = @nodeId AND type = 'common'
+    ORDER BY timestamp DESC
+    LIMIT 1
+  `;
+
+  const previousShareQuery = `
+    SELECT shortest_path_share
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE nodeid = @nodeId AND type = 'common' AND timestamp < TIMESTAMP(@periodStartDate)
+    ORDER BY timestamp DESC
+    LIMIT 1
+  `;
+
+  try {
+    const [latestShareJob] = await bigquery.createQueryJob({
+      query: latestShareQuery,
+      params: { nodeId: nodeId }
+    });
+    const [[latestShareResult]] = await latestShareJob.getQueryResults();
+    const latestShare = latestShareResult?.shortest_path_share !== undefined && latestShareResult?.shortest_path_share !== null ? Number(latestShareResult.shortest_path_share) : null;
+
+    const [previousShareJob] = await bigquery.createQueryJob({
+      query: previousShareQuery,
+      params: { nodeId: nodeId, periodStartDate: periodStartDateString }
+    });
+    const [[previousShareResult]] = await previousShareJob.getQueryResults();
+    const previousShare = previousShareResult?.shortest_path_share !== undefined && previousShareResult?.shortest_path_share !== null ? Number(previousShareResult.shortest_path_share) : null;
+
+    return { latestShare, previousShare };
+
+  } catch (error) {
+    logBigQueryError(`fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod})`, error);
+    return { latestShare: null, previousShare: null };
+  }
+}

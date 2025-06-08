@@ -11,9 +11,10 @@ import {
   fetchHistoricalPaymentVolume,
   fetchPeriodForwardingSummary,
   fetchPeriodChannelActivity,
-  fetchBetweennessRank
+  fetchBetweennessRank,
+  fetchShortestPathShare
 } from '@/services/nodeService';
-import type { KeyMetric, BetweennessRankData } from '@/lib/types';
+import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
 
 
@@ -30,9 +31,10 @@ export default async function OverviewPage({
 
   const keyMetrics = await fetchKeyMetrics();
   const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
-  const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation);
+  // const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation); // Replaced by shortestPathShare
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
+  const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
   
   let descriptiveLabel = 'Day';
   switch (currentAggregation) {
@@ -53,6 +55,16 @@ export default async function OverviewPage({
       break;
   }
 
+  const shortestPathShareLatest = shortestPathShareData.latestShare;
+  const shortestPathSharePrevious = shortestPathShareData.previousShare;
+  const shortestPathDisplayValue = shortestPathShareLatest !== null 
+    ? `${(shortestPathShareLatest * 100).toFixed(3)}%` 
+    : 'N/A';
+  let shortestPathAbsoluteChange: number | undefined = undefined;
+  if (shortestPathShareLatest !== null && shortestPathSharePrevious !== null) {
+    shortestPathAbsoluteChange = parseFloat(((shortestPathShareLatest - shortestPathSharePrevious) * 100).toFixed(3));
+  }
+
   const periodMetrics: KeyMetric[] = [
     {
       id: 'betweenness_rank',
@@ -66,18 +78,21 @@ export default async function OverviewPage({
       description: `Node's current betweenness centrality rank. Lower is better. Change shown vs prior period.`,
     },
     {
-      id: 'fees_earned_period',
-      title: `Fees Earned (last ${descriptiveLabel})`,
-      displayValue: forwardingSummary.totalFeesEarnedSats.toLocaleString(),
-      unit: 'sats',
-      iconName: 'Activity',
+      id: 'shortest_path_share',
+      title: `Shortest Path Share (last ${descriptiveLabel})`,
+      displayValue: shortestPathDisplayValue,
+      iconName: 'PieChart',
+      absoluteChange: shortestPathAbsoluteChange,
+      absoluteChangeDescription: `% vs previous`,
+      description: `Expected fraction of routing attempts using this node for common payments.`,
     },
     {
       id: 'payments_forwarded_period',
       title: `Payments Forwarded (last ${descriptiveLabel})`,
-      displayValue: forwardingSummary.paymentsForwardedCount.toLocaleString(),
+      displayValue: (await fetchPeriodForwardingSummary(currentAggregation)).paymentsForwardedCount.toLocaleString(), // Fetching here for simplicity
       unit: 'Payments',
       iconName: 'Zap',
+      description: `Total payments successfully forwarded in the last ${descriptiveLabel.toLowerCase()}.`,
     },
     {
       id: 'channel_changes_period',
@@ -85,6 +100,7 @@ export default async function OverviewPage({
       displayValue: `${channelActivity.openedCount} / ${channelActivity.closedCount}`,
       unit: 'Opened / Closed',
       iconName: 'Network',
+      description: `Channels opened vs closed in the last ${descriptiveLabel.toLowerCase()}.`,
     },
   ];
 

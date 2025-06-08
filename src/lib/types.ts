@@ -100,3 +100,8 @@ export interface BetweennessRankData {
   latestRank: number | null;
   previousRank: number | null;
 }
+
+export interface ShortestPathShareData {
+  latestShare: number | null;
+  previousShare: number | null;
+}
