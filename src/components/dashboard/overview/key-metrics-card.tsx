@@ -25,14 +25,13 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
   const IconComponent = iconMap[metric.iconName] || Activity;
   
   const hasAbsoluteChange = typeof metric.absoluteChange === 'number';
-  const isPositiveAbsoluteChange = hasAbsoluteChange && metric.absoluteChange! > 0; // For rank, positive change might mean worse
-  const isImprovement = hasAbsoluteChange && metric.absoluteChange! < 0; // For rank, negative change means improvement (e.g. 10 -> 5)
+  const isImprovement = hasAbsoluteChange && metric.absoluteChange! < 0; // For rank, negative change means improvement
 
   const hasTrend = typeof metric.trend === 'number' && !hasAbsoluteChange;
   const isPositiveTrend = hasTrend && metric.trend! >= 0;
 
   return (
-    <Card className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <Card className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
       {/* Top Section: Title, Icon - Fixed Height h-16 */}
       <div className="p-4 h-16 flex flex-col justify-start">
         <div className="flex flex-row items-start justify-between">
@@ -50,7 +49,7 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {metric.description && (
+            {metric.description && !hasAbsoluteChange && ( // Show description here only if not showing absolute change card's description
               <p className="text-xs text-muted-foreground line-clamp-1 leading-tight">
                 {metric.description}
               </p>
@@ -68,36 +67,40 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       </div>
 
       {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16 */}
-      <div className="p-4 h-16 flex items-center">
-        <div className="flex items-center w-full">
-          {hasAbsoluteChange ? (
+      <div className="px-4 h-16 flex items-center">
+        {hasAbsoluteChange ? (
+          <div className="flex items-center justify-center w-full"> {/* Centering wrapper for absoluteChange */}
             <p className={cn(
-                "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1",
+                "text-xs text-muted-foreground flex items-center gap-1",
                 isImprovement ? "text-green-500" : (metric.absoluteChange === 0 ? "text-muted-foreground" : "text-red-500")
             )}>
                 {metric.absoluteChange !== 0 && (isImprovement ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />)}
                 {metric.absoluteChange! > 0 ? '+' : ''}{metric.absoluteChange} {metric.absoluteChangeDescription || "change"}
             </p>
-          ) : hasTrend ? (
-            <p className={cn(
-                "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1",
-                isPositiveTrend ? "text-green-500" : "text-red-500"
-            )}>
-                {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
-            </p>
-          ) : (
-            <div className="h-4 w-4" /> // Placeholder to maintain alignment if no trend/change
-          )}
-          
-          <div className="flex-grow" /> 
+          </div>
+        ) : (
+          <div className="flex items-center w-full"> {/* Original layout for trend/unit */}
+            {hasTrend ? (
+              <p className={cn(
+                  "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1",
+                  isPositiveTrend ? "text-green-500" : "text-red-500"
+              )}>
+                  {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
+              </p>
+            ) : (
+              <div className="h-4 w-4" /> // Placeholder to maintain alignment if no trend
+            )}
+            
+            <div className="flex-grow" /> 
 
-          {metric.unit && (
-            <p className="text-sm text-muted-foreground font-body line-clamp-1">
-                {metric.unit}
-            </p>
-          )}
-        </div>
+            {metric.unit && (
+              <p className="text-sm text-muted-foreground font-body line-clamp-1">
+                  {metric.unit}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );
