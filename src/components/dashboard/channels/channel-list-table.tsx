@@ -76,13 +76,12 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                 <TableHead>Balance (Local/Remote %)</TableHead>
                 <TableHead className="text-right">Success Rate</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredChannels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No channels found.
                   </TableCell>
                 </TableRow>
@@ -111,31 +110,6 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                       <TableCell className="text-right">{channel.historicalPaymentSuccessRate}%</TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(channel.status)} className="capitalize">{channel.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <TriangleAlert className="mr-2 h-4 w-4" />
-                              Adjust Fees
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              Close Channel
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
