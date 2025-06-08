@@ -199,14 +199,14 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                       <TableCell className="font-medium truncate max-w-xs" title={tooltipTitle}>
                         {displayPeer}
                       </TableCell>
-                      <TableCell className="text-right">{channel.capacity.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{channel.capacity.toLocaleString('en-US')}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                            <Progress value={localBalancePercent} className="w-20 h-2" />
                            <span>{localBalancePercent.toFixed(0)}%</span>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                            {channel.localBalance.toLocaleString()} / {channel.remoteBalance.toLocaleString()}
+                            {channel.localBalance.toLocaleString('en-US')} / {channel.remoteBalance.toLocaleString('en-US')}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">{channel.historicalPaymentSuccessRate}%</TableCell>
