@@ -77,7 +77,7 @@ export default async function OverviewPage({
       absoluteChange: (betweennessRankData.latestRank !== null && betweennessRankData.previousRank !== null) 
                       ? betweennessRankData.latestRank - betweennessRankData.previousRank 
                       : undefined,
-      absoluteChangeDescription: ``, // Removed "vs previous"
+      absoluteChangeDescription: ``, 
       absoluteChangeDirection: 'lower_is_better',
       description: `Node's current betweenness centrality rank. Lower is better. Change shown vs prior period.`,
     },
@@ -87,7 +87,7 @@ export default async function OverviewPage({
       displayValue: shortestPathDisplayValue,
       iconName: 'PieChart',
       absoluteChange: shortestPathAbsoluteChange,
-      absoluteChangeDescription: `%`, // Changed from "% vs previous"
+      absoluteChangeDescription: `%`, 
       absoluteChangeDirection: 'higher_is_better',
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
@@ -142,6 +142,26 @@ export default async function OverviewPage({
               <KeyMetricsCard key={metric.id} metric={metric} />
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">About 5satoshi</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <p className="text-muted-foreground">
+            Welcome to the 5satoshi Lightning Node dashboard. This platform offers a transparent view into our node's performance, operational strategy, and ongoing journey within the Lightning Network.
+          </p>
+          <p>
+            Operating since Spring 2019, 5satoshi began as an experimental endeavor. It has since matured into a mid-scale routing node, distinguished by its pursuit of alternative configurations that differ from those of large, central routing entities.
+          </p>
+          <p>
+            Our core mission is to identify and refine setups that enable operators with limited budgets to run profitable, efficient mid-sized routing nodes, emphasizing low local failure rates. For peer discovery and channel management, we leverage the services of lightningnetwork.plus.
+          </p>
+          <p>
+            Summer 2022 marked the formal start of our intensive routing activities. The initial phase focuses on understanding our network topology and impact. To facilitate this, routing fees are generally minimized (e.g., 1 ppm with a zero base fee) to encourage traffic, while channels with more constrained liquidity may have appropriately higher ppm fees.
+          </p>
         </CardContent>
       </Card>
       
