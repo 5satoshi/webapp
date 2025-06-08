@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, PaymentAmountDistributionData, AveragePaymentValueData } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -176,10 +176,10 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     const totalForwardingVolumeBtc = totalForwardingVolumeMsat / 1000 / 100000000; // msat to sat, then sat to BTC
 
     return [
-      { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: totalForwards.toLocaleString(), unit: 'Forwards', iconName: 'Zap' },
-      { id: 'fees', title: 'Forwarding Fees Earned', displayValue: totalFeesSats.toLocaleString(), unit: 'sats', iconName: 'Activity' },
+      { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: totalForwards.toLocaleString('en-US'), unit: 'Forwards', iconName: 'Zap' },
+      { id: 'fees', title: 'Forwarding Fees Earned', displayValue: totalFeesSats.toLocaleString('en-US'), unit: 'sats', iconName: 'Activity' },
       { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: totalForwardingVolumeBtc.toFixed(4), unit: 'BTC', iconName: 'BarChart3' },
-      { id: 'connected_peers', title: 'Connected Peers', displayValue: connectedPeers.toLocaleString(), unit: 'Peers', iconName: 'Users' },
+      { id: 'connected_peers', title: 'Connected Peers', displayValue: connectedPeers.toLocaleString('en-US'), unit: 'Peers', iconName: 'Users' },
     ];
 
   } catch (error) {
@@ -200,19 +200,24 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
   }
 
   let dateGroupingExpression = "";
+  let limit = 20;
   switch (aggregationPeriod.toLowerCase()) {
     case 'week':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))";
+      limit = 12; // Approx 3 months
       break;
     case 'month':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
+      limit = 12; // 1 year
       break;
     case 'quarter':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), QUARTER)";
+      limit = 8; // 2 years
       break;
     case 'day':
     default:
       dateGroupingExpression = "DATE(received_time)";
+      limit = 30; // Approx 1 month
       break;
   }
 
@@ -226,7 +231,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
       AND received_time IS NOT NULL
     GROUP BY date_group
     ORDER BY date_group DESC
-    LIMIT 20 
+    LIMIT ${limit}
   `;
   
   try {
@@ -243,7 +248,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
       }
       return {
         date: formatDateFromBQ(row.date_group), 
-        forwardingVolume: Number(row.total_volume_msat || 0) / 100000000000, 
+        forwardingVolume: Number(row.total_volume_msat || 0) / 100000000000, // msat to BTC
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
@@ -279,7 +284,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         SUM(total_forwards) as total_forwards
       FROM (
         SELECT
-          in_channel as scid, -- Corrected column name
+          in_channel as scid,
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
@@ -287,7 +292,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         GROUP BY in_channel
         UNION ALL
         SELECT
-          out_channel as scid, -- Corrected column name
+          out_channel as scid, 
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
@@ -385,10 +390,11 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         FROM \`${projectId}.${datasetId}.forwardings\`
         WHERE in_channel = @shortChannelId OR out_channel = @shortChannelId
     ),
-    AggregatedForwardingStats AS (
+    AggregatedStats AS (
         SELECT
-            MIN(received_time) AS first_tx_timestamp_bq_val,
-            MAX(COALESCE(resolved_time, received_time)) AS last_tx_timestamp_bq_val,
+            MIN(IF(status = 'settled', received_time, NULL)) AS first_tx_timestamp_bq_val,
+            MAX(IF(status = 'settled', COALESCE(resolved_time, received_time), NULL)) AS last_tx_timestamp_bq_val,
+            
             COUNTIF(status = 'settled') AS total_tx_count_val,
 
             SUM(IF(in_channel = @shortChannelId AND status = 'settled', 1, 0)) AS in_tx_count_successful_val,
@@ -398,31 +404,31 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', 1, 0)) AS out_tx_count_successful_val,
             SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(out_msat, 0), 0)) AS out_tx_volume_msat_val,
-
+            
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
         FROM ForwardingsForChannel
     )
     SELECT
-        afs.first_tx_timestamp_bq_val AS first_tx_timestamp_bq,
-        afs.last_tx_timestamp_bq_val AS last_tx_timestamp_bq,
-        COALESCE(afs.total_tx_count_val, 0) as total_tx_count,
+        agg.first_tx_timestamp_bq_val AS first_tx_timestamp_bq,
+        agg.last_tx_timestamp_bq_val AS last_tx_timestamp_bq,
+        COALESCE(agg.total_tx_count_val, 0) as total_tx_count,
         
-        COALESCE(afs.in_tx_count_successful_val, 0) as in_tx_count,
-        COALESCE(afs.in_tx_volume_msat_val, 0) as in_tx_volume_msat,
-        IF(COALESCE(afs.in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(afs.in_tx_count_successful_val, 0) * 100.0, COALESCE(afs.in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
+        COALESCE(agg.in_tx_count_successful_val, 0) as in_tx_count,
+        COALESCE(agg.in_tx_volume_msat_val, 0) as in_tx_volume_msat,
+        IF(COALESCE(agg.in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.in_tx_count_successful_val, 0) * 100.0, COALESCE(agg.in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
         
-        COALESCE(afs.out_tx_count_successful_val, 0) as out_tx_count,
-        COALESCE(afs.out_tx_volume_msat_val, 0) as out_tx_volume_msat,
-        IF(COALESCE(afs.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(afs.out_tx_count_successful_val, 0) * 100.0, COALESCE(afs.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
+        COALESCE(agg.out_tx_count_successful_val, 0) as out_tx_count,
+        COALESCE(agg.out_tx_volume_msat_val, 0) as out_tx_volume_msat,
+        IF(COALESCE(agg.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.out_tx_count_successful_val, 0) * 100.0, COALESCE(agg.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
 
-        COALESCE(afs.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_on_this_channel_msat,
+        COALESCE(agg.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_msat,
         
         p.updates.local.fee_base_msat as our_node_fee_base_msat,
         p.updates.local.fee_proportional_millionths as our_node_fee_ppm
     FROM 
         \`${projectId}.${datasetId}.peers\` p
     CROSS JOIN 
-        AggregatedForwardingStats afs
+        AggregatedStats agg
     WHERE 
         p.short_channel_id = @shortChannelId
     LIMIT 1
@@ -479,7 +485,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
       outTxVolumeSats: Math.floor(Number(result.out_tx_volume_msat || 0) / 1000),
       inSuccessRate: parseFloat(Number(result.in_success_rate || 0).toFixed(2)),
       outSuccessRate: parseFloat(Number(result.out_success_rate || 0).toFixed(2)),
-      totalFeesEarnedSats: Math.floor(Number(result.total_fees_earned_on_this_channel_msat || 0) / 1000),
+      totalFeesEarnedSats: Math.floor(Number(result.total_fees_earned_msat || 0) / 1000),
       ourAdvertisedPolicy: ourPolicyString,
     };
 
@@ -509,7 +515,7 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
       startOfPeriod = startOfDay(subDays(now, 90));
       break;
     default: 
-      startOfPeriod = startOfDay(subDays(now, 1)); // Default to 'day'
+      startOfPeriod = startOfDay(subDays(now, 1)); 
       break;
   }
   return { 
@@ -714,3 +720,121 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
   }
 }
 
+export async function fetchPaymentAmountDistribution(aggregationPeriod: string): Promise<PaymentAmountDistributionData[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchPaymentAmountDistribution.");
+    return [];
+  }
+  const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
+
+  const query = `
+    SELECT
+      CASE
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000 THEN '0-1k sats'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 1000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 10000 THEN '1k-10k sats'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 10000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 50000 THEN '10k-50k sats'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 50000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 200000 THEN '50k-200k sats'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 200000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000000 THEN '200k-1M sats'
+        ELSE '>1M sats'
+      END AS payment_range,
+      COUNT(*) AS frequency
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+      AND received_time >= TIMESTAMP(@startDate)
+      AND received_time <= TIMESTAMP(@endDate)
+      AND out_msat IS NOT NULL
+    GROUP BY payment_range
+    ORDER BY
+      CASE payment_range
+        WHEN '0-1k sats' THEN 1
+        WHEN '1k-10k sats' THEN 2
+        WHEN '10k-50k sats' THEN 3
+        WHEN '50k-200k sats' THEN 4
+        WHEN '200k-1M sats' THEN 5
+        WHEN '>1M sats' THEN 6
+      END
+  `;
+  const options = {
+    query: query,
+    params: { startDate, endDate }
+  };
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+    return rows.map(row => ({
+      range: String(row.payment_range),
+      frequency: Number(row.frequency),
+    }));
+  } catch (error) {
+    logBigQueryError(`fetchPaymentAmountDistribution (aggregation: ${aggregationPeriod})`, error);
+    return [];
+  }
+}
+
+export async function fetchAveragePaymentValueOverTime(aggregationPeriod: string): Promise<AveragePaymentValueData[]> {
+    if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchAveragePaymentValueOverTime.");
+    return [];
+  }
+
+  let dateGroupingExpression = "";
+  let limit = 20; // Default limit
+
+  switch (aggregationPeriod.toLowerCase()) {
+    case 'week':
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))";
+      limit = 12; // Approx 3 months of weekly data
+      break;
+    case 'month':
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
+      limit = 12; // 1 year of monthly data
+      break;
+    case 'quarter':
+      dateGroupingExpression = "DATE_TRUNC(DATE(received_time), QUARTER)";
+      limit = 8; // 2 years of quarterly data
+      break;
+    case 'day':
+    default:
+      dateGroupingExpression = "DATE(received_time)";
+      limit = 30; // Approx 1 month of daily data
+      break;
+  }
+  
+  const query = `
+    SELECT
+      ${dateGroupingExpression} AS date_group,
+      AVG(SAFE_CAST(out_msat AS NUMERIC) / 1000) AS average_value_sats
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+      AND received_time IS NOT NULL
+      AND out_msat IS NOT NULL
+    GROUP BY date_group
+    ORDER BY date_group DESC
+    LIMIT ${limit}
+  `;
+
+  try {
+    const [job] = await bigquery.createQueryJob({ query });
+    const [rows] = await job.getQueryResults();
+
+    if (!rows || rows.length === 0) {
+      return [];
+    }
+    
+    const formattedAndSortedRows = rows.map(row => {
+       if (!row || row.date_group === null || row.date_group === undefined) {
+        return null;
+      }
+      return {
+        date: formatDateFromBQ(row.date_group),
+        averageValue: parseFloat(Number(row.average_value_sats || 0).toFixed(0)), // sats, no decimals
+      };
+    }).filter(item => item !== null)
+      .sort((a,b) => new Date(a!.date).getTime() - new Date(b!.date).getTime());
+
+    return formattedAndSortedRows as AveragePaymentValueData[];
+  } catch (error) {
+    logBigQueryError(`fetchAveragePaymentValueOverTime (aggregation: ${aggregationPeriod})`, error);
+    return [];
+  }
+}
