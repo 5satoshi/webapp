@@ -50,7 +50,7 @@ const AmbossLogoIcon = ({ className }: { className?: string }) => (
       </linearGradient>
     </defs>
     <path 
-      d="M6 18H9V15H15V18H18V6H15V9H9V6H6V18ZM12 10.5H14V13.5H12V10.5Z" 
+      d="M6 19 L12 7 L18 19 H15 L12 13 L9 19 H6Z"
       fill="url(#ambossGradient)" 
     />
   </svg>
@@ -88,7 +88,7 @@ const OneMlLogoIcon = ({ className }: { className?: string }) => (
       textAnchor="middle"
       fill="white"
       fontSize="36"
-      fontFamily="Arial, Helvetica, sans-serif"
+      fontFamily="var(--font-space-grotesk), sans-serif"
       fontWeight="bold"
     >
       1ML
