@@ -25,15 +25,7 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
   const IconComponent = iconMap[metric.iconName] || Activity;
   
   const hasAbsoluteChange = typeof metric.absoluteChange === 'number';
-  let isImprovement = false;
-  if (hasAbsoluteChange) {
-    if (metric.absoluteChangeDirection === 'higher_is_better') {
-      isImprovement = metric.absoluteChange! > 0;
-    } else { // Defaults to 'lower_is_better' or if undefined
-      isImprovement = metric.absoluteChange! < 0;
-    }
-  }
-
+  
   const hasTrend = typeof metric.trend === 'number' && !hasAbsoluteChange;
   const isPositiveTrend = hasTrend && metric.trend! >= 0;
 
@@ -68,43 +60,48 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
         </div>
       </div>
 
-      {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16 */}
-      <div className="px-4 h-16 flex items-center">
+      {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16, Centered Content */}
+      <div className="px-4 h-16 flex items-center justify-center">
         {hasAbsoluteChange ? (
-          <div className="flex items-center justify-center w-full">
-            <p className={cn(
-                "text-xs text-muted-foreground flex items-center gap-1",
-                metric.absoluteChange === 0 ? "text-muted-foreground" : 
-                (metric.absoluteChangeDirection === 'higher_is_better' ? (metric.absoluteChange! > 0 ? "text-green-500" : "text-red-500") :
-                (metric.absoluteChange! < 0 ? "text-green-500" : "text-red-500"))
-            )}>
-                {metric.absoluteChange !== 0 && (
-                  (metric.absoluteChangeDirection === 'higher_is_better' ? (metric.absoluteChange! > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />) :
-                  (metric.absoluteChange! < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />))
-                )}
-                {metric.absoluteChange! > 0 ? '+' : ''}{metric.absoluteChange} {metric.absoluteChangeDescription || "change"}
-            </p>
-          </div>
+          <p className={cn(
+              "text-xs text-muted-foreground flex items-center gap-1",
+              metric.absoluteChange === 0 ? "text-muted-foreground" : 
+              (metric.absoluteChangeDirection === 'higher_is_better' ? 
+                (metric.absoluteChange! > 0 ? "text-green-500" : "text-red-500") : // higher_is_better
+                (metric.absoluteChange! < 0 ? "text-green-500" : "text-red-500")) // lower_is_better (negative change is good for 'lower_is_better')
+          )}>
+              {metric.absoluteChange !== 0 && ( // Show icon only if change is not zero
+                (metric.absoluteChangeDirection === 'higher_is_better' ? 
+                  (metric.absoluteChange! > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />) : // higher_is_better
+                  (metric.absoluteChange! < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />) // lower_is_better
+                )
+              )}
+              {metric.absoluteChange !== 0 && metric.absoluteChange! > 0 ? '+' : ''}
+              {metric.absoluteChange} {metric.absoluteChangeDescription || "change"}
+          </p>
         ) : (
-          <div className="flex items-center w-full">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
             {hasTrend ? (
-              <p className={cn(
-                  "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1",
+              <span className={cn(
+                  "flex items-center gap-1",
                   isPositiveTrend ? "text-green-500" : "text-red-500"
               )}>
-                  {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
-              </p>
+                {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {isPositiveTrend ? '+' : ''}{metric.trend}%
+              </span>
             ) : (
-              <div className="h-4 w-4" /> 
+              // Placeholder only if NO trend AND NO unit, to maintain alignment consistency
+              !metric.unit && <div className="h-4 w-4" /> 
             )}
             
-            <div className="flex-grow" /> 
+            {hasTrend && metric.unit && ( // Separator text if both trend and unit exist
+              <span className="mx-1 text-muted-foreground">|</span>
+            )}
 
             {metric.unit && (
-              <p className="text-sm text-muted-foreground font-body line-clamp-1">
+              <span className="text-sm text-muted-foreground font-body line-clamp-1">
                   {metric.unit}
-              </p>
+              </span>
             )}
           </div>
         )}
@@ -112,4 +109,3 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
     </Card>
   );
 }
-
