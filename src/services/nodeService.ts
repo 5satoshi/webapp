@@ -385,46 +385,50 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         FROM \`${projectId}.${datasetId}.forwardings\`
         WHERE in_channel = @shortChannelId OR out_channel = @shortChannelId
     ),
-    AggregatedStats AS (
+    AggregatedForwardingStats AS (
         SELECT
             MIN(received_time) AS first_tx_timestamp_bq,
             MAX(COALESCE(resolved_time, received_time)) AS last_tx_timestamp_bq,
             COUNTIF(status = 'settled') AS total_tx_count_val,
 
-            SUM(IF(in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_attempts_val,
             SUM(IF(in_channel = @shortChannelId AND status = 'settled', 1, 0)) AS in_tx_count_successful_val,
+            SUM(IF(in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_attempts_val,
             SUM(IF(in_channel = @shortChannelId AND status = 'settled', COALESCE(in_msat, 0), 0)) AS in_tx_volume_msat_val,
 
-            SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', 1, 0)) AS out_tx_count_successful_val,
+            SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(out_msat, 0), 0)) AS out_tx_volume_msat_val,
 
-            SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val,
-            SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(out_msat, 0), 0)) AS routing_volume_for_fees_on_this_channel_msat_val,
-
-            SUM(IF(in_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_when_this_was_in_channel_msat_val,
-            SUM(IF(in_channel = @shortChannelId AND status = 'settled', COALESCE(in_msat, 0), 0)) AS routing_volume_when_this_was_in_channel_msat_val
-
+            SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
         FROM ForwardingsForChannel
+    ),
+    PeerChannelInfo AS (
+      SELECT
+        p.feerate_base_msat,
+        p.feerate_ppm
+      FROM \`${projectId}.${datasetId}.peers\` p
+      WHERE p.short_channel_id = @shortChannelId
+      LIMIT 1 
     )
     SELECT
-        first_tx_timestamp_bq,
-        last_tx_timestamp_bq,
-        COALESCE(total_tx_count_val, 0) as total_tx_count,
+        afs.first_tx_timestamp_bq,
+        afs.last_tx_timestamp_bq,
+        COALESCE(afs.total_tx_count_val, 0) as total_tx_count,
         
-        COALESCE(in_tx_count_successful_val, 0) as in_tx_count,
-        COALESCE(in_tx_volume_msat_val, 0) as in_tx_volume_msat,
-        IF(COALESCE(in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(in_tx_count_successful_val, 0) * 100.0, COALESCE(in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
+        COALESCE(afs.in_tx_count_successful_val, 0) as in_tx_count,
+        COALESCE(afs.in_tx_volume_msat_val, 0) as in_tx_volume_msat,
+        IF(COALESCE(afs.in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(afs.in_tx_count_successful_val, 0) * 100.0, COALESCE(afs.in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
         
-        COALESCE(out_tx_count_successful_val, 0) as out_tx_count,
-        COALESCE(out_tx_volume_msat_val, 0) as out_tx_volume_msat,
-        IF(COALESCE(out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(out_tx_count_successful_val, 0) * 100.0, COALESCE(out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
+        COALESCE(afs.out_tx_count_successful_val, 0) as out_tx_count,
+        COALESCE(afs.out_tx_volume_msat_val, 0) as out_tx_volume_msat,
+        IF(COALESCE(afs.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(afs.out_tx_count_successful_val, 0) * 100.0, COALESCE(afs.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
 
-        COALESCE(total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_on_this_channel_msat,
-        COALESCE(routing_volume_for_fees_on_this_channel_msat_val, 0) as routing_volume_for_fees_on_this_channel_msat,
-        COALESCE(total_fees_earned_when_this_was_in_channel_msat_val, 0) as total_fees_earned_when_this_was_in_channel_msat,
-        COALESCE(routing_volume_when_this_was_in_channel_msat_val, 0) as routing_volume_when_this_was_in_channel_msat
-    FROM AggregatedStats
+        COALESCE(afs.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_on_this_channel_msat,
+
+        pci.feerate_base_msat as peer_feerate_base_msat,
+        pci.feerate_ppm as peer_feerate_ppm
+    FROM AggregatedForwardingStats afs
+    LEFT JOIN PeerChannelInfo pci ON TRUE 
   `;
 
   const options = {
@@ -449,25 +453,24 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         inSuccessRate: 0,
         outSuccessRate: 0,
         totalFeesEarnedSats: 0,
-        avgOutboundFeePpm: null,
-        avgInboundFeePpm: null,
+        peerFeePolicy: null,
       };
     }
     
     const result = rows[0];
 
-    const totalFeesEarnedOnThisChannelMsat = Number(result.total_fees_earned_on_this_channel_msat || 0);
-    const routingVolumeForFeesOnThisChannelMsat = Number(result.routing_volume_for_fees_on_this_channel_msat || 0);
-    const totalFeesEarnedWhenThisWasInChannelMsat = Number(result.total_fees_earned_when_this_was_in_channel_msat || 0);
-    const routingVolumeWhenThisWasInChannelMsat = Number(result.routing_volume_when_this_was_in_channel_msat || 0);
+    const peerBaseMsat = result.peer_feerate_base_msat;
+    const peerPpm = result.peer_feerate_ppm;
+    let peerFeePolicyString: string | null = null;
 
-    const avgOutboundFeePpm = routingVolumeForFeesOnThisChannelMsat > 0 
-      ? (totalFeesEarnedOnThisChannelMsat / routingVolumeForFeesOnThisChannelMsat) * 1000000 
-      : null;
-      
-    const avgInboundFeePpm = routingVolumeWhenThisWasInChannelMsat > 0
-      ? (totalFeesEarnedWhenThisWasInChannelMsat / routingVolumeWhenThisWasInChannelMsat) * 1000000
-      : null;
+    if (peerBaseMsat !== null && peerBaseMsat !== undefined && peerPpm !== null && peerPpm !== undefined) {
+        peerFeePolicyString = `${Number(peerBaseMsat).toLocaleString('en-US')} msat + ${Number(peerPpm).toLocaleString('en-US')} ppm`;
+    } else if (peerBaseMsat !== null && peerBaseMsat !== undefined) {
+        peerFeePolicyString = `${Number(peerBaseMsat).toLocaleString('en-US')} msat base`;
+    } else if (peerPpm !== null && peerPpm !== undefined) {
+        peerFeePolicyString = `${Number(peerPpm).toLocaleString('en-US')} ppm`;
+    }
+
 
     return {
       shortChannelId: shortChannelId,
@@ -480,9 +483,8 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
       outTxVolumeSats: Math.floor(Number(result.out_tx_volume_msat || 0) / 1000),
       inSuccessRate: parseFloat(Number(result.in_success_rate || 0).toFixed(2)),
       outSuccessRate: parseFloat(Number(result.out_success_rate || 0).toFixed(2)),
-      totalFeesEarnedSats: Math.floor(totalFeesEarnedOnThisChannelMsat / 1000),
-      avgOutboundFeePpm: avgOutboundFeePpm !== null ? parseFloat(avgOutboundFeePpm.toFixed(0)) : null,
-      avgInboundFeePpm: avgInboundFeePpm !== null ? parseFloat(avgInboundFeePpm.toFixed(0)) : null,
+      totalFeesEarnedSats: Math.floor(Number(result.total_fees_earned_on_this_channel_msat || 0) / 1000),
+      peerFeePolicy: peerFeePolicyString,
     };
 
   } catch (error) {
@@ -715,4 +717,3 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
     return { latestShare: null, previousShare: null };
   }
 }
-

@@ -112,15 +112,19 @@ export interface ChannelDetails {
   shortChannelId: string;
   firstTxTimestamp: string | null;
   lastTxTimestamp: string | null;
-  totalTxCount: number;
-  inTxCount: number;
-  outTxCount: number;
-  inTxVolumeSats: number;
-  outTxVolumeSats: number;
-  inSuccessRate: number;
-  outSuccessRate: number;
-  totalFeesEarnedSats: number; // Total fees earned when this channel was the outgoing hop
-  avgOutboundFeePpm: number | null; // Avg fee rate (ppm) when this channel was outgoing
-  avgInboundFeePpm: number | null; // Avg fee rate (ppm) on forwards that used this channel as incoming
-}
+  totalTxCount: number; // Total successful transactions involving this channel
 
+  // Incoming stats (towards our node via this channel)
+  inTxCount: number; // Successful incoming
+  inTxVolumeSats: number;
+  inSuccessRate: number;
+  peerFeePolicy: string | null; // Peer's advertised fee policy (base + ppm) for *their* outgoing direction on this channel
+
+  // Outgoing stats (from our node via this channel)
+  outTxCount: number; // Successful outgoing
+  outTxVolumeSats: number;
+  outSuccessRate: number;
+
+  // Fees earned by our node
+  totalFeesEarnedSats: number; // Total fees earned when this channel was the outgoing hop for our node
+}

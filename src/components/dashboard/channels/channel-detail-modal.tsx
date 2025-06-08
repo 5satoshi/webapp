@@ -73,7 +73,7 @@ export function ChannelDetailModal({
   
   const DetailSkeleton = () => (
     <div className="space-y-3">
-      {[...Array(9)].map((_, i) => ( // Increased skeleton items for fees
+      {[...Array(10)].map((_, i) => ( // Increased skeleton items for fees and peer policy
         <div key={i} className="grid grid-cols-2 gap-2 items-center">
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-1/3 justify-self-end" />
@@ -113,6 +113,7 @@ export function ChannelDetailModal({
                 {renderDetailItem('Successful Count', details.inTxCount.toLocaleString('en-US'))}
                 {renderDetailItem('Volume', details.inTxVolumeSats.toLocaleString('en-US'), 'sats')}
                 {renderDetailItem('Success Rate', details.inSuccessRate.toFixed(1), '%')}
+                {renderDetailItem("Peer's Fee Policy", details.peerFeePolicy)}
               </div>
 
               <div className="pt-3">
@@ -125,8 +126,6 @@ export function ChannelDetailModal({
               <div className="pt-3">
                 <h4 className="text-md font-semibold mb-1 font-headline">Fees</h4>
                 {renderDetailItem('Total Fees Earned (via this channel)', details.totalFeesEarnedSats.toLocaleString('en-US'), 'sats')}
-                {renderDetailItem('Avg. Outbound Fee Rate', details.avgOutboundFeePpm !== null ? details.avgOutboundFeePpm.toLocaleString('en-US') : 'N/A', details.avgOutboundFeePpm !== null ? 'ppm' : undefined)}
-                {renderDetailItem('Avg. Inbound Fee Rate', details.avgInboundFeePpm !== null ? details.avgInboundFeePpm.toLocaleString('en-US') : 'N/A', details.avgInboundFeePpm !== null ? 'ppm' : undefined)}
               </div>
             </>
           )}
@@ -149,4 +148,3 @@ export function ChannelDetailModal({
     </Dialog>
   );
 }
-
