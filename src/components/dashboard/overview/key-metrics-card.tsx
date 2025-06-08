@@ -65,20 +65,18 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16, Centered Content */}
       <div className="px-4 h-16 flex items-center justify-center">
         {hasAbsoluteChange ? (
-          <div className="flex items-center gap-1"> {/* Inner div for grouping icon and text */}
-            {/* Icon, only if change is not zero */}
+          <div className="flex items-center justify-center gap-1">
             {metric.absoluteChange !== 0 && (
               metric.absoluteChangeDirection === 'higher_is_better' ?
                 (metric.absoluteChange! > 0 ?
-                  <TrendingUp className="h-4 w-4 text-green-500" /> :
-                  <TrendingDown className="h-4 w-4 text-red-500" />
+                  <TrendingUp className="h-4 w-4" /> :
+                  <TrendingDown className="h-4 w-4" />
                 ) : // lower_is_better
-                (metric.absoluteChange! < 0 ?
-                  <TrendingDown className="h-4 w-4 text-green-500" /> :
-                  <TrendingUp className="h-4 w-4 text-red-500" />
+                (metric.absoluteChange! < 0 ? // Value DECREASED (better for lower_is_better) - Show UP arrow
+                  <TrendingUp className="h-4 w-4" /> : // Value INCREASED (worse for lower_is_better) - Show DOWN arrow
+                  <TrendingDown className="h-4 w-4" />
                 )
             )}
-            {/* Text span for the change value and description */}
             <span className={cn(
               "text-xs",
               metric.absoluteChange === 0 ? "text-muted-foreground" :
@@ -86,10 +84,11 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
                 (metric.absoluteChange! > 0 ? "text-green-500" : "text-red-500") :
                 (metric.absoluteChange! < 0 ? "text-green-500" : "text-red-500"))
             )}>
-              {metric.absoluteChange !== 0 && metric.absoluteChange! > 0 ? '+' : ''}
+              {metric.absoluteChange !== 0 && metric.absoluteChange! > 0 && metric.absoluteChangeDirection === 'higher_is_better' ? '+' : ''}
+              {metric.absoluteChange !== 0 && metric.absoluteChange! > 0 && metric.absoluteChangeDirection === 'lower_is_better' ? '+' : ''}
               {metric.absoluteChange}
               {' '}
-              {metric.absoluteChangeDescription || "change"}
+              {metric.absoluteChangeDescription || ""}
             </span>
           </div>
         ) : (
