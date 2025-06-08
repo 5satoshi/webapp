@@ -26,7 +26,7 @@ const LnRouterLogoIcon = ({ className }: { className?: string }) => (
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
     className={className} 
-    fill="currentColor" // Use currentColor for LN Router icon
+    fill="#00C4B3" // Teal color for LN Router icon
   >
     <path
       d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"
@@ -65,11 +65,34 @@ const LnPlusLogoIcon = ({ className }: { className?: string }) => (
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <circle cx="12" cy="12" r="11" fill="hsl(var(--card))" stroke="hsl(var(--primary))" strokeWidth="1" />
+    <circle cx="12" cy="12" r="11" fill="hsl(var(--card))" stroke="hsl(var(--primary))" strokeWidth="1.5" />
     <path
       d="M11.9162 5.33301L8.41618 12.4997H12.7495L11.0828 18.6663L14.5828 11.4997H10.2495L11.9162 5.33301Z"
       fill="hsl(var(--primary))" 
     />
+  </svg>
+);
+
+// Define the custom 1ML SVG icon
+const OneMlLogoIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 80 80"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <rect width="80" height="80" rx="8" ry="8" fill="#1E88E5" /> {/* Blue background */}
+    <text
+      x="50%"
+      y="52%"
+      dominantBaseline="middle"
+      textAnchor="middle"
+      fill="white"
+      fontSize="36"
+      fontFamily="Arial, Helvetica, sans-serif"
+      fontWeight="bold"
+    >
+      1ML
+    </text>
   </svg>
 );
 
@@ -179,7 +202,7 @@ export default async function OverviewPage({
     { 
       name: "1ml.com", 
       url: "https://1ml.com/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: BarChart3
+      icon: OneMlLogoIcon
     },
     { 
       name: "LN Router", 
@@ -271,3 +294,4 @@ export default async function OverviewPage({
     </div>
   );
 }
+
