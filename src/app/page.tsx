@@ -16,7 +16,7 @@ import {
 } from '@/services/nodeService';
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
-import { Users, BarChart3 } from 'lucide-react'; // Mountain and RouteIcon removed
+import { BarChart3 } from 'lucide-react'; 
 
 // Define the custom LN Router SVG icon
 const LnRouterLogoIcon = ({ className }: { className?: string }) => (
@@ -26,10 +26,10 @@ const LnRouterLogoIcon = ({ className }: { className?: string }) => (
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
     className={className} 
+    fill="currentColor" // Use currentColor for LN Router icon
   >
     <path
       d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"
-      fill="currentColor" // Use currentColor to inherit color from parent, can be overridden
     />
   </svg>
 );
@@ -52,6 +52,23 @@ const AmbossLogoIcon = ({ className }: { className?: string }) => (
     <path 
       d="M6 18H9V15H15V18H18V6H15V9H9V6H6V18ZM12 10.5H14V13.5H12V10.5Z" 
       fill="url(#ambossGradient)" 
+    />
+  </svg>
+);
+
+// Define the custom LN+ SVG icon
+const LnPlusLogoIcon = ({ className }: { className?: string }) => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <circle cx="12" cy="12" r="11" fill="hsl(var(--card))" stroke="hsl(var(--primary))" strokeWidth="1" />
+    <path
+      d="M11.9162 5.33301L8.41618 12.4997H12.7495L11.0828 18.6663L14.5828 11.4997H10.2495L11.9162 5.33301Z"
+      fill="hsl(var(--primary))" 
     />
   </svg>
 );
@@ -152,7 +169,7 @@ export default async function OverviewPage({
     { 
       name: "lightningnetwork.plus", 
       url: "https://lightningnetwork.plus/nodes/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: Users 
+      icon: LnPlusLogoIcon 
     },
     { 
       name: "Amboss.space", 
@@ -254,4 +271,3 @@ export default async function OverviewPage({
     </div>
   );
 }
-
