@@ -13,7 +13,8 @@ export interface KeyMetric {
 }
 
 export interface Channel {
-  id: string;
+  id: string; // Typically funding_txid:funding_outnum
+  shortChannelId: string | null; // The short channel ID from the peers table
   peerNodeId: string;
   peerAlias?: string; 
   capacity: number; 
@@ -107,3 +108,15 @@ export interface ShortestPathShareData {
   previousShare: number | null;
 }
 
+export interface ChannelDetails {
+  shortChannelId: string;
+  firstTxTimestamp: string | null;
+  lastTxTimestamp: string | null;
+  totalTxCount: number;
+  inTxCount: number;
+  outTxCount: number;
+  inTxVolumeSats: number;
+  outTxVolumeSats: number;
+  inSuccessRate: number;
+  outSuccessRate: number;
+}

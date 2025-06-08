@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -41,6 +41,23 @@ try {
 } catch (error) {
   logBigQueryError("BigQuery client initialization", error);
 }
+
+function formatTimestampFromBQValue(timestampValue: string | null | undefined): string | null {
+  if (!timestampValue) {
+    return null;
+  }
+  try {
+    const date = parseISO(timestampValue);
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+    return format(date, "yyyy-MM-dd HH:mm:ss");
+  } catch (e) {
+    console.warn("Failed to parse timestamp from BQ value:", timestampValue, e);
+    return null;
+  }
+}
+
 
 function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | string | Date | { value: string }): string {
   if (!timestamp) {
@@ -330,6 +347,7 @@ export async function fetchChannels(): Promise<Channel[]> {
       
       return {
         id: channelIdString, 
+        shortChannelId: row.short_channel_id ? String(row.short_channel_id) : null,
         peerNodeId: String(row.peer_node_id || 'unknown-peer-id'),
         peerAlias: row.peer_alias || undefined,
         capacity: capacitySats,
@@ -346,6 +364,99 @@ export async function fetchChannels(): Promise<Channel[]> {
     return []; 
   }
 }
+
+export async function fetchChannelDetails(shortChannelId: string): Promise<ChannelDetails | null> {
+  if (!bigquery || !datasetId || !shortChannelId) {
+    console.error("BigQuery client not initialized, datasetId missing, or shortChannelId not provided for fetchChannelDetails.");
+    return null;
+  }
+
+  const query = `
+    WITH ForwardingsForChannel AS (
+        SELECT
+            in_channel,
+            out_channel,
+            received_time,
+            resolved_time,
+            status,
+            in_msat,
+            out_msat
+        FROM \`${projectId}.${datasetId}.forwardings\`
+        WHERE in_channel = @shortChannelId OR out_channel = @shortChannelId
+    ),
+    AggregatedStats AS (
+        SELECT
+            MIN(received_time) AS first_tx_timestamp_bq,
+            MAX(COALESCE(resolved_time, received_time)) AS last_tx_timestamp_bq,
+            COUNT(*) AS total_tx_count_val,
+
+            SUM(IF(in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_val,
+            SUM(IF(in_channel = @shortChannelId AND status = 'settled', 1, 0)) AS in_tx_count_successful_val,
+            SUM(IF(in_channel = @shortChannelId, COALESCE(in_msat, 0), 0)) AS in_tx_volume_msat_val,
+
+            SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_val,
+            SUM(IF(out_channel = @shortChannelId AND status = 'settled', 1, 0)) AS out_tx_count_successful_val,
+            SUM(IF(out_channel = @shortChannelId, COALESCE(out_msat, 0), 0)) AS out_tx_volume_msat_val
+        FROM ForwardingsForChannel
+    )
+    SELECT
+        first_tx_timestamp_bq,
+        last_tx_timestamp_bq,
+        COALESCE(total_tx_count_val, 0) as total_tx_count,
+        COALESCE(in_tx_count_total_val, 0) as in_tx_count,
+        COALESCE(in_tx_volume_msat_val, 0) as in_tx_volume_msat,
+        IF(COALESCE(in_tx_count_total_val, 0) > 0, SAFE_DIVIDE(COALESCE(in_tx_count_successful_val, 0) * 100.0, COALESCE(in_tx_count_total_val, 0)), 0) AS in_success_rate,
+        COALESCE(out_tx_count_total_val, 0) as out_tx_count,
+        COALESCE(out_tx_volume_msat_val, 0) as out_tx_volume_msat,
+        IF(COALESCE(out_tx_count_total_val, 0) > 0, SAFE_DIVIDE(COALESCE(out_tx_count_successful_val, 0) * 100.0, COALESCE(out_tx_count_total_val, 0)), 0) AS out_success_rate
+    FROM AggregatedStats
+  `;
+
+  const options = {
+    query: query,
+    params: { shortChannelId: shortChannelId }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    if (!rows || rows.length === 0 || !rows[0]) {
+      return { // Return default values if no forwarding data found for the channel
+        shortChannelId: shortChannelId,
+        firstTxTimestamp: null,
+        lastTxTimestamp: null,
+        totalTxCount: 0,
+        inTxCount: 0,
+        outTxCount: 0,
+        inTxVolumeSats: 0,
+        outTxVolumeSats: 0,
+        inSuccessRate: 0,
+        outSuccessRate: 0,
+      };
+    }
+    
+    const result = rows[0];
+
+    return {
+      shortChannelId: shortChannelId,
+      firstTxTimestamp: formatTimestampFromBQValue(result.first_tx_timestamp_bq?.value),
+      lastTxTimestamp: formatTimestampFromBQValue(result.last_tx_timestamp_bq?.value),
+      totalTxCount: Number(result.total_tx_count || 0),
+      inTxCount: Number(result.in_tx_count || 0),
+      outTxCount: Number(result.out_tx_count || 0),
+      inTxVolumeSats: Math.floor(Number(result.in_tx_volume_msat || 0) / 1000),
+      outTxVolumeSats: Math.floor(Number(result.out_tx_volume_msat || 0) / 1000),
+      inSuccessRate: parseFloat(Number(result.in_success_rate || 0).toFixed(2)),
+      outSuccessRate: parseFloat(Number(result.out_success_rate || 0).toFixed(2)),
+    };
+
+  } catch (error) {
+    logBigQueryError(`fetchChannelDetails (shortChannelId: ${shortChannelId})`, error);
+    return null;
+  }
+}
+
 
 function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
@@ -570,4 +681,3 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
     return { latestShare: null, previousShare: null };
   }
 }
-
