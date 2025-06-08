@@ -10,9 +10,10 @@ import {
   fetchKeyMetrics, 
   fetchHistoricalPaymentVolume,
   fetchPeriodForwardingSummary,
-  fetchPeriodChannelActivity
+  fetchPeriodChannelActivity,
+  fetchBetweennessRank
 } from '@/services/nodeService';
-import type { KeyMetric } from '@/lib/types';
+import type { KeyMetric, BetweennessRankData } from '@/lib/types';
 
 
 export default async function OverviewPage({ 
@@ -30,6 +31,7 @@ export default async function OverviewPage({
   const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
   const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation);
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
+  const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   
   let descriptiveLabel = 'Day';
   switch (currentAggregation) {
@@ -46,18 +48,21 @@ export default async function OverviewPage({
       descriptiveLabel = '90 Days';
       break;
     default:
-      descriptiveLabel = 'Period'; // Fallback
+      descriptiveLabel = 'Period'; 
       break;
   }
 
-
   const periodMetrics: KeyMetric[] = [
     {
-      id: 'max_payment_period',
-      title: `Max Payment Forwarded (last ${descriptiveLabel})`,
-      displayValue: (forwardingSummary.maxPaymentForwardedSats / 100000000).toFixed(3),
-      unit: 'BTC',
-      iconName: 'BarChart3',
+      id: 'betweenness_rank',
+      title: `Betweenness Rank`,
+      displayValue: betweennessRankData.latestRank !== null ? betweennessRankData.latestRank.toString() : 'N/A',
+      iconName: 'LineChart',
+      absoluteChange: (betweennessRankData.latestRank !== null && betweennessRankData.previousRank !== null) 
+                      ? betweennessRankData.latestRank - betweennessRankData.previousRank 
+                      : undefined,
+      absoluteChangeDescription: `vs previous`,
+      description: `Node's current betweenness centrality rank. Lower is better. Change shown vs prior period.`,
     },
     {
       id: 'fees_earned_period',

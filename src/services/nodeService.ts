@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -13,6 +13,7 @@ import {
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
+const specificNodeId = '03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69';
 
 let bigquery: BigQuery | undefined;
 
@@ -300,34 +301,33 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
   const now = new Date();
   let startOfPeriod: Date;
   let endOfPeriod: Date;
-  const yesterday = subDays(now, 1);
+  const yesterday = endOfDay(subDays(now, 1)); // End of yesterday is the most recent point for "last N days"
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'day': // Yesterday
-      startOfPeriod = startOfDay(yesterday);
-      endOfPeriod = endOfDay(yesterday);
+      startOfPeriod = startOfDay(subDays(now, 1));
+      endOfPeriod = yesterday;
       break;
-    case 'week': // Last 7 days, excluding today (i.e., 7 days ending yesterday)
-      endOfPeriod = endOfDay(yesterday);
-      startOfPeriod = startOfDay(subDays(yesterday, 6)); // 6 days before yesterday = 7 days total
+    case 'week': // Last 7 days, ending yesterday
+      startOfPeriod = startOfDay(subDays(now, 7)); 
+      endOfPeriod = yesterday;
       break;
-    case 'month': // Last 30 days, excluding today (i.e., 30 days ending yesterday)
-      endOfPeriod = endOfDay(yesterday);
-      startOfPeriod = startOfDay(subDays(yesterday, 29)); // 29 days before yesterday = 30 days total
+    case 'month': // Last 30 days, ending yesterday
+      startOfPeriod = startOfDay(subDays(now, 30));
+      endOfPeriod = yesterday;
       break;
-    case 'quarter': // Last 90 days, excluding today (i.e., 90 days ending yesterday)
-      endOfPeriod = endOfDay(yesterday);
-      startOfPeriod = startOfDay(subDays(yesterday, 89)); // 89 days before yesterday = 90 days total
+    case 'quarter': // Last 90 days, ending yesterday
+      startOfPeriod = startOfDay(subDays(now, 90));
+      endOfPeriod = yesterday;
       break;
     default: 
-      // Default to yesterday if an unknown aggregation period is provided
-      startOfPeriod = startOfDay(yesterday);
-      endOfPeriod = endOfDay(yesterday);
+      startOfPeriod = startOfDay(subDays(now, 1));
+      endOfPeriod = yesterday;
       break;
   }
   return { 
-    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ss"), 
-    endDate: format(endOfPeriod, "yyyy-MM-dd'T'HH:mm:ss") 
+    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"), 
+    endDate: format(endOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX") 
   };
 }
 
@@ -431,3 +431,52 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
   }
 }
 
+export async function fetchBetweennessRank(aggregationPeriod: string): Promise<BetweennessRankData> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchBetweennessRank.");
+    return { latestRank: null, previousRank: null };
+  }
+
+  const nodeId = specificNodeId; 
+  const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
+  // periodStartDateString is the start of the current N-day window.
+  // For previous rank, we need data *before* this timestamp.
+
+  const latestRankQuery = `
+    SELECT rank
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE id = @nodeId
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+
+  const previousRankQuery = `
+    SELECT rank
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE id = @nodeId AND created_at < TIMESTAMP(@periodStartDate)
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+
+  try {
+    const [latestRankJob] = await bigquery.createQueryJob({
+      query: latestRankQuery,
+      params: { nodeId: nodeId }
+    });
+    const [[latestRankResult]] = await latestRankJob.getQueryResults();
+    const latestRank = latestRankResult?.rank !== undefined ? Number(latestRankResult.rank) : null;
+
+    const [previousRankJob] = await bigquery.createQueryJob({
+      query: previousRankQuery,
+      params: { nodeId: nodeId, periodStartDate: periodStartDateString }
+    });
+    const [[previousRankResult]] = await previousRankJob.getQueryResults();
+    const previousRank = previousRankResult?.rank !== undefined ? Number(previousRankResult.rank) : null;
+    
+    return { latestRank, previousRank };
+
+  } catch (error) {
+    logBigQueryError(`fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod})`, error);
+    return { latestRank: null, previousRank: null };
+  }
+}

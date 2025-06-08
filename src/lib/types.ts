@@ -2,11 +2,13 @@
 export interface KeyMetric {
   id: string;
   title: string;
-  displayValue: string; // Changed from 'value'
-  unit?: string;          // New optional field for units
+  displayValue: string;
+  unit?: string;
   iconName: 'Zap' | 'Activity' | 'Clock' | 'Network' | 'BarChart3' | 'PieChart' | 'LineChart' | 'Users';
   description?: string;
   trend?: number; 
+  absoluteChange?: number;
+  absoluteChangeDescription?: string;
 }
 
 export interface Channel {
@@ -94,3 +96,7 @@ export type AiStructuredInput = {
   timingPatternsHeatmapData: string; 
 };
 
+export interface BetweennessRankData {
+  latestRank: number | null;
+  previousRank: number | null;
+}
