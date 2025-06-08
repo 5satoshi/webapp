@@ -262,20 +262,20 @@ export async function fetchChannels(): Promise<Channel[]> {
         SUM(total_forwards) as total_forwards
       FROM (
         SELECT
-          in_channel_id as scid,
+          in_channel as scid,
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
-        WHERE in_channel_id IS NOT NULL
-        GROUP BY in_channel_id
+        WHERE in_channel IS NOT NULL
+        GROUP BY in_channel
         UNION ALL
         SELECT
-          out_channel_id as scid,
+          out_channel as scid,
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
-        WHERE out_channel_id IS NOT NULL
-        GROUP BY out_channel_id
+        WHERE out_channel IS NOT NULL
+        GROUP BY out_channel
       )
       WHERE scid IS NOT NULL
       GROUP BY scid
@@ -284,7 +284,7 @@ export async function fetchChannels(): Promise<Channel[]> {
       p.id as peer_node_id,        
       p.funding_txid,        
       p.funding_outnum,
-      p.short_channel_id, -- Assuming this column exists in the 'peers' table for this channel
+      p.short_channel_id, 
       p.msatoshi_total,      
       p.msatoshi_to_us,      
       p.state,
@@ -315,7 +315,7 @@ export async function fetchChannels(): Promise<Channel[]> {
       
       const channelIdString = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
                         ? `${row.funding_txid}:${row.funding_outnum}` 
-                        : `peer-${row.id || 'unknown'}-${Math.random().toString(36).substring(2, 9)}`;
+                        : `peer-${row.peer_node_id || 'unknown'}-${Math.random().toString(36).substring(2, 9)}`;
 
       const successfulForwards = Number(row.successful_forwards_count || 0);
       const totalForwards = Number(row.total_forwards_count || 0);
@@ -330,7 +330,7 @@ export async function fetchChannels(): Promise<Channel[]> {
       
       return {
         id: channelIdString, 
-        peerNodeId: String(row.id || 'unknown-peer-id'),
+        peerNodeId: String(row.peer_node_id || 'unknown-peer-id'),
         peerAlias: row.peer_alias || undefined,
         capacity: capacitySats,
         localBalance: localBalanceSats,
