@@ -28,8 +28,8 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
 
   return (
     <Card className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
-      {/* Top Section: Title, Description, Icon - Fixed Height h-24 (96px) */}
-      <div className="p-4 h-24 flex flex-col justify-start">
+      {/* Top Section: Title, Description, Icon - Fixed Height h-20 (80px) */}
+      <div className="p-4 h-20 flex flex-col justify-start">
         <div className="flex flex-row items-start justify-between">
           <div className="flex-1 mr-2 space-y-1">
             <h3 className="text-sm font-medium text-muted-foreground font-body line-clamp-2 leading-tight">
@@ -47,8 +47,8 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
 
       <Separator />
 
-      {/* Middle Section: Number - Fixed Height h-16 (64px) */}
-      <div className="px-4 py-2 h-16 flex items-center">
+      {/* Middle Section: Number - Fixed Height h-16 (64px), Centered */}
+      <div className="px-4 py-2 h-16 flex items-center justify-center">
         <div className="text-3xl font-bold font-headline text-foreground">
           {metric.displayValue}
         </div>
@@ -57,22 +57,25 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       <Separator />
 
       {/* Bottom Section: Unit, Trend - Fixed Height h-16 (64px) */}
-      <div className="p-4 h-16 flex flex-col justify-start">
-        <div className="space-y-1">
-            {metric.unit && (
-            <p className="text-sm text-muted-foreground font-body line-clamp-1 leading-tight">
-                {metric.unit}
-            </p>
-            )}
-            {hasTrend && (
+      <div className="p-4 h-16 flex items-center">
+        <div className="flex items-center w-full">
+          {hasTrend && (
             <p className={cn(
-                "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1 leading-tight",
+                "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1",
                 isPositiveTrend ? "text-green-500" : "text-red-500"
             )}>
                 {isPositiveTrend ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                 {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
             </p>
-            )}
+          )}
+          
+          <div className="flex-grow" /> {/* Spacer to push unit to the right */}
+
+          {metric.unit && (
+            <p className="text-sm text-muted-foreground font-body line-clamp-1">
+                {metric.unit}
+            </p>
+          )}
         </div>
       </div>
     </Card>
