@@ -35,7 +35,7 @@ export default async function OverviewPage({
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
   
-  let descriptiveLabel = 'Day'; // Default for 'day'
+  let descriptiveLabel = 'Day';
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
     switch (currentAggregation) {
@@ -52,7 +52,7 @@ export default async function OverviewPage({
         descriptiveLabel = '90 Days';
         break;
       default:
-        descriptiveLabel = selectedOption.label.replace(/s$/, ''); // Attempt to singularize
+        descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
         break;
     }
   }
@@ -77,7 +77,7 @@ export default async function OverviewPage({
       absoluteChange: (betweennessRankData.latestRank !== null && betweennessRankData.previousRank !== null) 
                       ? betweennessRankData.latestRank - betweennessRankData.previousRank 
                       : undefined,
-      absoluteChangeDescription: `vs previous`,
+      absoluteChangeDescription: ``, // Removed "vs previous"
       absoluteChangeDirection: 'lower_is_better',
       description: `Node's current betweenness centrality rank. Lower is better. Change shown vs prior period.`,
     },
@@ -87,7 +87,7 @@ export default async function OverviewPage({
       displayValue: shortestPathDisplayValue,
       iconName: 'PieChart',
       absoluteChange: shortestPathAbsoluteChange,
-      absoluteChangeDescription: `% vs previous`,
+      absoluteChangeDescription: `%`, // Changed from "% vs previous"
       absoluteChangeDirection: 'higher_is_better',
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
@@ -148,4 +148,3 @@ export default async function OverviewPage({
     </div>
   );
 }
-

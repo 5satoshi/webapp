@@ -111,7 +111,7 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     return [
         { id: 'payments', title: 'Total Payments Processed', displayValue: 'N/A', unit: 'Payments', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'N/A', unit: 'sats', iconName: 'Activity' },
-        { id: 'active_channels', title: 'Active Channels', displayValue: 'N/A', unit: 'Channels', iconName: 'Network' },
+        { id: 'total_volume', title: 'Total Payment Volume', displayValue: 'N/A', unit: 'BTC', iconName: 'BarChart3' },
         { id: 'connected_peers', title: 'Connected Peers', displayValue: 'N/A', unit: 'Peers', iconName: 'Users' },
     ];
   }
@@ -126,10 +126,10 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
   `;
-  const activeChannelsQuery = `
-    SELECT COUNT(*) as active_channels
-    FROM \`${projectId}.${datasetId}.peers\` 
-    WHERE state = 'CHANNELD_NORMAL' OR state = 'DUALOPEND_NORMAL'
+  const totalVolumeQuery = `
+    SELECT SUM(out_msat) as total_volume_msat
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
   `;
   const connectedPeersQuery = `
     SELECT COUNT(DISTINCT id) as connected_peers 
@@ -144,23 +144,24 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
     const [[feesResult]] = await feesJob.getQueryResults();
 
-    const [activeChannelsJob] = await bigquery.createQueryJob({ query: activeChannelsQuery });
-    const [[activeChannelsResult]] = await activeChannelsJob.getQueryResults();
+    const [totalVolumeJob] = await bigquery.createQueryJob({ query: totalVolumeQuery });
+    const [[totalVolumeResult]] = await totalVolumeJob.getQueryResults();
     
     const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
     const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
         
     const totalPayments = Number(paymentsResult?.total_payments || 0);
     const totalFeesMsat = Number(feesResult?.total_fees_msat || 0);
-    const activeChannels = Number(activeChannelsResult?.active_channels || 0);
+    const totalVolumeMsat = Number(totalVolumeResult?.total_volume_msat || 0);
     const connectedPeers = Number(connectedPeersResult?.connected_peers || 0);
 
     const totalFeesSats = Math.floor(totalFeesMsat / 1000);
+    const totalVolumeBtc = totalVolumeMsat / 1000 / 100000000; // msat to sat, then sat to BTC
 
     return [
       { id: 'payments', title: 'Total Payments Processed', displayValue: totalPayments.toLocaleString(), unit: 'Payments', iconName: 'Zap' },
       { id: 'fees', title: 'Forwarding Fees Earned', displayValue: totalFeesSats.toLocaleString(), unit: 'sats', iconName: 'Activity' },
-      { id: 'active_channels', title: 'Active Channels', displayValue: activeChannels.toLocaleString(), unit: 'Channels', iconName: 'Network' },
+      { id: 'total_volume', title: 'Total Payment Volume', displayValue: totalVolumeBtc.toFixed(4), unit: 'BTC', iconName: 'BarChart3' },
       { id: 'connected_peers', title: 'Connected Peers', displayValue: connectedPeers.toLocaleString(), unit: 'Peers', iconName: 'Users' },
     ];
 
@@ -169,7 +170,7 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     return [
         { id: 'payments', title: 'Total Payments Processed', displayValue: 'Error', unit: 'Payments', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'Error', unit: 'sats', iconName: 'Activity' },
-        { id: 'active_channels', title: 'Active Channels', displayValue: 'Error', unit: 'Channels', iconName: 'Network' },
+        { id: 'total_volume', title: 'Total Payment Volume', displayValue: 'Error', unit: 'BTC', iconName: 'BarChart3' },
         { id: 'connected_peers', title: 'Connected Peers', displayValue: 'Error', unit: 'Peers', iconName: 'Users' },
     ];
   }
@@ -316,7 +317,7 @@ function getPeriodDateRange(aggregationPeriod: string): { startDate: string, end
       startOfPeriod = startOfDay(subDays(now, 90));
       break;
     default: 
-      startOfPeriod = startOfDay(subDays(now, 1));
+      startOfPeriod = startOfDay(subDays(now, 1)); // Default to 'day'
       break;
   }
   return { 
