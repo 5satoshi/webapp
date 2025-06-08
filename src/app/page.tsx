@@ -14,6 +14,7 @@ import {
   fetchBetweennessRank
 } from '@/services/nodeService';
 import type { KeyMetric, BetweennessRankData } from '@/lib/types';
+import { getOrdinalSuffix } from '@/lib/utils';
 
 
 export default async function OverviewPage({ 
@@ -56,7 +57,7 @@ export default async function OverviewPage({
     {
       id: 'betweenness_rank',
       title: `Betweenness Rank`,
-      displayValue: betweennessRankData.latestRank !== null ? betweennessRankData.latestRank.toString() : 'N/A',
+      displayValue: betweennessRankData.latestRank !== null ? `${betweennessRankData.latestRank}${getOrdinalSuffix(betweennessRankData.latestRank)}` : 'N/A',
       iconName: 'LineChart',
       absoluteChange: (betweennessRankData.latestRank !== null && betweennessRankData.previousRank !== null) 
                       ? betweennessRankData.latestRank - betweennessRankData.previousRank 
