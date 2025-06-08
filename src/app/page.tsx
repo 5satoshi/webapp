@@ -16,6 +16,7 @@ import {
 } from '@/services/nodeService';
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
+import { Users, Mountain, BarChart3, Route as RouteIcon } from 'lucide-react';
 
 
 export default async function OverviewPage({ 
@@ -79,7 +80,7 @@ export default async function OverviewPage({
                       : undefined,
       absoluteChangeDescription: ``, 
       absoluteChangeDirection: 'lower_is_better',
-      description: `Node's current betweenness centrality rank. Lower is better. Change shown vs prior period.`,
+      description: `Node's current betweenness centrality rank for common payments. Lower is better.`,
     },
     {
       id: 'shortest_path_share',
@@ -106,6 +107,29 @@ export default async function OverviewPage({
       unit: 'Opened / Closed',
       iconName: 'Network',
       description: `Channels opened vs closed in the last ${descriptiveLabel.toLowerCase()}.`,
+    },
+  ];
+
+  const externalPlatforms = [
+    { 
+      name: "lightningnetwork.plus", 
+      url: "https://lightningnetwork.plus/nodes/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
+      icon: Users 
+    },
+    { 
+      name: "Amboss.space", 
+      url: "https://amboss.space/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
+      icon: Mountain
+    },
+    { 
+      name: "1ml.com", 
+      url: "https://1ml.com/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
+      icon: BarChart3
+    },
+    { 
+      name: "LN Router", 
+      url: "https://lnrouter.app/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
+      icon: RouteIcon 
     },
   ];
 
@@ -162,9 +186,34 @@ export default async function OverviewPage({
           <p>
             Summer 2022 marked the formal start of our intensive routing activities. The initial phase focuses on understanding our network topology and impact. To facilitate this, routing fees are generally minimized (e.g., 1 ppm with a zero base fee) to encourage traffic, while channels with more constrained liquidity may have appropriately higher ppm fees.
           </p>
+          <div className="pt-4 mt-4 border-t">
+            <h3 className="text-lg font-semibold font-headline mb-3 text-foreground">Explore on External Platforms</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {externalPlatforms.map((platform) => {
+                const IconComponent = platform.icon;
+                return (
+                  <a 
+                    key={platform.name}
+                    href={platform.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="block hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <Card className="h-full bg-card hover:bg-muted/50 transition-colors">
+                      <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full aspect-square sm:aspect-auto"> {/* aspect-square for more consistent shape */}
+                        <IconComponent className="h-10 w-10 mb-3 text-primary" />
+                        <span className="font-medium text-sm text-foreground">{platform.name}</span>
+                      </CardContent>
+                    </Card>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
         </CardContent>
       </Card>
       
     </div>
   );
 }
+
