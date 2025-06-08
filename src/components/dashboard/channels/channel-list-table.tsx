@@ -139,7 +139,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-            <CardTitle className="font-headline">Your Channels ({sortedChannels.length})</CardTitle>
+            <CardTitle className="font-headline">Our Channels ({sortedChannels.length})</CardTitle>
             <Input 
               placeholder="Filter by Peer Alias or Node ID..." 
               value={searchTerm}
@@ -252,3 +252,4 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
     </>
   );
 }
+
