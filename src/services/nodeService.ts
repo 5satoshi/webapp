@@ -388,27 +388,29 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         SELECT
             MIN(received_time) AS first_tx_timestamp_bq,
             MAX(COALESCE(resolved_time, received_time)) AS last_tx_timestamp_bq,
-            COUNT(*) AS total_tx_count_val,
+            COUNTIF(status = 'settled') AS total_tx_count_val,
 
-            SUM(IF(in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_val,
+            SUM(IF(in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_attempts_val,
             SUM(IF(in_channel = @shortChannelId AND status = 'settled', 1, 0)) AS in_tx_count_successful_val,
-            SUM(IF(in_channel = @shortChannelId, COALESCE(in_msat, 0), 0)) AS in_tx_volume_msat_val,
+            SUM(IF(in_channel = @shortChannelId AND status = 'settled', COALESCE(in_msat, 0), 0)) AS in_tx_volume_msat_val,
 
-            SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_val,
+            SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
             SUM(IF(out_channel = @shortChannelId AND status = 'settled', 1, 0)) AS out_tx_count_successful_val,
-            SUM(IF(out_channel = @shortChannelId, COALESCE(out_msat, 0), 0)) AS out_tx_volume_msat_val
+            SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(out_msat, 0), 0)) AS out_tx_volume_msat_val
         FROM ForwardingsForChannel
     )
     SELECT
         first_tx_timestamp_bq,
         last_tx_timestamp_bq,
         COALESCE(total_tx_count_val, 0) as total_tx_count,
-        COALESCE(in_tx_count_total_val, 0) as in_tx_count,
+        
+        COALESCE(in_tx_count_successful_val, 0) as in_tx_count,
         COALESCE(in_tx_volume_msat_val, 0) as in_tx_volume_msat,
-        IF(COALESCE(in_tx_count_total_val, 0) > 0, SAFE_DIVIDE(COALESCE(in_tx_count_successful_val, 0) * 100.0, COALESCE(in_tx_count_total_val, 0)), 0) AS in_success_rate,
-        COALESCE(out_tx_count_total_val, 0) as out_tx_count,
+        IF(COALESCE(in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(in_tx_count_successful_val, 0) * 100.0, COALESCE(in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
+        
+        COALESCE(out_tx_count_successful_val, 0) as out_tx_count,
         COALESCE(out_tx_volume_msat_val, 0) as out_tx_volume_msat,
-        IF(COALESCE(out_tx_count_total_val, 0) > 0, SAFE_DIVIDE(COALESCE(out_tx_count_successful_val, 0) * 100.0, COALESCE(out_tx_count_total_val, 0)), 0) AS out_success_rate
+        IF(COALESCE(out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(out_tx_count_successful_val, 0) * 100.0, COALESCE(out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate
     FROM AggregatedStats
   `;
 
@@ -422,7 +424,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
     const [rows] = await job.getQueryResults();
 
     if (!rows || rows.length === 0 || !rows[0]) {
-      return { // Return default values if no forwarding data found for the channel
+      return { 
         shortChannelId: shortChannelId,
         firstTxTimestamp: null,
         lastTxTimestamp: null,
