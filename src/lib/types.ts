@@ -15,6 +15,7 @@ export interface KeyMetric {
 export interface Channel {
   id: string;
   peerNodeId: string;
+  peerAlias?: string; // Added peerAlias
   capacity: number; 
   localBalance: number; 
   remoteBalance: number; 

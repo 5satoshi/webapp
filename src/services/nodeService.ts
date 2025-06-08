@@ -247,15 +247,25 @@ export async function fetchChannels(): Promise<Channel[]> {
   }
 
   const query = `
+    WITH LatestAliases AS (
+      SELECT
+        nodeid,
+        alias,
+        ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE alias IS NOT NULL AND TRIM(alias) != ''
+    )
     SELECT
-      id,
-      funding_txid,        
-      funding_outnum,      
-      msatoshi_total,      
-      msatoshi_to_us,      
-      state                
-    FROM \`${projectId}.${datasetId}.peers\`
-    ORDER BY state, id
+      p.id,
+      p.funding_txid,        
+      p.funding_outnum,      
+      p.msatoshi_total,      
+      p.msatoshi_to_us,      
+      p.state,
+      la.alias AS peer_alias             
+    FROM \`${projectId}.${datasetId}.peers\` p
+    LEFT JOIN LatestAliases la ON p.id = la.nodeid AND la.rn = 1
+    ORDER BY p.state, p.id
   `;
 
   try {
@@ -282,6 +292,7 @@ export async function fetchChannels(): Promise<Channel[]> {
       return {
         id: channelIdString, 
         peerNodeId: String(row.id || 'unknown-peer-id'),
+        peerAlias: row.peer_alias || undefined,
         capacity: capacitySats,
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,

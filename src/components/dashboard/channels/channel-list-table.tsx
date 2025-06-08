@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Channel } from '@/lib/types';
@@ -32,9 +33,12 @@ interface ChannelListTableProps {
 export function ChannelListTable({ channels: initialChannels }: ChannelListTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredChannels = initialChannels.filter(channel => 
-    channel.peerNodeId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredChannels = initialChannels.filter(channel => {
+    const term = searchTerm.toLowerCase();
+    const nodeIdMatch = channel.peerNodeId.toLowerCase().includes(term);
+    const aliasMatch = channel.peerAlias && channel.peerAlias.toLowerCase().includes(term);
+    return nodeIdMatch || aliasMatch;
+  });
   
   const getStatusVariant = (status: Channel['status']) => {
     switch (status) {
@@ -55,7 +59,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
         <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
           <CardTitle className="font-headline">Your Channels ({filteredChannels.length})</CardTitle>
           <Input 
-            placeholder="Filter by Peer Node ID..." 
+            placeholder="Filter by Peer Alias or Node ID..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-xs"
@@ -67,7 +71,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Peer Node ID</TableHead>
+                <TableHead>Peer Alias / Node ID</TableHead>
                 <TableHead className="text-right">Capacity (sats)</TableHead>
                 <TableHead>Balance (Local/Remote %)</TableHead>
                 <TableHead className="text-right">Success Rate</TableHead>
@@ -87,10 +91,13 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                 filteredChannels.map((channel) => {
                   const totalBalance = channel.localBalance + channel.remoteBalance;
                   const localBalancePercent = totalBalance > 0 ? (channel.localBalance / totalBalance) * 100 : 0;
+                  const displayPeer = channel.peerAlias || `${channel.peerNodeId.substring(0,10)}...${channel.peerNodeId.substring(channel.peerNodeId.length - 10)}`;
+                  const tooltipTitle = channel.peerAlias ? `${channel.peerAlias} (${channel.peerNodeId})` : channel.peerNodeId;
+
                   return (
                     <TableRow key={channel.id}>
-                      <TableCell className="font-medium truncate max-w-xs" title={channel.peerNodeId}>
-                        {channel.peerNodeId.substring(0,10)}...{channel.peerNodeId.substring(channel.peerNodeId.length - 10)}
+                      <TableCell className="font-medium truncate max-w-xs" title={tooltipTitle}>
+                        {displayPeer}
                       </TableCell>
                       <TableCell className="text-right">{channel.capacity.toLocaleString()}</TableCell>
                       <TableCell>
