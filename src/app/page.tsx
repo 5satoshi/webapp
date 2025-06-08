@@ -16,7 +16,23 @@ import {
 } from '@/services/nodeService';
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
-import { Users, Mountain, BarChart3, Route as RouteIcon } from 'lucide-react';
+import { Users, Mountain, BarChart3 } from 'lucide-react'; // RouteIcon removed
+
+// Define the custom LN Router SVG icon
+const LnRouterLogoIcon = ({ className }: { className?: string }) => (
+  <svg
+    width="24" 
+    height="24"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className} 
+  >
+    <path
+      d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"
+      fill="#4FD1C5" // Teal color for LN Router logo
+    />
+  </svg>
+);
 
 
 export default async function OverviewPage({ 
@@ -129,7 +145,7 @@ export default async function OverviewPage({
     { 
       name: "LN Router", 
       url: "https://lnrouter.app/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: RouteIcon 
+      icon: LnRouterLogoIcon // Using the custom SVG icon here
     },
   ];
 
@@ -200,7 +216,7 @@ export default async function OverviewPage({
                     className="block hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     <Card className="h-full bg-card hover:bg-muted/50 transition-colors">
-                      <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full aspect-square sm:aspect-auto"> {/* aspect-square for more consistent shape */}
+                      <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full aspect-square sm:aspect-auto">
                         <IconComponent className="h-10 w-10 mb-3 text-primary" />
                         <span className="font-medium text-sm text-foreground">{platform.name}</span>
                       </CardContent>
@@ -216,4 +232,3 @@ export default async function OverviewPage({
     </div>
   );
 }
-
