@@ -31,29 +31,32 @@ export default async function OverviewPage({
 
   const keyMetrics = await fetchKeyMetrics();
   const historicalPaymentVolume = await fetchHistoricalPaymentVolume(currentAggregation);
-  // const forwardingSummary = await fetchPeriodForwardingSummary(currentAggregation); // Replaced by shortestPathShare
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
   
-  let descriptiveLabel = 'Day';
-  switch (currentAggregation) {
-    case 'day':
-      descriptiveLabel = 'Day';
-      break;
-    case 'week':
-      descriptiveLabel = '7 Days';
-      break;
-    case 'month':
-      descriptiveLabel = '30 Days';
-      break;
-    case 'quarter':
-      descriptiveLabel = '90 Days';
-      break;
-    default:
-      descriptiveLabel = 'Period'; 
-      break;
+  let descriptiveLabel = 'Day'; // Default for 'day'
+  const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
+  if (selectedOption) {
+    switch (currentAggregation) {
+      case 'day':
+        descriptiveLabel = 'Day';
+        break;
+      case 'week':
+        descriptiveLabel = '7 Days';
+        break;
+      case 'month':
+        descriptiveLabel = '30 Days';
+        break;
+      case 'quarter':
+        descriptiveLabel = '90 Days';
+        break;
+      default:
+        descriptiveLabel = selectedOption.label.replace(/s$/, ''); // Attempt to singularize
+        break;
+    }
   }
+
 
   const shortestPathShareLatest = shortestPathShareData.latestShare;
   const shortestPathSharePrevious = shortestPathShareData.previousShare;
@@ -75,6 +78,7 @@ export default async function OverviewPage({
                       ? betweennessRankData.latestRank - betweennessRankData.previousRank 
                       : undefined,
       absoluteChangeDescription: `vs previous`,
+      absoluteChangeDirection: 'lower_is_better',
       description: `Node's current betweenness centrality rank. Lower is better. Change shown vs prior period.`,
     },
     {
@@ -84,12 +88,13 @@ export default async function OverviewPage({
       iconName: 'PieChart',
       absoluteChange: shortestPathAbsoluteChange,
       absoluteChangeDescription: `% vs previous`,
+      absoluteChangeDirection: 'higher_is_better',
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
     {
       id: 'payments_forwarded_period',
       title: `Payments Forwarded (last ${descriptiveLabel})`,
-      displayValue: (await fetchPeriodForwardingSummary(currentAggregation)).paymentsForwardedCount.toLocaleString(), // Fetching here for simplicity
+      displayValue: (await fetchPeriodForwardingSummary(currentAggregation)).paymentsForwardedCount.toLocaleString(),
       unit: 'Payments',
       iconName: 'Zap',
       description: `Total payments successfully forwarded in the last ${descriptiveLabel.toLowerCase()}.`,
@@ -143,3 +148,4 @@ export default async function OverviewPage({
     </div>
   );
 }
+

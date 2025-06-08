@@ -25,7 +25,14 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
   const IconComponent = iconMap[metric.iconName] || Activity;
   
   const hasAbsoluteChange = typeof metric.absoluteChange === 'number';
-  const isImprovement = hasAbsoluteChange && metric.absoluteChange! < 0; // For rank, negative change means improvement
+  let isImprovement = false;
+  if (hasAbsoluteChange) {
+    if (metric.absoluteChangeDirection === 'higher_is_better') {
+      isImprovement = metric.absoluteChange! > 0;
+    } else { // Defaults to 'lower_is_better' or if undefined
+      isImprovement = metric.absoluteChange! < 0;
+    }
+  }
 
   const hasTrend = typeof metric.trend === 'number' && !hasAbsoluteChange;
   const isPositiveTrend = hasTrend && metric.trend! >= 0;
@@ -49,11 +56,6 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {metric.description && !hasAbsoluteChange && ( // Show description here only if not showing absolute change card's description
-              <p className="text-xs text-muted-foreground line-clamp-1 leading-tight">
-                {metric.description}
-              </p>
-            )}
           </div>
           <IconComponent className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
         </div>
@@ -69,17 +71,22 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16 */}
       <div className="px-4 h-16 flex items-center">
         {hasAbsoluteChange ? (
-          <div className="flex items-center justify-center w-full"> {/* Centering wrapper for absoluteChange */}
+          <div className="flex items-center justify-center w-full">
             <p className={cn(
                 "text-xs text-muted-foreground flex items-center gap-1",
-                isImprovement ? "text-green-500" : (metric.absoluteChange === 0 ? "text-muted-foreground" : "text-red-500")
+                metric.absoluteChange === 0 ? "text-muted-foreground" : 
+                (metric.absoluteChangeDirection === 'higher_is_better' ? (metric.absoluteChange! > 0 ? "text-green-500" : "text-red-500") :
+                (metric.absoluteChange! < 0 ? "text-green-500" : "text-red-500"))
             )}>
-                {metric.absoluteChange !== 0 && (isImprovement ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />)}
+                {metric.absoluteChange !== 0 && (
+                  (metric.absoluteChangeDirection === 'higher_is_better' ? (metric.absoluteChange! > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />) :
+                  (metric.absoluteChange! < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />))
+                )}
                 {metric.absoluteChange! > 0 ? '+' : ''}{metric.absoluteChange} {metric.absoluteChangeDescription || "change"}
             </p>
           </div>
         ) : (
-          <div className="flex items-center w-full"> {/* Original layout for trend/unit */}
+          <div className="flex items-center w-full">
             {hasTrend ? (
               <p className={cn(
                   "text-xs text-muted-foreground flex items-center gap-1 line-clamp-1",
@@ -89,7 +96,7 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
                   {isPositiveTrend ? '+' : ''}{metric.trend}% from last period
               </p>
             ) : (
-              <div className="h-4 w-4" /> // Placeholder to maintain alignment if no trend
+              <div className="h-4 w-4" /> 
             )}
             
             <div className="flex-grow" /> 
@@ -105,3 +112,4 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
     </Card>
   );
 }
+

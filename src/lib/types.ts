@@ -9,6 +9,7 @@ export interface KeyMetric {
   trend?: number; 
   absoluteChange?: number;
   absoluteChangeDescription?: string;
+  absoluteChangeDirection?: 'higher_is_better' | 'lower_is_better'; // New property
 }
 
 export interface Channel {
@@ -105,3 +106,4 @@ export interface ShortestPathShareData {
   latestShare: number | null;
   previousShare: number | null;
 }
+
