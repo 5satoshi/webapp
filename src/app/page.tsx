@@ -16,7 +16,7 @@ import {
 } from '@/services/nodeService';
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
-import { Users, Mountain, BarChart3 } from 'lucide-react'; // RouteIcon removed
+import { Users, BarChart3 } from 'lucide-react'; // Mountain and RouteIcon removed
 
 // Define the custom LN Router SVG icon
 const LnRouterLogoIcon = ({ className }: { className?: string }) => (
@@ -29,7 +29,29 @@ const LnRouterLogoIcon = ({ className }: { className?: string }) => (
   >
     <path
       d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"
-      fill="#4FD1C5" // Teal color for LN Router logo
+      fill="currentColor" // Use currentColor to inherit color from parent, can be overridden
+    />
+  </svg>
+);
+
+// Define the custom Amboss SVG icon
+const AmbossLogoIcon = ({ className }: { className?: string }) => (
+  <svg 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    xmlns="http://www.w3.org/2000/svg" 
+    className={className}
+  >
+    <defs>
+      <linearGradient id="ambossGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style={{stopColor: 'rgb(236, 72, 153)', stopOpacity: 1}} /> 
+        <stop offset="100%" style={{stopColor: 'rgb(139, 92, 246)', stopOpacity: 1}} />
+      </linearGradient>
+    </defs>
+    <path 
+      d="M6 18H9V15H15V18H18V6H15V9H9V6H6V18ZM12 10.5H14V13.5H12V10.5Z" 
+      fill="url(#ambossGradient)" 
     />
   </svg>
 );
@@ -135,7 +157,7 @@ export default async function OverviewPage({
     { 
       name: "Amboss.space", 
       url: "https://amboss.space/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: Mountain
+      icon: AmbossLogoIcon
     },
     { 
       name: "1ml.com", 
@@ -145,7 +167,7 @@ export default async function OverviewPage({
     { 
       name: "LN Router", 
       url: "https://lnrouter.app/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: LnRouterLogoIcon // Using the custom SVG icon here
+      icon: LnRouterLogoIcon 
     },
   ];
 
@@ -213,12 +235,12 @@ export default async function OverviewPage({
                     href={platform.url} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="block hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 group"
                   >
-                    <Card className="h-full bg-card hover:bg-muted/50 transition-colors">
+                    <Card className="h-full bg-card group-hover:shadow-lg group-hover:border-primary/50 group-focus-visible:shadow-lg group-focus-visible:border-primary/50 transition-all duration-200">
                       <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full aspect-square sm:aspect-auto">
-                        <IconComponent className="h-10 w-10 mb-3 text-primary" />
-                        <span className="font-medium text-sm text-foreground">{platform.name}</span>
+                        <IconComponent className="h-10 w-10 mb-3 text-primary group-hover:text-primary transition-colors" />
+                        <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{platform.name}</span>
                       </CardContent>
                     </Card>
                   </a>
@@ -232,3 +254,4 @@ export default async function OverviewPage({
     </div>
   );
 }
+
