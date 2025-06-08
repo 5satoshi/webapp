@@ -28,6 +28,26 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
   const hasTrend = typeof metric.trend === 'number' && !hasAbsoluteChange;
   const isPositiveTrend = hasTrend && metric.trend! >= 0;
 
+  // Determine which icon to show for absoluteChange
+  let TrendIconComponent: React.ElementType | null = null;
+  if (hasAbsoluteChange && metric.absoluteChange !== 0) {
+    if (metric.absoluteChangeDirection === 'higher_is_better') {
+      TrendIconComponent = metric.absoluteChange! > 0 ? TrendingUp : TrendingDown;
+    } else { // lower_is_better
+      TrendIconComponent = metric.absoluteChange! < 0 ? TrendingUp : TrendingDown;
+    }
+  }
+
+  // Determine color for absoluteChange (icon and text)
+  let absoluteChangeColorClass = "text-muted-foreground";
+  if (hasAbsoluteChange && metric.absoluteChange !== 0) {
+    const isGoodChange = metric.absoluteChangeDirection === 'higher_is_better'
+      ? metric.absoluteChange! > 0
+      : metric.absoluteChange! < 0;
+    absoluteChangeColorClass = isGoodChange ? "text-green-500" : "text-red-500";
+  }
+
+
   return (
     <Card className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
       {/* Top Section: Title, Icon - Fixed Height h-16 */}
@@ -65,25 +85,12 @@ export function KeyMetricsCard({ metric }: KeyMetricsCardProps) {
       {/* Bottom Section: Unit, Trend/AbsoluteChange - Fixed Height h-16, Centered Content */}
       <div className="px-4 h-16 flex items-center justify-center">
         {hasAbsoluteChange ? (
-          <div className="flex items-center justify-center gap-1">
-            {metric.absoluteChange !== 0 && (
-              metric.absoluteChangeDirection === 'higher_is_better' ?
-                (metric.absoluteChange! > 0 ?
-                  <TrendingUp className="h-4 w-4" /> :
-                  <TrendingDown className="h-4 w-4" />
-                ) : // lower_is_better
-                (metric.absoluteChange! < 0 ? // Value DECREASED (better for lower_is_better) - Show UP arrow
-                  <TrendingUp className="h-4 w-4" /> : // Value INCREASED (worse for lower_is_better) - Show DOWN arrow
-                  <TrendingDown className="h-4 w-4" />
-                )
-            )}
-            <span className={cn(
-              "text-xs",
-              metric.absoluteChange === 0 ? "text-muted-foreground" :
-              (metric.absoluteChangeDirection === 'higher_is_better' ?
-                (metric.absoluteChange! > 0 ? "text-green-500" : "text-red-500") :
-                (metric.absoluteChange! < 0 ? "text-green-500" : "text-red-500"))
-            )}>
+          <div className={cn(
+            "flex items-center justify-center gap-1",
+            absoluteChangeColorClass
+          )}>
+            {TrendIconComponent && <TrendIconComponent className="h-4 w-4" />}
+            <span className="text-xs">
               {metric.absoluteChange !== 0 && metric.absoluteChange! > 0 && metric.absoluteChangeDirection === 'higher_is_better' ? '+' : ''}
               {metric.absoluteChange !== 0 && metric.absoluteChange! > 0 && metric.absoluteChangeDirection === 'lower_is_better' ? '+' : ''}
               {metric.absoluteChange}
