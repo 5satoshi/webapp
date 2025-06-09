@@ -24,8 +24,8 @@ const PURPLE_SATURATION_TARGET = 70;
 const PURPLE_LIGHTNESS_TARGET = 36;
 
 // Base values for "white" or min-intensity color
-const BASE_SATURATION_MIN = 10; 
-const BASE_LIGHTNESS_MAX = 97; 
+const BASE_SATURATION_MIN = 10; // Lowered for a more "white" appearance at min
+const BASE_LIGHTNESS_MAX = 97; // Increased for a more "white" appearance at min
 
 const regionalIndicators = [
   { name: 'Asia', start: 6, end: 12 },    // 06:00-11:59 UTC
@@ -57,17 +57,14 @@ const getCellColor = (
   const range = maxValueForMetric - minValueForMetric;
   let normalized = 0;
 
-  if (currentValue < minValueForMetric) {
+  if (currentValue < minValueForMetric) { // Should not happen if minValueForMetric is actual min
       normalized = 0;
   } else if (range > 0) {
     normalized = (currentValue - minValueForMetric) / range;
   } else { 
-    if (maxValueForMetric === 0 && minValueForMetric === 0 && currentValue === 0) { // All values are 0
-        return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`; 
-    }
-    // All values are the same (non-zero or zero), or only one data point.
+    // All values are the same for this metric or only one data point.
+    // If all values are 0, it should be white.
     // If all values are the same non-zero, it should be full intensity.
-    // If all values are the same zero, it's covered above.
     normalized = (currentValue > 0 || maxValueForMetric > 0) ? 1 : 0;
   }
   
@@ -133,7 +130,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
           <Tooltip key={`region-indicator-${region.name}`}>
             <TooltipTrigger asChild>
               <div
-                className="h-full p-1 text-xs text-center bg-muted/40 border border-border/60 flex items-center justify-center rounded-sm"
+                className="h-full p-1 text-xs text-center text-muted-foreground bg-card flex items-center justify-center rounded-sm"
                 style={{ gridColumn: `span ${span}` }}
               >
                 {region.name}
@@ -208,22 +205,25 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
             </React.Fragment>
           ))}
 
-          {/* Hour Labels Row (Bottom) */}
-          <div className="p-1 bg-card"></div> {/* Empty cell for day label column alignment */}
+          {/* Hour Labels Row (Bottom of this grid) */}
+          <div className="p-1 bg-card text-xs text-center font-medium text-muted-foreground flex items-center justify-center col-start-1">UTC</div>
           {hours.map(hour => (
             <div key={`hour-label-bottom-${hour}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground">
               {hour}
             </div>
           ))}
+        </div>
 
-          {/* Afternoon Indicators Row */}
-          <div className="p-1 bg-card text-xs text-center font-medium text-muted-foreground flex items-center justify-center col-start-1">UTC</div>
+        {/* Regional Indicators Row (Separate grid, no gap-px bg-border) */}
+        <div className="grid mt-1" style={{ gridTemplateColumns: `auto repeat(${hours.length}, minmax(30px, 1fr))` }}>
+          <div className="p-1 bg-card"></div> {/* Empty cell for alignment with day labels column (now effectively aligning with UTC label) */}
           {indicatorRowCells}
         </div>
       </div>
        <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes forwarding activity from the last 8 weeks. Hours are in UTC. Cell color intensity (from white representing the minimum observed count for the selected metric to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume. The bottom row highlights late afternoon periods in Asia, Europe, and America, displayed as merged cells spanning their respective UTC timeframes. Hover over cells for detailed counts.
+        Heatmap visualizes forwarding activity from the last 8 weeks. Hours are in UTC. Cell color intensity (from white representing the minimum observed count for the selected metric to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume. The bottom row highlights late afternoon periods in Asia, Europe, and America with text labels on a white background. Hover over cells for detailed counts.
       </CardDescription>
     </TooltipProvider>
   );
 }
+
