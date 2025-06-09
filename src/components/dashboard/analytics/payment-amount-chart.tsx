@@ -31,6 +31,15 @@ const valueOverTimeConfig = {
 } satisfies ChartConfig;
 
 export function PaymentAmountChart({ distributionData, forwardingValueData, frequencyChartTitleLabel }: PaymentAmountChartProps) {
+  
+  let yAxisMin = 1;
+  if (forwardingValueData && forwardingValueData.length > 0) {
+    const positiveMedians = forwardingValueData.map(d => d.medianValue).filter(v => v > 0);
+    if (positiveMedians.length > 0) {
+      yAxisMin = Math.max(1, Math.min(...positiveMedians));
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
       <div>
@@ -96,7 +105,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
                 />
                 <YAxis
                     scale="log"
-                    domain={[1, 'auto']} 
+                    domain={[yAxisMin, 'auto']} 
                     allowDataOverflow={true}
                     tickLine={false}
                     axisLine={false}
@@ -144,3 +153,4 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
     </div>
   );
 }
+
