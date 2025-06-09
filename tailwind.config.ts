@@ -18,6 +18,9 @@ export default {
       },
     },
     extend: {
+      screens: {
+        'xs': '231px', // Custom breakpoint for external platform cards
+      },
       fontFamily: {
         body: ['var(--font-inter)', ...fontFamily.sans],
         headline: ['var(--font-space-grotesk)', ...fontFamily.sans],

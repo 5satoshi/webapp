@@ -266,7 +266,7 @@ export default async function OverviewPage({
           </p>
           <div className="pt-4 mt-4 border-t">
             <h3 className="text-lg font-semibold font-headline mb-3 text-foreground">Explore on External Platforms</h3>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 xs:grid-cols-4 gap-4">
               {externalPlatforms.map((platform) => {
                 const IconComponent = platform.icon;
                 return (
@@ -280,7 +280,7 @@ export default async function OverviewPage({
                     <Card className="aspect-square bg-card group-hover:shadow-lg group-hover:border-primary/50 group-focus-visible:shadow-lg group-focus-visible:border-primary/50 transition-all duration-200">
                       <CardContent className="p-3 flex flex-col items-center justify-center text-center h-full">
                         <IconComponent className="h-7 w-7 text-primary group-hover:text-primary transition-colors" />
-                        <span className="font-medium text-xs text-foreground group-hover:text-primary transition-colors mt-2 hidden md:inline-block">{platform.name}</span>
+                        <span className="font-medium text-xs text-foreground group-hover:text-primary transition-colors mt-2 hidden lg:inline-block">{platform.name}</span>
                       </CardContent>
                     </Card>
                   </a>
