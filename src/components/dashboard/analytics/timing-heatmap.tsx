@@ -2,7 +2,6 @@
 'use client';
 
 import type { HeatmapCell } from '@/lib/types';
-import { CardDescription } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import React, { useState, useMemo, useEffect } from 'react';
@@ -11,8 +10,8 @@ interface TimingHeatmapProps {
   data: HeatmapCell[];
 }
 
-const allDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const allHours = Array.from({ length: 24 }, (_, i) => i); // 0-23
+const ALL_DAYS_ORDERED = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; // Sunday as 0
+const ALL_HOURS_NUMERIC = Array.from({ length: 24 }, (_, i) => i); // 0-23
 
 const ORANGE_HUE = 34; // hsl(var(--secondary))
 const ORANGE_SATURATION_TARGET = 100;
@@ -22,8 +21,8 @@ const PURPLE_HUE = 277; // hsl(var(--primary))
 const PURPLE_SATURATION_TARGET = 70;
 const PURPLE_LIGHTNESS_TARGET = 36;
 
-const BASE_SATURATION_MIN = 20; 
-const BASE_LIGHTNESS_MAX = 97; 
+const BASE_SATURATION_MIN = 20;
+const BASE_LIGHTNESS_MAX = 97; // Represents "white" or very light color
 
 const MOBILE_LAYOUT_BREAKPOINT = 384; 
 
@@ -55,27 +54,27 @@ const getCellColor = (
   }
   
   if (maxValueForMetric === minValueForMetric) {
-    if (currentValue === 0 && minValueForMetric === 0) { // All zeros or single zero data point
-        return `hsl(${hue}, ${BASE_SATURATION_MIN}%, ${BASE_LIGHTNESS_MAX}%)`;
-    }
-    // All values are the same non-zero, or single non-zero data point
-    return `hsl(${hue}, ${targetSaturation}%, ${targetLightness}%)`;
+    // All values are the same. If that value is 0, make it white. Otherwise, full intensity.
+    return currentValue === 0 
+      ? `hsl(${hue}, ${BASE_SATURATION_MIN}%, ${BASE_LIGHTNESS_MAX}%)` 
+      : `hsl(${hue}, ${targetSaturation}%, ${targetLightness}%)`;
   }
 
   // Ensure minValueForMetric isn't greater than maxValueForMetric if dataset is very small
+  // This path should ideally not be hit if the above condition handles single-value non-zero cases.
   const effectiveMin = Math.min(minValueForMetric, maxValueForMetric);
   const range = maxValueForMetric - effectiveMin;
 
   let normalized = 0;
-  if (currentValue <= effectiveMin) {
+  if (currentValue <= effectiveMin) { // Catches values at or below min, including min itself
     normalized = 0;
   } else if (range > 0) {
     normalized = (currentValue - effectiveMin) / range;
-  } else { // Should only happen if effectiveMin == maxValueForMetric (and not zero)
-    normalized = 1; // full intensity if it's the same non-zero value
+  } else { // Should only happen if effectiveMin == maxValueForMetric (and not zero), already handled.
+    normalized = 1; 
   }
   
-  normalized = Math.max(0, Math.min(1, normalized));
+  normalized = Math.max(0, Math.min(1, normalized)); // Clamp between 0 and 1
 
   const saturation = Math.round(BASE_SATURATION_MIN + normalized * (targetSaturation - BASE_SATURATION_MIN));
   const lightness = Math.round(BASE_LIGHTNESS_MAX - normalized * (BASE_LIGHTNESS_MAX - targetLightness));
@@ -92,7 +91,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
       setIsMobileLayout(window.innerWidth < MOBILE_LAYOUT_BREAKPOINT);
     };
     if (typeof window !== 'undefined') {
-      handleResize(); 
+      handleResize();
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
     }
@@ -115,10 +114,11 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         minF = Math.min(minF, cell.failedForwards);
         maxF = Math.max(maxF, cell.failedForwards);
       });
-      if (minS === Infinity) minS = 0;
-      if (maxS === -Infinity) maxS = 0; else if (maxS < minS) maxS = minS;
-      if (minF === Infinity) minF = 0;
-      if (maxF === -Infinity) maxF = 0; else if (maxF < minF) maxF = minF;
+      // Handle cases where all values are 0 or only one data point exists
+      minS = minS === Infinity ? 0 : minS;
+      maxS = maxS === -Infinity ? 0 : maxS;
+      minF = minF === Infinity ? 0 : minF;
+      maxF = maxF === -Infinity ? 0 : maxF;
     } else {
       minS = 0; maxS = 0; minF = 0; maxF = 0;
     }
@@ -136,11 +136,13 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
   const currentMinValue = selectedMetric === 'successfulForwards' ? minSuccessful : minFailed;
   const currentMaxValue = selectedMetric === 'successfulForwards' ? maxSuccessful : maxFailed;
 
-  const rowIterationSource = isMobileLayout ? allHours : allDays;
-  const colIterationSource = isMobileLayout ? allDays : allHours;
+  const rowIterationSource = isMobileLayout ? ALL_HOURS_NUMERIC : ALL_DAYS_ORDERED;
+  const colIterationSource = isMobileLayout ? ALL_DAYS_ORDERED : ALL_HOURS_NUMERIC;
 
-  const rowLabels = isMobileLayout ? allHours.map(h => h.toString().padStart(2, '0')) : allDays;
-  const colLabels = isMobileLayout ? allDays : allHours.map(h => h.toString().padStart(2, '0'));
+  const rowLabels = isMobileLayout ? ALL_HOURS_NUMERIC.map(h => h.toString().padStart(2, '0')) : ALL_DAYS_ORDERED;
+  const colLabels = isMobileLayout ? ALL_DAYS_ORDERED : ALL_HOURS_NUMERIC.map(h => h.toString().padStart(2, '0'));
+  
+  const topLeftLabel = isMobileLayout ? "Hour" : "UTC";
 
   const heatmapGridStyle: React.CSSProperties = {
     display: 'grid',
@@ -150,10 +152,10 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
   };
   
   const regionalIndicatorCells: React.ReactNode[] = [];
-  if (!isMobileLayout) {
+  if (!isMobileLayout) { // Only prepare these for desktop layout
     let currentHourIndicatorIndex = 0;
-    while (currentHourIndicatorIndex < allHours.length) {
-      const hourValue = allHours[currentHourIndicatorIndex];
+    while (currentHourIndicatorIndex < ALL_HOURS_NUMERIC.length) {
+      const hourValue = ALL_HOURS_NUMERIC[currentHourIndicatorIndex];
       let regionProcessed = false;
       for (const region of regionalIndicatorsConfig) {
         if (hourValue === region.start) {
@@ -200,9 +202,11 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         </Tabs>
       </div>
       
-      <div className="w-full overflow-hidden"> 
+      <div className="w-full overflow-hidden">
         <div className="grid my-2" style={heatmapGridStyle}>
-          <div className="p-1 bg-card flex items-center justify-center" />
+          <div className="p-1 text-xs text-center font-medium bg-card text-muted-foreground flex items-center justify-center">
+            {topLeftLabel}
+          </div>
 
           {colLabels.map((label, idx) => (
             <div key={`col-header-${idx}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground flex items-center justify-center">
@@ -212,25 +216,25 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
 
           {rowIterationSource.map((_, rowIndex) => (
             <React.Fragment key={`heatmap-data-row-${rowIndex}`}>
-              <div className="p-1 text-xs text-center font-medium bg-card text-muted-foreground flex items-center justify-center">
+              <div className="p-1 text-xs text-center font-medium bg-card text-muted-foreground flex items-center justify-center" style={{minHeight: isMobileLayout ? '1.5rem' : 'auto'}}>
                 {rowLabels[rowIndex]}
               </div>
 
               {colIterationSource.map((_, colIndex) => {
-                const dayIndex = isMobileLayout ? colIndex : rowIndex;
-                const hourValue = isMobileLayout ? rowIndex : colIndex; 
+                const dayValue = isMobileLayout ? colIndex : ALL_DAYS_ORDERED.indexOf(rowLabels[rowIndex] as string);
+                const hourValue = isMobileLayout ? parseInt(rowLabels[rowIndex] as string) : parseInt(colLabels[colIndex] as string);
 
-                const cell = cellDataMap.get(`${dayIndex}-${hourValue}`) || { day: dayIndex, hour: hourValue, successfulForwards: 0, failedForwards: 0 };
+                const cell = cellDataMap.get(`${dayValue}-${hourValue}`) || { day: dayValue, hour: hourValue, successfulForwards: 0, failedForwards: 0 };
                 const valueForMetric = cell[selectedMetric];
                 const color = getCellColor(valueForMetric, currentMinValue, currentMaxValue, selectedMetric);
                 
-                const dayLabelForTooltip = allDays[dayIndex];
-                const hourLabelForTooltip = allHours[hourValue].toString().padStart(2, '0');
+                const dayLabelForTooltip = ALL_DAYS_ORDERED[dayValue];
+                const hourLabelForTooltip = ALL_HOURS_NUMERIC[hourValue].toString().padStart(2, '0');
                 const totalForwards = cell.successfulForwards + cell.failedForwards;
                 const successRate = totalForwards > 0 ? (cell.successfulForwards / totalForwards) * 100 : 0;
 
                 return (
-                  <Tooltip key={`cell-${dayIndex}-${hourValue}`}>
+                  <Tooltip key={`cell-${dayValue}-${hourValue}`}>
                     <TooltipTrigger asChild>
                       <div
                         className="w-full h-full rounded-sm"
@@ -254,20 +258,17 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
       </div>
 
       {!isMobileLayout && regionalIndicatorCells.length > 0 && (
-        <div className="grid mt-1" style={{ gridTemplateColumns: `min-content repeat(${allHours.length}, minmax(0, 1fr))` }}>
+        <div className="grid mt-1" style={{ 
+            gridTemplateColumns: `min-content repeat(${ALL_HOURS_NUMERIC.length}, minmax(0, 1fr))`,
+            // No gap or bg-border for this row as per user request (white background implied by card)
+          }}>
+          {/* Spacer cell to align with the Day/Hour labels column of the heatmap above it. */}
           <div className="p-1 bg-card text-xs text-muted-foreground flex items-center justify-center">
-            UTC
+            {/* This could be empty or label this row e.g. "Regions" */}
           </div>
           {regionalIndicatorCells}
         </div>
       )}
-
-      <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes forwarding activity from the last 8 weeks. Cell color intensity (from white representing the minimum observed count for the selected metric, to full orange for successful or full purple for failed representing the maximum) indicates the volume. 
-        On screens narrower than {MOBILE_LAYOUT_BREAKPOINT}px, axes are swapped: hours are vertical, days horizontal. Cells expand to fill available space.
-        The bottom row (on wider screens) highlights late afternoon periods in Asia, Europe, and America (UTC-based). Hover over cells for detailed counts.
-      </CardDescription>
     </TooltipProvider>
   );
 }
-
