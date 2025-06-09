@@ -75,7 +75,7 @@ export default async function AnalyticsPage({
         </CardHeader>
         <CardContent className="space-y-8">
           <p className="text-sm text-muted-foreground mb-4">
-            Another important information is to understand the amount of routed payments. We’re presenting two kinds of insights. The first is showing the distribution of payment amounts, the second the evolution of the median payment amount over time.
+            Understanding the routed payment amounts for the {chartTitlePeriodLabel.toLowerCase()} is crucial. We present two insights: first, the distribution of payment amounts, and second, the evolution of median and maximum payment values over this period.
           </p>
           <PaymentAmountChart
             distributionData={forwardingDistributionData} 
@@ -90,7 +90,7 @@ export default async function AnalyticsPage({
               Timing Patterns Heatmap ({chartTitlePeriodLabel})
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              What can be analyzed are the timestamps of transaction requests hitting the node. If we put the timestamps for the received routing requests of the last 8 weeks with our Lightning node in a weekly heatmap, we get the following overview in Coordinated Universal Time (UTC).
+              What can be analyzed are the timestamps of transaction requests hitting the node. If we put the timestamps for the received routing requests of the {chartTitlePeriodLabel.toLowerCase()} with our Lightning node in a weekly heatmap, we get the following overview in Coordinated Universal Time (UTC).
             </p>
             <TimingHeatmap data={timingHeatmapData} />
           </div>
