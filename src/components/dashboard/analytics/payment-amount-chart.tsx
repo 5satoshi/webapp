@@ -62,7 +62,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
     <div className="space-y-8"> {/* Changed from grid to space-y-8 for full-width stacking */}
       <div>
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
-          Forwarding Size Frequency ({frequencyChartTitleLabel})
+          Forwarding Size Volume ({frequencyChartTitleLabel})
         </h3>
          {(!distributionData || distributionData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No distribution data available for this period.</div>
@@ -171,3 +171,4 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
     </div>
   );
 }
+
