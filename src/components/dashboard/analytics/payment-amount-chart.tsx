@@ -94,13 +94,20 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
                     tickFormatter={(value) => new Date(value + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     className="text-xs" 
                 />
-                <YAxis 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickMargin={8} 
+                <YAxis
+                    scale="log"
+                    domain={[1, 'auto']} 
+                    allowDataOverflow={true}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
                     className="text-xs"
-                    tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-                    domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.1)]}
+                    tickFormatter={(value) => {
+                        const num = Number(value);
+                        if (num === 0) return '0'; 
+                        if (num < 1000) return num.toLocaleString();
+                        return `${(num / 1000).toFixed(num % 1000 !== 0 ? 1 : 0)}k`;
+                    }}
                 />
                 <ChartTooltip
                     cursor={false}
