@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
 
-import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart'; // Will be renamed to ForwardingAmountChart conceptually
+import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
 
 import { 
@@ -30,6 +30,29 @@ export default async function AnalyticsPage({
   const averageForwardingValueData = await fetchAverageForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData();
 
+  let descriptiveLabel = 'Day';
+  const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
+  if (selectedOption) {
+    switch (currentAggregation) {
+      case 'day':
+        descriptiveLabel = 'Day';
+        break;
+      case 'week':
+        descriptiveLabel = '7 Days';
+        break;
+      case 'month':
+        descriptiveLabel = '30 Days';
+        break;
+      case 'quarter':
+        descriptiveLabel = '90 Days';
+        break;
+      default:
+        // Fallback for any other aggregation period to use its label, removing 's' if present
+        descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
+        break;
+    }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -53,7 +76,8 @@ export default async function AnalyticsPage({
         <CardContent>
           <PaymentAmountChart
             distributionData={forwardingDistributionData} 
-            averageValueData={averageForwardingValueData} 
+            averageValueData={averageForwardingValueData}
+            aggregationPeriodLabel={descriptiveLabel}
           />
         </CardContent>
       </Card>

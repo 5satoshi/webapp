@@ -6,9 +6,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Bar, BarChart, Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart";
 
-interface PaymentAmountChartProps { // Component name not changed, but props are for forwarding data
+interface PaymentAmountChartProps {
   distributionData: ForwardingAmountDistributionData[];
   averageValueData: AverageForwardingValueData[];
+  aggregationPeriodLabel: string;
 }
 
 const distributionConfig = {
@@ -25,11 +26,13 @@ const averageValueConfig = {
   },
 } satisfies ChartConfig;
 
-export function PaymentAmountChart({ distributionData, averageValueData }: PaymentAmountChartProps) {
+export function PaymentAmountChart({ distributionData, averageValueData, aggregationPeriodLabel }: PaymentAmountChartProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
-        <h3 className="text-md font-semibold mb-2 font-headline text-center">Forwarding Size Frequency</h3>
+        <h3 className="text-md font-semibold mb-2 font-headline text-center">
+          Forwarding Size Frequency (Last {aggregationPeriodLabel})
+        </h3>
          {(!distributionData || distributionData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No distribution data available for this period.</div>
         ) : (
@@ -46,7 +49,6 @@ export function PaymentAmountChart({ distributionData, averageValueData }: Payme
                   tickFormatter={(value) => {
                     const num = Number(value);
                     if (num >= 1000) {
-                      // Show one decimal place if not a round thousand (e.g. 1.2k), no decimal if round (e.g. 15k)
                       return `${(num / 1000).toFixed(num % 1000 !== 0 ? 1 : 0)}k`;
                     }
                     return num.toLocaleString();
@@ -70,7 +72,9 @@ export function PaymentAmountChart({ distributionData, averageValueData }: Payme
         )}
       </div>
       <div>
-        <h3 className="text-md font-semibold mb-2 font-headline text-center">Average Forwarding Value Over Time</h3>
+        <h3 className="text-md font-semibold mb-2 font-headline text-center">
+          Average Forwarding Value Over Time (Last {aggregationPeriodLabel})
+        </h3>
          {(!averageValueData || averageValueData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No average value data available for this period.</div>
         ) : (
