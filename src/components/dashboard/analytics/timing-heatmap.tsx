@@ -4,34 +4,33 @@
 import type { HeatmapCell } from '@/lib/types';
 import { CardDescription } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import React, { useState, useMemo } from 'react'; 
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useMemo } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface TimingHeatmapProps {
   data: HeatmapCell[];
 }
 
-const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+const allDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const allHours = Array.from({ length: 24 }, (_, i) => i); // 0-23
 
-// Theme colors from globals.css for full intensity
-const ORANGE_HUE = 34; 
+const ORANGE_HUE = 34;
 const ORANGE_SATURATION_TARGET = 100;
 const ORANGE_LIGHTNESS_TARGET = 50;
 
-const PURPLE_HUE = 277; 
+const PURPLE_HUE = 277;
 const PURPLE_SATURATION_TARGET = 70;
 const PURPLE_LIGHTNESS_TARGET = 36;
 
-// Base values for "white" or min-intensity color
-const BASE_SATURATION_MIN = 10; // Lowered for a more "white" appearance at min
-const BASE_LIGHTNESS_MAX = 97; // Increased for a more "white" appearance at min
+const BASE_SATURATION_MIN = 15;
+const BASE_LIGHTNESS_MAX = 97;
 
 const regionalIndicators = [
   { name: 'Asia', start: 6, end: 12 },    // 06:00-11:59 UTC
   { name: 'Europe', start: 13, end: 19 }, // 13:00-18:59 UTC
-  { name: 'America', start: 19, end: 24 }, // 19:00-23:59 UTC (covers US ET/CT late afternoon)
-].sort((a, b) => a.start - b.start); // Sort by start time for rendering logic
+  { name: 'America', start: 19, end: 24 }, // 19:00-23:59 UTC
+].sort((a, b) => a.start - b.start);
 
 
 const getCellColor = (
@@ -57,18 +56,15 @@ const getCellColor = (
   const range = maxValueForMetric - minValueForMetric;
   let normalized = 0;
 
-  if (currentValue < minValueForMetric) { // Should not happen if minValueForMetric is actual min
+  if (currentValue < minValueForMetric) {
       normalized = 0;
   } else if (range > 0) {
     normalized = (currentValue - minValueForMetric) / range;
-  } else { 
-    // All values are the same for this metric or only one data point.
-    // If all values are 0, it should be white.
-    // If all values are the same non-zero, it should be full intensity.
+  } else {
     normalized = (currentValue > 0 || maxValueForMetric > 0) ? 1 : 0;
   }
   
-  normalized = Math.max(0, Math.min(1, normalized)); // Clamp between 0 and 1
+  normalized = Math.max(0, Math.min(1, normalized));
 
   const saturation = Math.round(BASE_SATURATION_MIN + normalized * (targetSaturation - BASE_SATURATION_MIN));
   const lightness = Math.round(BASE_LIGHTNESS_MAX - normalized * (BASE_LIGHTNESS_MAX - targetLightness));
@@ -78,11 +74,12 @@ const getCellColor = (
 
 export function TimingHeatmap({ data }: TimingHeatmapProps) {
   const [selectedMetric, setSelectedMetric] = useState<'successfulForwards' | 'failedForwards'>('successfulForwards');
+  const isMobile = useIsMobile();
 
-  const { 
-    cellDataMap, 
-    minSuccessful, maxSuccessful, 
-    minFailed, maxFailed 
+  const {
+    cellDataMap,
+    minSuccessful, maxSuccessful,
+    minFailed, maxFailed
   } = useMemo(() => {
     const map = new Map<string, HeatmapCell>();
     let minS = Infinity, maxS = -Infinity, minF = Infinity, maxF = -Infinity;
@@ -95,21 +92,19 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         minF = Math.min(minF, cell.failedForwards);
         maxF = Math.max(maxF, cell.failedForwards);
       });
-      // Ensure min/max are at least 0 if all actual values are > 0 or if dataset empty
-      if (minS === Infinity) minS = 0; 
+      if (minS === Infinity) minS = 0;
       if (maxS === -Infinity) maxS = 0;
       if (minF === Infinity) minF = 0;
       if (maxF === -Infinity) maxF = 0;
     } else {
       minS = 0; maxS = 0; minF = 0; maxF = 0;
     }
-    return { 
-      cellDataMap: map, 
-      minSuccessful: minS, maxSuccessful: maxS, 
-      minFailed: minF, maxFailed: maxF 
+    return {
+      cellDataMap: map,
+      minSuccessful: minS, maxSuccessful: maxS,
+      minFailed: minF, maxFailed: maxF
     };
   }, [data]);
-
 
   if (!data || data.length === 0) {
     return <div className="text-center text-muted-foreground p-4">No timing data available.</div>;
@@ -118,15 +113,28 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
   const currentMinValue = selectedMetric === 'successfulForwards' ? minSuccessful : minFailed;
   const currentMaxValue = selectedMetric === 'successfulForwards' ? maxSuccessful : maxFailed;
 
-  const indicatorRowCells: React.ReactNode[] = [];
+  const rowIterationSource = isMobile ? allHours : allDays;
+  const colIterationSource = isMobile ? allDays : allHours;
+
+  const rowLabels = isMobile ? allHours.map(h => h.toString().padStart(2, '0')) : allDays;
+  const colLabels = isMobile ? allDays : allHours.map(h => h.toString().padStart(2, '0'));
+
+  const heatmapGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: `min-content repeat(${colLabels.length}, minmax(0, 1fr))`,
+    gap: '1px',
+    backgroundColor: 'hsl(var(--border))',
+  };
+  
+  const regionalIndicatorCells: React.ReactNode[] = [];
   let currentHourIndicatorIndex = 0;
-  while (currentHourIndicatorIndex < hours.length) {
-    const hourValue = parseInt(hours[currentHourIndicatorIndex]);
+  while (currentHourIndicatorIndex < allHours.length) {
+    const hourValue = allHours[currentHourIndicatorIndex];
     let regionProcessed = false;
     for (const region of regionalIndicators) {
       if (hourValue === region.start) {
         const span = region.end - region.start;
-        indicatorRowCells.push(
+        regionalIndicatorCells.push(
           <Tooltip key={`region-indicator-${region.name}`}>
             <TooltipTrigger asChild>
               <div
@@ -138,7 +146,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
             </TooltipTrigger>
             <TooltipContent>
               <p className="font-medium">{region.name} Late Afternoon</p>
-              <p>UTC {String(region.start).padStart(2, '0')}:00 - {String(region.end - 1).padStart(2, '0')}:59</p>
+              <p>UTC {String(region.start).padStart(2, '0')}:00 - {String(region.end -1).padStart(2, '0')}:59</p>
             </TooltipContent>
           </Tooltip>
         );
@@ -148,13 +156,12 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
       }
     }
     if (!regionProcessed) {
-      indicatorRowCells.push(
+      regionalIndicatorCells.push(
         <div key={`empty-indicator-${hourValue}`} className="p-1 h-5 text-center bg-card" />
       );
       currentHourIndicatorIndex++;
     }
   }
-
 
   return (
     <TooltipProvider>
@@ -166,34 +173,53 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
           </TabsList>
         </Tabs>
       </div>
+      
+      {/* Container to allow heatmap grid to shrink without causing page overflow initially */}
+      <div className="w-full overflow-hidden"> 
+        <div className="grid my-2" style={heatmapGridStyle}>
+          {/* Top-left empty cell of the main heatmap grid */}
+          <div className="p-1 bg-card aspect-square flex items-center justify-center" />
 
-      <div className="overflow-x-auto">
-        <div className="grid gap-px bg-border my-2" style={{ gridTemplateColumns: `auto repeat(${hours.length}, minmax(30px, 1fr))` }}>
-          
-          {days.map((dayLabel, dayIndex) => (
-            <React.Fragment key={`day-row-${dayIndex}`}>
-              <div key={`daylabel-${dayIndex}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground flex items-center justify-center">
-                {dayLabel}
+          {/* Column Headers (Days on mobile, Hours on desktop) */}
+          {colLabels.map((label, idx) => (
+            <div key={`col-header-${idx}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground aspect-square flex items-center justify-center">
+              {label}
+            </div>
+          ))}
+
+          {/* Heatmap Rows: Row Header + Data Cells */}
+          {rowIterationSource.map((_, rowIndex) => (
+            <React.Fragment key={`heatmap-data-row-${rowIndex}`}>
+              {/* Row Header (Hours on mobile, Days on desktop) */}
+              <div className="p-1 text-xs text-center font-medium bg-card text-muted-foreground aspect-square flex items-center justify-center">
+                {rowLabels[rowIndex]}
               </div>
-              {hours.map((hourLabel, hourIndex) => {
-                const cell = cellDataMap.get(`${dayIndex}-${hourIndex}`) || { day: dayIndex, hour: hourIndex, successfulForwards: 0, failedForwards: 0 };
-                const currentValueForMetric = cell[selectedMetric];
-                const color = getCellColor(currentValueForMetric, currentMinValue, currentMaxValue, selectedMetric);
+
+              {/* Data Cells */}
+              {colIterationSource.map((_, colIndex) => {
+                const dayIndex = isMobile ? colIndex : rowIndex;
+                const hourValue = isMobile ? rowIndex : colIndex; // hourValue is the actual hour number (0-23)
+
+                const cell = cellDataMap.get(`${dayIndex}-${hourValue}`) || { day: dayIndex, hour: hourValue, successfulForwards: 0, failedForwards: 0 };
+                const valueForMetric = cell[selectedMetric];
+                const color = getCellColor(valueForMetric, currentMinValue, currentMaxValue, selectedMetric);
                 
+                const dayLabelForTooltip = allDays[dayIndex];
+                const hourLabelForTooltip = allHours[hourValue].toString().padStart(2, '0');
                 const totalForwards = cell.successfulForwards + cell.failedForwards;
                 const successRate = totalForwards > 0 ? (cell.successfulForwards / totalForwards) * 100 : 0;
 
                 return (
-                  <Tooltip key={`${dayIndex}-${hourIndex}`}>
+                  <Tooltip key={`cell-${dayIndex}-${hourValue}`}>
                     <TooltipTrigger asChild>
                       <div
-                        className="h-6 w-full rounded-sm" 
+                        className="w-full rounded-sm aspect-square" // aspect-square to make cells responsive squares
                         style={{ backgroundColor: color }}
-                        aria-label={`Data for ${dayLabel} ${hourLabel}:00`}
+                        aria-label={`Data for ${dayLabelForTooltip} ${hourLabelForTooltip}:00`}
                       />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-medium">{dayLabel}, {hourLabel}:00 - {(parseInt(hourLabel)+1).toString().padStart(2, '0')}:00 UTC</p>
+                      <p className="font-medium">{dayLabelForTooltip}, {hourLabelForTooltip}:00 - {(parseInt(hourLabelForTooltip)+1).toString().padStart(2, '0')}:00 UTC</p>
                       <p>Successful Forwards: {cell.successfulForwards.toLocaleString()}</p>
                       <p>Failed Forwards: {cell.failedForwards.toLocaleString()}</p>
                       <p>Total Forwards: {totalForwards.toLocaleString()}</p>
@@ -204,26 +230,22 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
               })}
             </React.Fragment>
           ))}
-
-          {/* Hour Labels Row (Bottom of this grid) */}
-          <div className="p-1 bg-card text-xs text-center font-medium text-muted-foreground flex items-center justify-center col-start-1">UTC</div>
-          {hours.map(hour => (
-            <div key={`hour-label-bottom-${hour}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground">
-              {hour}
-            </div>
-          ))}
-        </div>
-
-        {/* Regional Indicators Row (Separate grid, no gap-px bg-border) */}
-        <div className="grid mt-1" style={{ gridTemplateColumns: `auto repeat(${hours.length}, minmax(30px, 1fr))` }}>
-          <div className="p-1 bg-card"></div> {/* Empty cell for alignment with day labels column (now effectively aligning with UTC label) */}
-          {indicatorRowCells}
         </div>
       </div>
-       <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes forwarding activity from the last 8 weeks. Hours are in UTC. Cell color intensity (from white representing the minimum observed count for the selected metric to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume. The bottom row highlights late afternoon periods in Asia, Europe, and America with text labels on a white background. Hover over cells for detailed counts.
+
+      {/* Regional Indicators Row (Separate grid, always horizontal based on hours) */}
+      <div className="grid mt-1" style={{ gridTemplateColumns: `min-content repeat(${allHours.length}, minmax(0, 1fr))` }}>
+        <div className="p-1 bg-card text-xs text-muted-foreground flex items-center justify-center">
+           {isMobile ? 'Regions' : 'UTC'} {/* Label for the first column of the regional indicators */}
+        </div>
+        {regionalIndicatorCells}
+      </div>
+
+      <CardDescription className="mt-2 text-xs">
+        Heatmap visualizes forwarding activity from the last 8 weeks. Cell color intensity (from white to orange for successful, or white to purple for failed, relative to observed min/max for that metric) indicates the volume. 
+        On smaller screens, axes are swapped: hours are vertical, days horizontal.
+        The bottom row highlights late afternoon periods in Asia, Europe, and America (UTC-based). Hover over cells for detailed counts.
       </CardDescription>
     </TooltipProvider>
   );
 }
-
