@@ -8,14 +8,14 @@ import { Separator } from '@/components/ui/separator';
 
 import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
-import { RoutingActivityChart } from '@/components/dashboard/analytics/routing-activity-chart';
+// import { RoutingActivityChart } from '@/components/dashboard/analytics/routing-activity-chart'; // Removed
 
 import { 
   fetchForwardingAmountDistribution,
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
-  fetchMonthlyRoutingCount,
-  fetchDailyRoutingVolume,
+  // fetchMonthlyRoutingCount, // Removed
+  // fetchDailyRoutingVolume, // Removed
 } from '@/services/nodeService';
 
 
@@ -33,8 +33,8 @@ export default async function AnalyticsPage({
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
-  const monthlyRoutingCountData = await fetchMonthlyRoutingCount();
-  const dailyRoutingVolumeData = await fetchDailyRoutingVolume();
+  // const monthlyRoutingCountData = await fetchMonthlyRoutingCount(); // Removed
+  // const dailyRoutingVolumeData = await fetchDailyRoutingVolume(); // Removed
 
   let chartTitlePeriodLabel = 'Last 7 Days'; // Default for 'day'
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
@@ -63,6 +63,8 @@ export default async function AnalyticsPage({
     <div className="space-y-6">
       <PageTitle title="Node Analytics" description="Deep dive into your node's performance metrics and trends." />
 
+      {/* Routing Activity Trends Card Removed */}
+      {/* 
       <Card>
         <CardHeader>
             <CardTitle className="font-headline">Routing Activity Trends</CardTitle>
@@ -73,10 +75,11 @@ export default async function AnalyticsPage({
         <CardContent>
             <RoutingActivityChart 
                 monthlyCountData={monthlyRoutingCountData} 
-                dailyVolumeData={dailyRoutingVolumeData} 
+                dailyVolumeData={dailyVolumeData} 
             />
         </CardContent>
-      </Card>
+      </Card> 
+      */}
 
       <Card>
         <CardHeader>
