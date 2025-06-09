@@ -61,9 +61,10 @@ export interface ForwardingAmountDistributionData {
   frequency: number;
 }
 
-export interface AverageForwardingValueData {
+export interface ForwardingValueOverTimeData {
   date: string;
-  averageValue: number;
+  medianValue: number;
+  maxValue: number;
 }
 
 export interface NetworkSubsumptionData {

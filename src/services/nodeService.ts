@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, AverageForwardingValueData, HeatmapCell } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -771,9 +771,9 @@ export async function fetchForwardingAmountDistribution(aggregationPeriod: strin
   }
 }
 
-export async function fetchAverageForwardingValueOverTime(aggregationPeriod: string): Promise<AverageForwardingValueData[]> {
+export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod: string): Promise<ForwardingValueOverTimeData[]> {
     if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchAverageForwardingValueOverTime.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchMedianAndMaxForwardingValueOverTime.");
     return [];
   }
 
@@ -803,7 +803,8 @@ export async function fetchAverageForwardingValueOverTime(aggregationPeriod: str
   const query = `
     SELECT
       ${dateGroupingExpression} AS date_group,
-      AVG(SAFE_CAST(out_msat AS NUMERIC) / 1000) AS average_value_sats
+      APPROX_QUANTILES(SAFE_CAST(out_msat AS NUMERIC) / 1000, 2)[OFFSET(1)] AS median_value_sats,
+      MAX(SAFE_CAST(out_msat AS NUMERIC) / 1000) AS max_value_sats
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
       AND received_time IS NOT NULL
@@ -827,14 +828,15 @@ export async function fetchAverageForwardingValueOverTime(aggregationPeriod: str
       }
       return {
         date: formatDateFromBQ(row.date_group),
-        averageValue: parseFloat(Number(row.average_value_sats || 0).toFixed(0)), // sats, no decimals
+        medianValue: parseFloat(Number(row.median_value_sats || 0).toFixed(0)),
+        maxValue: parseFloat(Number(row.max_value_sats || 0).toFixed(0)),
       };
     }).filter(item => item !== null)
       .sort((a,b) => new Date(a!.date).getTime() - new Date(b!.date).getTime());
 
-    return formattedAndSortedRows as AverageForwardingValueData[];
+    return formattedAndSortedRows as ForwardingValueOverTimeData[];
   } catch (error) {
-    logBigQueryError(`fetchAverageForwardingValueOverTime (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchMedianAndMaxForwardingValueOverTime (aggregation: ${aggregationPeriod})`, error);
     return [];
   }
 }
@@ -852,21 +854,20 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
   const effectiveEndDate = endOfDay(subDays(now, 1)); // Data up to yesterday (end of day)
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': // Corresponds to "Last 7 Days" title
-      // Data for the last 7 full days ending yesterday
+    case 'day': // Corresponds to "Last 7 Days" title in chart
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'week': // Corresponds to "Last 4 Weeks" title
-      // Data for the last 4 full weeks (28 days) ending yesterday
+    case 'week': // Corresponds to "Last 4 Weeks" title in chart
+      queryStartDate = format(startOfDay(subWeeks(effectiveEndDate, 4 -1 )), "yyyy-MM-dd'T'HH:mm:ssXXX");
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'month': // Corresponds to "Last 3 Months" title
-      // Data for the last 3 full months ending yesterday
-      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 3)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+    case 'month': // Corresponds to "Last 3 Months" title in chart
+      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 3 -1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'quarter': // Corresponds to "Last 12 Months" title
-      // Data for the last 12 full months ending yesterday
-      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+    case 'quarter': // Corresponds to "Last 12 Months" title in chart
+      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 12 -1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     default: // Fallback to last 7 days for heatmap if period is unknown
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -914,3 +915,4 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
     return [];
   }
 }
+

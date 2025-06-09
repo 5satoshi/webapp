@@ -11,7 +11,7 @@ import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
 
 import { 
   fetchForwardingAmountDistribution,
-  fetchAverageForwardingValueOverTime,
+  fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
 } from '@/services/nodeService';
 
@@ -28,7 +28,7 @@ export default async function AnalyticsPage({
   }
 
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
-  const averageForwardingValueData = await fetchAverageForwardingValueOverTime(currentAggregation);
+  const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
 
   let chartTitlePeriodLabel = 'Last 7 Days'; // Default for 'day'
@@ -49,8 +49,7 @@ export default async function AnalyticsPage({
         chartTitlePeriodLabel = 'Last 12 Months';
         break;
       default:
-        // Fallback for safety, though currentAggregation should always be one of the above
-        chartTitlePeriodLabel = `Last ${selectedOption.label}`; // e.g., "Last Days"
+        chartTitlePeriodLabel = `Last ${selectedOption.label}`; 
         break;
     }
   }
@@ -77,7 +76,7 @@ export default async function AnalyticsPage({
         <CardContent className="space-y-8">
           <PaymentAmountChart
             distributionData={forwardingDistributionData} 
-            averageValueData={averageForwardingValueData}
+            forwardingValueData={forwardingValueData}
             frequencyChartTitleLabel={chartTitlePeriodLabel}
           />
         

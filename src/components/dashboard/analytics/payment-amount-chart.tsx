@@ -1,14 +1,14 @@
 
 'use client';
 
-import type { ForwardingAmountDistributionData, AverageForwardingValueData } from '@/lib/types';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import type { ForwardingAmountDistributionData, ForwardingValueOverTimeData } from '@/lib/types';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart";
 
 interface PaymentAmountChartProps {
   distributionData: ForwardingAmountDistributionData[];
-  averageValueData: AverageForwardingValueData[];
+  forwardingValueData: ForwardingValueOverTimeData[];
   frequencyChartTitleLabel: string;
 }
 
@@ -19,14 +19,18 @@ const distributionConfig = {
   },
 } satisfies ChartConfig;
 
-const averageValueConfig = {
-  averageValue: {
-    label: "Avg. Value (sats)",
-    color: "hsl(var(--chart-4))",
+const valueOverTimeConfig = {
+  medianValue: {
+    label: "Median Value (sats)",
+    color: "hsl(var(--chart-4))", // Orange
   },
+  maxValue: {
+    label: "Max Value (sats)",
+    color: "hsl(var(--chart-1))", // Purple
+  }
 } satisfies ChartConfig;
 
-export function PaymentAmountChart({ distributionData, averageValueData, frequencyChartTitleLabel }: PaymentAmountChartProps) {
+export function PaymentAmountChart({ distributionData, forwardingValueData, frequencyChartTitleLabel }: PaymentAmountChartProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
       <div>
@@ -75,19 +79,19 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
           Forwarding Value Over Time
         </h3>
-         {(!averageValueData || averageValueData.length === 0) ? (
-            <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No average value data available for this period.</div>
+         {(!forwardingValueData || forwardingValueData.length === 0) ? (
+            <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No value data available for this period.</div>
         ) : (
             <div className="h-[250px] w-full">
-            <ChartContainer config={averageValueConfig} className="w-full h-full">
-                <LineChart data={averageValueData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+            <ChartContainer config={valueOverTimeConfig} className="w-full h-full">
+                <LineChart data={forwardingValueData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
                 <XAxis 
                     dataKey="date" 
                     tickLine={false} 
                     axisLine={false} 
                     tickMargin={8}
-                    tickFormatter={(value) => new Date(value + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} // Ensure date is treated as UTC
+                    tickFormatter={(value) => new Date(value + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     className="text-xs" 
                 />
                 <YAxis 
@@ -103,8 +107,8 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
                     content={<ChartTooltipContent indicator="line" 
                        formatter={(value, name) => (
                         <div className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: averageValueConfig[name as keyof typeof averageValueConfig]?.color }} />
-                          <span>{averageValueConfig[name as keyof typeof averageValueConfig]?.label}: <strong>{Number(value).toLocaleString()} sats</strong></span>
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: valueOverTimeConfig[name as keyof typeof valueOverTimeConfig]?.color }} />
+                          <span>{valueOverTimeConfig[name as keyof typeof valueOverTimeConfig]?.label}: <strong>{Number(value).toLocaleString()} sats</strong></span>
                         </div>
                       )}
                       labelFormatter={(label, payload) => {
@@ -115,7 +119,9 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
                        }}
                     />}
                 />
-                <Line type="monotone" dataKey="averageValue" stroke="var(--color-averageValue)" strokeWidth={2} dot={false} />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Line type="monotone" dataKey="medianValue" stroke="var(--color-medianValue)" strokeWidth={2} dot={false} name="Median Value (sats)" />
+                <Line type="monotone" dataKey="maxValue" stroke="var(--color-maxValue)" strokeWidth={2} dot={false} strokeDasharray="5 5" name="Max Value (sats)" />
                 </LineChart>
             </ChartContainer>
             </div>
@@ -124,4 +130,3 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
     </div>
   );
 }
-
