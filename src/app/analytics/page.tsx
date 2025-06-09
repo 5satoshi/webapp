@@ -1,18 +1,21 @@
 
 import Link from 'next/link';
 import { PageTitle } from '@/components/ui/page-title';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 
 import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
+import { RoutingActivityChart } from '@/components/dashboard/analytics/routing-activity-chart';
 
 import { 
   fetchForwardingAmountDistribution,
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
+  fetchMonthlyRoutingCount,
+  fetchDailyRoutingVolume,
 } from '@/services/nodeService';
 
 
@@ -30,6 +33,8 @@ export default async function AnalyticsPage({
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
+  const monthlyRoutingCountData = await fetchMonthlyRoutingCount();
+  const dailyRoutingVolumeData = await fetchDailyRoutingVolume();
 
   let chartTitlePeriodLabel = 'Last 7 Days'; // Default for 'day'
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
@@ -60,6 +65,21 @@ export default async function AnalyticsPage({
 
       <Card>
         <CardHeader>
+            <CardTitle className="font-headline">Routing Activity Trends</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground pt-1">
+              Now, let’s have look at the number of payments we’ve routed through our node over time. We’re displaying two interesting metrics, the long-term trend, showing the last year per month and the short term trend, each day of the last 6 weeks.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <RoutingActivityChart 
+                monthlyCountData={monthlyRoutingCountData} 
+                dailyVolumeData={dailyRoutingVolumeData} 
+            />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <CardTitle className="font-headline">Forwarding &amp; Timing Analysis</CardTitle>
                 <Tabs value={currentAggregation} className="w-full sm:w-auto">
@@ -83,9 +103,12 @@ export default async function AnalyticsPage({
           <Separator />
 
           <div>
-            <h3 className="text-xl font-semibold mb-4 font-headline text-center md:text-left">
+            <h3 className="text-xl font-semibold mb-2 font-headline text-center md:text-left">
               Timing Patterns Heatmap ({chartTitlePeriodLabel})
             </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              What can be analyzed are the timestamps of transaction requests hitting the node. If we put the timestamps for the received routing requests of the last 8 weeks with our Lightning node in a weekly heatmap, we get the following overview in Coordinated Universal Time (UTC).
+            </p>
             <TimingHeatmap data={timingHeatmapData} />
           </div>
         </CardContent>

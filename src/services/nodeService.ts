@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -752,7 +752,7 @@ export async function fetchForwardingAmountDistribution(aggregationPeriod: strin
         WHEN '>1M' THEN 6
       END
     `;
-  } else {
+  } else { // Weeks, Months, Quarters
     paymentRangeCaseStatement = `
       CASE
         WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000 THEN '0-1k'
@@ -903,10 +903,10 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     case 'month': // Corresponds to "Last 3 Months" title in chart
-      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Corrected for full 3 months
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
       break;
     case 'quarter': // Corresponds to "Last 12 Months" title in chart
-      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Corrected for full 12 months
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
       break;
     default: // Fallback to last 7 days for heatmap if period is unknown
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -955,5 +955,83 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
   }
 }
 
+export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchMonthlyRoutingCount.");
+    return [];
+  }
+  const query = `
+    SELECT
+      FORMAT_TIMESTAMP('%b', DATE_TRUNC(DATE(received_time), MONTH)) AS month,
+      COUNT(*) AS count
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 12 MONTH)
+      AND received_time IS NOT NULL
+    GROUP BY month
+    ORDER BY MIN(DATE_TRUNC(DATE(received_time), MONTH)) -- Order by actual month sequence
+  `;
+  try {
+    const [job] = await bigquery.createQueryJob({ query });
+    const [rows] = await job.getQueryResults();
 
+    // Ensure we have 12 months, even if some have 0 count
+    const monthMap = new Map<string, number>();
+    for (let i = 11; i >= 0; i--) {
+      const date = subMonths(new Date(), i);
+      const monthName = format(date, 'MMM');
+      monthMap.set(monthName, 0);
+    }
+    rows.forEach(row => {
+        if (row.month) { // Check if month is not null or undefined
+            monthMap.set(String(row.month), Number(row.count));
+        }
+    });
+
+    return Array.from(monthMap.entries()).map(([month, count]) => ({ month, count }));
+
+  } catch (error) {
+    logBigQueryError("fetchMonthlyRoutingCount", error);
+    return [];
+  }
+}
+
+export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchDailyRoutingVolume.");
+    return [];
+  }
+  const query = `
+    SELECT
+      DATE(received_time) AS date,
+      SUM(out_msat) AS volume_msat
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE status = 'settled'
+      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 42 DAY) -- 6 weeks
+      AND received_time IS NOT NULL
+    GROUP BY date
+    ORDER BY date
+  `;
+  try {
+    const [job] = await bigquery.createQueryJob({ query });
+    const [rows] = await job.getQueryResults();
     
+    if (!rows || rows.length === 0) {
+        return [];
+    }
+
+    return rows.map(row => {
+      if (!row || row.date === null || row.date === undefined) {
+        return null;
+      }
+      return {
+        date: formatDateFromBQ(row.date),
+        volume: Math.floor(Number(row.volume_msat || 0) / 1000), // msat to sat
+      };
+    }).filter(item => item !== null) as DailyRoutingVolumeData[];
+
+  } catch (error) {
+    logBigQueryError("fetchDailyRoutingVolume", error);
+    return [];
+  }
+}
