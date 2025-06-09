@@ -73,7 +73,7 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
       </div>
       <div>
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
-          Average Forwarding Value Over Time
+          Forwarding Value Over Time
         </h3>
          {(!averageValueData || averageValueData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No average value data available for this period.</div>
@@ -96,6 +96,7 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
                     tickMargin={8} 
                     className="text-xs"
                     tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+                    domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.1)]}
                 />
                 <ChartTooltip
                     cursor={false}
@@ -123,3 +124,4 @@ export function PaymentAmountChart({ distributionData, averageValueData, frequen
     </div>
   );
 }
+
