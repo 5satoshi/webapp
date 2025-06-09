@@ -104,9 +104,16 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
                     className="text-xs"
                     tickFormatter={(value) => {
                         const num = Number(value);
-                        if (num === 0) return '0'; 
-                        if (num < 1000) return num.toLocaleString();
-                        return `${(num / 1000).toFixed(num % 1000 !== 0 ? 1 : 0)}k`;
+                        if (num === 0) return '0';
+                        if (num >= 1000000) {
+                            const millions = num / 1000000;
+                            return `${millions % 1 === 0 ? millions : millions.toFixed(1)}M`;
+                        }
+                        if (num >= 1000) {
+                            const thousands = num / 1000;
+                            return `${thousands % 1 === 0 ? thousands : thousands.toFixed(1)}k`;
+                        }
+                        return num.toLocaleString();
                     }}
                 />
                 <ChartTooltip
