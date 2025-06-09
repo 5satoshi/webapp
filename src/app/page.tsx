@@ -266,7 +266,7 @@ export default async function OverviewPage({
           </p>
           <div className="pt-4 mt-4 border-t">
             <h3 className="text-lg font-semibold font-headline mb-3 text-foreground">Explore on External Platforms</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="flex space-x-4 overflow-x-auto pb-4">
               {externalPlatforms.map((platform) => {
                 const IconComponent = platform.icon;
                 return (
@@ -277,10 +277,10 @@ export default async function OverviewPage({
                     rel="noopener noreferrer" 
                     className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 group"
                   >
-                    <Card className="h-full bg-card group-hover:shadow-lg group-hover:border-primary/50 group-focus-visible:shadow-lg group-focus-visible:border-primary/50 transition-all duration-200">
-                      <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full aspect-square sm:aspect-auto">
-                        <IconComponent className="h-10 w-10 mb-3 text-primary group-hover:text-primary transition-colors" />
-                        <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{platform.name}</span>
+                    <Card className="flex-shrink-0 w-32 h-32 bg-card group-hover:shadow-lg group-hover:border-primary/50 group-focus-visible:shadow-lg group-focus-visible:border-primary/50 transition-all duration-200">
+                      <CardContent className="p-3 flex flex-col items-center justify-center text-center h-full">
+                        <IconComponent className="h-8 w-8 text-primary group-hover:text-primary transition-colors" />
+                        <span className="font-medium text-xs text-foreground group-hover:text-primary transition-colors mt-2 hidden md:inline-block">{platform.name}</span>
                       </CardContent>
                     </Card>
                   </a>
