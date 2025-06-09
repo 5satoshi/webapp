@@ -43,17 +43,14 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
       const minDataPoint = Math.min(...allPositiveValues);
       const maxDataPoint = Math.max(...allPositiveValues);
 
+      // Domain from half the min to double the max, ensuring min is at least 1.
       const domainMin = Math.max(1, Math.floor(minDataPoint / 2));
       let domainMax = Math.ceil(maxDataPoint * 2);
-
-      // Ensure domainMax is strictly greater than domainMin for a valid range
-      // If minDataPoint and maxDataPoint are the same (e.g., 1), 
-      // domainMin could be 1 and domainMax could be 2.
-      // This check ensures a slightly larger default range if the calculated one is too narrow or invalid.
-      if (domainMax <= domainMin) {
-        domainMax = domainMin * 10; // Default to one order of magnitude if calculated range is too small
-        if (domainMax <= domainMin) { // Further fallback if domainMin was 0 (though filtered) or 1
-            domainMax = Math.max(10, domainMin + 100);
+      
+      if (domainMax <= domainMin) { // Ensure a valid range
+        domainMax = Math.max(10, domainMin * 10); 
+        if (domainMax <= domainMin) {
+            domainMax = Math.max(100, domainMin + 100); // Further fallback
         }
       }
       
@@ -115,7 +112,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
         ) : (
             <div className="h-[250px] w-full">
             <ChartContainer config={valueOverTimeConfig} className="w-full h-full">
-                <LineChart data={forwardingValueData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <LineChart data={forwardingValueData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                 <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
                 <XAxis 
                     dataKey="date" 
