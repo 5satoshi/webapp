@@ -8,14 +8,11 @@ import { Separator } from '@/components/ui/separator';
 
 import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
-// import { RoutingActivityChart } from '@/components/dashboard/analytics/routing-activity-chart'; // Removed
 
 import { 
   fetchForwardingAmountDistribution,
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
-  // fetchMonthlyRoutingCount, // Removed
-  // fetchDailyRoutingVolume, // Removed
 } from '@/services/nodeService';
 
 
@@ -33,10 +30,8 @@ export default async function AnalyticsPage({
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
-  // const monthlyRoutingCountData = await fetchMonthlyRoutingCount(); // Removed
-  // const dailyRoutingVolumeData = await fetchDailyRoutingVolume(); // Removed
 
-  let chartTitlePeriodLabel = 'Last 7 Days'; // Default for 'day'
+  let chartTitlePeriodLabel = 'Last 7 Days'; 
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
 
   if (selectedOption) {
@@ -63,24 +58,6 @@ export default async function AnalyticsPage({
     <div className="space-y-6">
       <PageTitle title="Node Analytics" description="Deep dive into your node's performance metrics and trends." />
 
-      {/* Routing Activity Trends Card Removed */}
-      {/* 
-      <Card>
-        <CardHeader>
-            <CardTitle className="font-headline">Routing Activity Trends</CardTitle>
-            <CardDescription className="text-sm text-muted-foreground pt-1">
-              Now, let’s have look at the number of payments we’ve routed through our node over time. We’re displaying two interesting metrics, the long-term trend, showing the last year per month and the short term trend, each day of the last 6 weeks.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <RoutingActivityChart 
-                monthlyCountData={monthlyRoutingCountData} 
-                dailyVolumeData={dailyVolumeData} 
-            />
-        </CardContent>
-      </Card> 
-      */}
-
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -97,6 +74,9 @@ export default async function AnalyticsPage({
             </div>
         </CardHeader>
         <CardContent className="space-y-8">
+          <p className="text-sm text-muted-foreground mb-4">
+            Another important information is to understand the amount of routed payments. We’re presenting two kinds of insights. The first is showing the distribution of payment amounts, the second the evolution of the median payment amount over time.
+          </p>
           <PaymentAmountChart
             distributionData={forwardingDistributionData} 
             forwardingValueData={forwardingValueData}
