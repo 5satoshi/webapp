@@ -24,13 +24,13 @@ const PURPLE_SATURATION_TARGET = 70;
 const PURPLE_LIGHTNESS_TARGET = 36;
 
 // Base values for "white" or min-intensity color
-const BASE_SATURATION_MIN = 10; // Reduced for whiter appearance at min
-const BASE_LIGHTNESS_MAX = 97; // Increased for whiter appearance at min
+const BASE_SATURATION_MIN = 10; 
+const BASE_LIGHTNESS_MAX = 97; 
 
-// Afternoon UTC hour ranges (inclusive start, exclusive end for easy checking)
-const europeAfternoonHours = { start: 10, end: 16 }; // 10:00-16:59 UTC
-const americaAfternoonHours = { start: 16, end: 23 }; // 16:00-23:59 UTC (covers US ET/CT/MT afternoon)
-const asiaAfternoonHours = { start: 4, end: 10 }; // 04:00-10:59 UTC (covers parts of East/SE Asia afternoon)
+// Late Afternoon UTC hour ranges (inclusive start, exclusive end for easy checking)
+const europeAfternoonHours = { start: 13, end: 19 }; // 13:00-18:59 UTC
+const americaAfternoonHours = { start: 19, end: 24 }; // 19:00-23:59 UTC (covers US ET/CT late afternoon)
+const asiaAfternoonHours = { start: 6, end: 12 };    // 06:00-11:59 UTC (covers parts of East/SE Asia late afternoon)
 
 
 const getCellColor = (
@@ -56,18 +56,19 @@ const getCellColor = (
   const range = maxValueForMetric - minValueForMetric;
   let normalized = 0;
 
-  if (range > 0) {
+  if (currentValue < minValueForMetric) { // Should not happen if data is clean, but safety
+      normalized = 0;
+  } else if (range > 0) {
     normalized = (currentValue - minValueForMetric) / range;
-  } else { // All values for this metric are the same, or only one data point, or no data
-    if (currentValue === 0 || maxValueForMetric === 0) { // All values are 0 or the current value is 0
-        return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`; // White for zero or no activity
+  } else { 
+    if (maxValueForMetric === 0 && minValueForMetric === 0) { // All values are 0
+        return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`; 
     }
-    // All values are the same non-zero number, so show full intensity
+    // All values are the same non-zero number, or only one data point
     normalized = 1; 
   }
   
-  // Ensure normalized is within [0, 1]
-  normalized = Math.max(0, Math.min(1, normalized));
+  normalized = Math.max(0, Math.min(1, normalized)); // Clamp between 0 and 1
 
   const saturation = Math.round(BASE_SATURATION_MIN + normalized * (targetSaturation - BASE_SATURATION_MIN));
   const lightness = Math.round(BASE_LIGHTNESS_MAX - normalized * (BASE_LIGHTNESS_MAX - targetLightness));
@@ -78,7 +79,11 @@ const getCellColor = (
 export function TimingHeatmap({ data }: TimingHeatmapProps) {
   const [selectedMetric, setSelectedMetric] = useState<'successfulForwards' | 'failedForwards'>('successfulForwards');
 
-  const { cellDataMap, minSuccessful, maxSuccessful, minFailed, maxFailed } = useMemo(() => {
+  const { 
+    cellDataMap, 
+    minSuccessful, maxSuccessful, 
+    minFailed, maxFailed 
+  } = useMemo(() => {
     const map = new Map<string, HeatmapCell>();
     let minS = Infinity, maxS = -Infinity, minF = Infinity, maxF = -Infinity;
 
@@ -90,20 +95,17 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         minF = Math.min(minF, cell.failedForwards);
         maxF = Math.max(maxF, cell.failedForwards);
       });
-       // If all values were initial Infinity/-Infinity (no data), set to 0
       if (minS === Infinity) minS = 0;
       if (maxS === -Infinity) maxS = 0;
       if (minF === Infinity) minF = 0;
       if (maxF === -Infinity) maxF = 0;
     } else {
-      minS = 0; maxS = 0; minF = 0; maxF = 0; // Handle empty data case explicitly
+      minS = 0; maxS = 0; minF = 0; maxF = 0;
     }
     return { 
       cellDataMap: map, 
-      minSuccessful: minS, 
-      maxSuccessful: maxS, 
-      minFailed: minF, 
-      maxFailed: maxF 
+      minSuccessful: minS, maxSuccessful: maxS, 
+      minFailed: minF, maxFailed: maxF 
     };
   }, [data]);
 
@@ -112,7 +114,6 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
     return <div className="text-center text-muted-foreground p-4">No timing data available.</div>;
   }
 
-  const metricLabel = selectedMetric === 'successfulForwards' ? 'Successful Forwards' : 'Failed Forwards';
   const currentMinValue = selectedMetric === 'successfulForwards' ? minSuccessful : minFailed;
   const currentMaxValue = selectedMetric === 'successfulForwards' ? maxSuccessful : maxFailed;
 
@@ -195,7 +196,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         </div>
       </div>
        <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes forwarding activity from the last 8 weeks. Hours are in UTC. Cell color intensity (from white representing the minimum observed count for the selected metric to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume. The bottom row indicates approximate afternoon periods in Europe (EU), America (US), and Asia (AS). Hover over cells for detailed counts.
+        Heatmap visualizes forwarding activity from the last 8 weeks. Hours are in UTC. Cell color intensity (from white representing the minimum observed count for the selected metric to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume. The bottom row indicates approximate late afternoon periods in Europe (EU), America (US), and Asia (AS). Hover over cells for detailed counts.
       </CardDescription>
     </TooltipProvider>
   );
