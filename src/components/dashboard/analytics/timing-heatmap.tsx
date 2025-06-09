@@ -1,8 +1,10 @@
+
 'use client';
 
 import type { HeatmapCell } from '@/lib/types';
 import { Card, CardDescription } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import React from 'react'; // Import React for React.Fragment
 
 interface TimingHeatmapProps {
   data: HeatmapCell[];
@@ -45,7 +47,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
           
           {/* Day rows */}
           {days.map((dayLabel, dayIndex) => (
-            <>
+            <React.Fragment key={`day-row-${dayIndex}`}>
               {/* Day label cell */}
               <div key={`daylabel-${dayIndex}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground flex items-center justify-center">
                 {dayLabel}
@@ -69,7 +71,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
                   </Tooltip>
                 );
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>
