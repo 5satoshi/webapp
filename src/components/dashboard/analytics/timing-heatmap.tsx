@@ -15,31 +15,39 @@ const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
 
 // Theme colors from globals.css for full intensity
-const ORANGE_HUE = 34; // hsl(var(--secondary)) -> HSL 34 100% 50%
+const ORANGE_HUE = 34; 
 const ORANGE_SATURATION_TARGET = 100;
 const ORANGE_LIGHTNESS_TARGET = 50;
 
-const PURPLE_HUE = 277; // hsl(var(--primary)) -> HSL 277 70% 36%
+const PURPLE_HUE = 277; 
 const PURPLE_SATURATION_TARGET = 70;
 const PURPLE_LIGHTNESS_TARGET = 36;
 
-// Base values for "white" or near-zero intensity
+// Base values for "white" or min-intensity
 const BASE_SATURATION_MIN = 20; 
 const BASE_LIGHTNESS_MAX = 95; 
 
 const getCellColor = (
   currentValue: number,
-  maxObservedValueForMetric: number,
+  minValueForMetric: number,
+  maxValueForMetric: number,
   metricType: 'successfulForwards' | 'failedForwards'
 ): string => {
-  if (currentValue < 0) currentValue = 0; 
+  if (currentValue < minValueForMetric) currentValue = minValueForMetric; 
+  if (currentValue > maxValueForMetric) currentValue = maxValueForMetric;
 
-  if (maxObservedValueForMetric <= 0) { 
-    return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`; 
+  const range = maxValueForMetric - minValueForMetric;
+  let normalized = 0;
+
+  if (range > 0) {
+    normalized = (currentValue - minValueForMetric) / range;
+  } else { // All values for this metric are the same
+    if (maxValueForMetric === 0) { // All values are 0
+        return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`;
+    }
+    normalized = 1; // All values are the same non-zero number, so show full intensity
   }
-
-  const normalized = Math.min(1, Math.max(0, currentValue / maxObservedValueForMetric));
-
+  
   let hue: number;
   let targetSaturation: number;
   let targetLightness: number;
@@ -63,27 +71,32 @@ const getCellColor = (
 export function TimingHeatmap({ data }: TimingHeatmapProps) {
   const [selectedMetric, setSelectedMetric] = useState<'successfulForwards' | 'failedForwards'>('successfulForwards');
 
-  const cellDataMap = useMemo(() => {
+  const { cellDataMap, minSuccessful, maxSuccessful, minFailed, maxFailed } = useMemo(() => {
     const map = new Map<string, HeatmapCell>();
-    if (data) {
+    let minS = Infinity, maxS = 0, minF = Infinity, maxF = 0;
+
+    if (data && data.length > 0) {
       data.forEach(cell => {
         map.set(`${cell.day}-${cell.hour}`, cell);
+        minS = Math.min(minS, cell.successfulForwards);
+        maxS = Math.max(maxS, cell.successfulForwards);
+        minF = Math.min(minF, cell.failedForwards);
+        maxF = Math.max(maxF, cell.failedForwards);
       });
+    } else {
+      minS = 0; maxS = 0; minF = 0; maxF = 0; // Handle empty data case
     }
-    return map;
+    return { cellDataMap: map, minSuccessful: minS, maxSuccessful: maxS, minFailed: minF, maxFailed: maxF };
   }, [data]);
 
-  const maxCountForSelectedMetric = useMemo(() => {
-    if (!data || data.length === 0) return 0;
-    const counts = data.map(cell => cell[selectedMetric]);
-    return Math.max(...counts, 0); // Ensure at least 0 if all counts are negative (though unlikely)
-  }, [data, selectedMetric]);
 
   if (!data || data.length === 0) {
     return <div className="text-center text-muted-foreground p-4">No timing data available.</div>;
   }
 
   const metricLabel = selectedMetric === 'successfulForwards' ? 'Successful Forwards' : 'Failed Forwards';
+  const currentMinValue = selectedMetric === 'successfulForwards' ? minSuccessful : minFailed;
+  const currentMaxValue = selectedMetric === 'successfulForwards' ? maxSuccessful : maxFailed;
 
   return (
     <TooltipProvider>
@@ -113,7 +126,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
               {hours.map((hourLabel, hourIndex) => {
                 const cell = cellDataMap.get(`${dayIndex}-${hourIndex}`) || { day: dayIndex, hour: hourIndex, successfulForwards: 0, failedForwards: 0 };
                 const currentValueForMetric = cell[selectedMetric];
-                const color = getCellColor(currentValueForMetric, maxCountForSelectedMetric, selectedMetric);
+                const color = getCellColor(currentValueForMetric, currentMinValue, currentMaxValue, selectedMetric);
                 
                 const totalForwards = cell.successfulForwards + cell.failedForwards;
                 const successRate = totalForwards > 0 ? (cell.successfulForwards / totalForwards) * 100 : 0;
@@ -142,7 +155,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         </div>
       </div>
        <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes forwarding activity from the last 8 weeks. Cell color intensity (from white to orange for successful, or white to purple for failed) indicates the volume of <strong>{metricLabel.toLowerCase()}</strong> for that hour and day. Hover over cells for detailed counts.
+        Heatmap visualizes forwarding activity from the last 8 weeks. For the selected metric ({metricLabel.toLowerCase()}), cell color intensity (from white for the minimum observed count to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume for that hour and day. Hover over cells for detailed counts.
       </CardDescription>
     </TooltipProvider>
   );
