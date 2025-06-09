@@ -23,9 +23,15 @@ const PURPLE_HUE = 277;
 const PURPLE_SATURATION_TARGET = 70;
 const PURPLE_LIGHTNESS_TARGET = 36;
 
-// Base values for "white" or min-intensity
-const BASE_SATURATION_MIN = 20; 
-const BASE_LIGHTNESS_MAX = 95; 
+// Base values for "white" or min-intensity color
+const BASE_SATURATION_MIN = 10; // Reduced for whiter appearance at min
+const BASE_LIGHTNESS_MAX = 97; // Increased for whiter appearance at min
+
+// Afternoon UTC hour ranges (inclusive start, exclusive end for easy checking)
+const europeAfternoonHours = { start: 10, end: 16 }; // 10:00-16:59 UTC
+const americaAfternoonHours = { start: 16, end: 23 }; // 16:00-23:59 UTC (covers US ET/CT/MT afternoon)
+const asiaAfternoonHours = { start: 4, end: 10 }; // 04:00-10:59 UTC (covers parts of East/SE Asia afternoon)
+
 
 const getCellColor = (
   currentValue: number,
@@ -33,21 +39,6 @@ const getCellColor = (
   maxValueForMetric: number,
   metricType: 'successfulForwards' | 'failedForwards'
 ): string => {
-  if (currentValue < minValueForMetric) currentValue = minValueForMetric; 
-  if (currentValue > maxValueForMetric) currentValue = maxValueForMetric;
-
-  const range = maxValueForMetric - minValueForMetric;
-  let normalized = 0;
-
-  if (range > 0) {
-    normalized = (currentValue - minValueForMetric) / range;
-  } else { // All values for this metric are the same
-    if (maxValueForMetric === 0) { // All values are 0
-        return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`;
-    }
-    normalized = 1; // All values are the same non-zero number, so show full intensity
-  }
-  
   let hue: number;
   let targetSaturation: number;
   let targetLightness: number;
@@ -62,6 +53,22 @@ const getCellColor = (
     targetLightness = PURPLE_LIGHTNESS_TARGET;
   }
 
+  const range = maxValueForMetric - minValueForMetric;
+  let normalized = 0;
+
+  if (range > 0) {
+    normalized = (currentValue - minValueForMetric) / range;
+  } else { // All values for this metric are the same, or only one data point, or no data
+    if (currentValue === 0 || maxValueForMetric === 0) { // All values are 0 or the current value is 0
+        return `hsl(0, 0%, ${BASE_LIGHTNESS_MAX}%)`; // White for zero or no activity
+    }
+    // All values are the same non-zero number, so show full intensity
+    normalized = 1; 
+  }
+  
+  // Ensure normalized is within [0, 1]
+  normalized = Math.max(0, Math.min(1, normalized));
+
   const saturation = Math.round(BASE_SATURATION_MIN + normalized * (targetSaturation - BASE_SATURATION_MIN));
   const lightness = Math.round(BASE_LIGHTNESS_MAX - normalized * (BASE_LIGHTNESS_MAX - targetLightness));
 
@@ -73,7 +80,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
 
   const { cellDataMap, minSuccessful, maxSuccessful, minFailed, maxFailed } = useMemo(() => {
     const map = new Map<string, HeatmapCell>();
-    let minS = Infinity, maxS = 0, minF = Infinity, maxF = 0;
+    let minS = Infinity, maxS = -Infinity, minF = Infinity, maxF = -Infinity;
 
     if (data && data.length > 0) {
       data.forEach(cell => {
@@ -83,10 +90,21 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         minF = Math.min(minF, cell.failedForwards);
         maxF = Math.max(maxF, cell.failedForwards);
       });
+       // If all values were initial Infinity/-Infinity (no data), set to 0
+      if (minS === Infinity) minS = 0;
+      if (maxS === -Infinity) maxS = 0;
+      if (minF === Infinity) minF = 0;
+      if (maxF === -Infinity) maxF = 0;
     } else {
-      minS = 0; maxS = 0; minF = 0; maxF = 0; // Handle empty data case
+      minS = 0; maxS = 0; minF = 0; maxF = 0; // Handle empty data case explicitly
     }
-    return { cellDataMap: map, minSuccessful: minS, maxSuccessful: maxS, minFailed: minF, maxFailed: maxF };
+    return { 
+      cellDataMap: map, 
+      minSuccessful: minS, 
+      maxSuccessful: maxS, 
+      minFailed: minF, 
+      maxFailed: maxF 
+    };
   }, [data]);
 
 
@@ -111,12 +129,6 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
 
       <div className="overflow-x-auto">
         <div className="grid gap-px bg-border my-2" style={{ gridTemplateColumns: `auto repeat(${hours.length}, minmax(0, 1fr))` }}>
-          <div className="p-1 text-xs bg-card"></div>
-          {hours.map(hour => (
-            <div key={`hour-${hour}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground">
-              {hour}
-            </div>
-          ))}
           
           {days.map((dayLabel, dayIndex) => (
             <React.Fragment key={`day-row-${dayIndex}`}>
@@ -141,7 +153,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
                       />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-medium">{dayLabel}, {hourLabel}:00 - {(parseInt(hourLabel)+1).toString().padStart(2, '0')}:00</p>
+                      <p className="font-medium">{dayLabel}, {hourLabel}:00 - {(parseInt(hourLabel)+1).toString().padStart(2, '0')}:00 UTC</p>
                       <p>Successful Forwards: {cell.successfulForwards.toLocaleString()}</p>
                       <p>Failed Forwards: {cell.failedForwards.toLocaleString()}</p>
                       <p>Total Forwards: {totalForwards.toLocaleString()}</p>
@@ -152,10 +164,38 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
               })}
             </React.Fragment>
           ))}
+
+          {/* Hour Labels Row (Bottom) */}
+          <div className="p-1 bg-card"></div> {/* Empty cell for day label column alignment */}
+          {hours.map(hour => (
+            <div key={`hour-label-bottom-${hour}`} className="p-1 text-xs text-center font-medium bg-card text-muted-foreground">
+              {hour}
+            </div>
+          ))}
+
+          {/* Afternoon Indicators Row */}
+          <div className="p-1 bg-card text-xs text-center font-medium text-muted-foreground flex items-center justify-center">UTC</div> {/* Label for this row */}
+          {hours.map(hour => {
+            const hourNum = parseInt(hour);
+            const indicators = [];
+            if (hourNum >= europeAfternoonHours.start && hourNum < europeAfternoonHours.end) indicators.push('EU');
+            if (hourNum >= americaAfternoonHours.start && hourNum < americaAfternoonHours.end) indicators.push('US');
+            if (hourNum >= asiaAfternoonHours.start && hourNum < asiaAfternoonHours.end) indicators.push('AS');
+            
+            return (
+              <div 
+                key={`indicator-${hour}`} 
+                className="p-1 text-[10px] h-5 text-center bg-card text-muted-foreground flex items-center justify-center"
+                title={`EU: ${europeAfternoonHours.start}:00-${europeAfternoonHours.end-1}:59 UTC | US: ${americaAfternoonHours.start}:00-${americaAfternoonHours.end-1}:59 UTC | AS: ${asiaAfternoonHours.start}:00-${asiaAfternoonHours.end-1}:59 UTC`}
+              >
+                {indicators.join('/') || '-'}
+              </div>
+            );
+          })}
         </div>
       </div>
        <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes forwarding activity from the last 8 weeks. For the selected metric ({metricLabel.toLowerCase()}), cell color intensity (from white for the minimum observed count to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume for that hour and day. Hover over cells for detailed counts.
+        Heatmap visualizes forwarding activity from the last 8 weeks. Hours are in UTC. Cell color intensity (from white representing the minimum observed count for the selected metric to full orange for successful, or white to full purple for failed for the maximum observed count) indicates the volume. The bottom row indicates approximate afternoon periods in Europe (EU), America (US), and Asia (AS). Hover over cells for detailed counts.
       </CardDescription>
     </TooltipProvider>
   );
