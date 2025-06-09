@@ -966,7 +966,7 @@ export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]>
       COUNT(*) AS count
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
-      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 12 MONTH)
+      AND received_time >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH))
       AND received_time IS NOT NULL
     GROUP BY month
     ORDER BY MIN(DATE_TRUNC(DATE(received_time), MONTH)) -- Order by actual month sequence
@@ -1035,3 +1035,4 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
     return [];
   }
 }
+
