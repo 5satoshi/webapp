@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, PaymentAmountDistributionData, AveragePaymentValueData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, AverageForwardingValueData } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -378,59 +378,59 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
 
   const query = `
     WITH ForwardingsForChannel AS (
-        SELECT
-            in_channel,
-            out_channel,
-            received_time,
-            resolved_time,
-            status,
-            in_msat,
-            out_msat,
-            fee_msat
-        FROM \`${projectId}.${datasetId}.forwardings\`
-        WHERE in_channel = @shortChannelId OR out_channel = @shortChannelId
+      SELECT
+        in_channel,
+        out_channel,
+        received_time,
+        resolved_time,
+        status,
+        in_msat,
+        out_msat,
+        fee_msat
+      FROM \`${projectId}.${datasetId}.forwardings\`
+      WHERE in_channel = @shortChannelId OR out_channel = @shortChannelId
     ),
-    AggregatedStats AS (
-        SELECT
-            MIN(IF(status = 'settled', received_time, NULL)) AS first_tx_timestamp_bq_val,
-            MAX(IF(status = 'settled', COALESCE(resolved_time, received_time), NULL)) AS last_tx_timestamp_bq_val,
-            
-            COUNTIF(status = 'settled') AS total_tx_count_val,
+    AggregatedForwardingStats AS (
+      SELECT
+        MIN(IF(f.status = 'settled', f.received_time, NULL)) AS first_tx_timestamp_bq_val,
+        MAX(IF(f.status = 'settled', COALESCE(f.resolved_time, f.received_time), NULL)) AS last_tx_timestamp_bq_val,
+        
+        COUNTIF(f.status = 'settled') AS total_tx_count_val,
 
-            SUM(IF(in_channel = @shortChannelId AND status = 'settled', 1, 0)) AS in_tx_count_successful_val,
-            SUM(IF(in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_attempts_val,
-            SUM(IF(in_channel = @shortChannelId AND status = 'settled', COALESCE(in_msat, 0), 0)) AS in_tx_volume_msat_val,
+        SUM(IF(f.in_channel = @shortChannelId AND f.status = 'settled', 1, 0)) AS in_tx_count_successful_val,
+        SUM(IF(f.in_channel = @shortChannelId, 1, 0)) AS in_tx_count_total_attempts_val,
+        SUM(IF(f.in_channel = @shortChannelId AND f.status = 'settled', COALESCE(f.in_msat, 0), 0)) AS in_tx_volume_msat_val,
 
-            SUM(IF(out_channel = @shortChannelId AND status = 'settled', 1, 0)) AS out_tx_count_successful_val,
-            SUM(IF(out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
-            SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(out_msat, 0), 0)) AS out_tx_volume_msat_val,
-            
-            SUM(IF(out_channel = @shortChannelId AND status = 'settled', COALESCE(fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
-        FROM ForwardingsForChannel
+        SUM(IF(f.out_channel = @shortChannelId AND f.status = 'settled', 1, 0)) AS out_tx_count_successful_val,
+        SUM(IF(f.out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
+        SUM(IF(f.out_channel = @shortChannelId AND f.status = 'settled', COALESCE(f.out_msat, 0), 0)) AS out_tx_volume_msat_val,
+        
+        SUM(IF(f.out_channel = @shortChannelId AND f.status = 'settled', COALESCE(f.fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
+      FROM ForwardingsForChannel f
     )
     SELECT
-        agg.first_tx_timestamp_bq_val AS first_tx_timestamp_bq,
-        agg.last_tx_timestamp_bq_val AS last_tx_timestamp_bq,
-        COALESCE(agg.total_tx_count_val, 0) as total_tx_count,
-        
-        COALESCE(agg.in_tx_count_successful_val, 0) as in_tx_count,
-        COALESCE(agg.in_tx_volume_msat_val, 0) as in_tx_volume_msat,
-        IF(COALESCE(agg.in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.in_tx_count_successful_val, 0) * 100.0, COALESCE(agg.in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
-        
-        COALESCE(agg.out_tx_count_successful_val, 0) as out_tx_count,
-        COALESCE(agg.out_tx_volume_msat_val, 0) as out_tx_volume_msat,
-        IF(COALESCE(agg.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.out_tx_count_successful_val, 0) * 100.0, COALESCE(agg.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
+      agg.first_tx_timestamp_bq_val AS first_tx_timestamp_bq,
+      agg.last_tx_timestamp_bq_val AS last_tx_timestamp_bq,
+      COALESCE(agg.total_tx_count_val, 0) as total_tx_count,
+      
+      COALESCE(agg.in_tx_count_successful_val, 0) as in_tx_count,
+      COALESCE(agg.in_tx_volume_msat_val, 0) as in_tx_volume_msat,
+      IF(COALESCE(agg.in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.in_tx_count_successful_val, 0) * 100.0, COALESCE(agg.in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
+      
+      COALESCE(agg.out_tx_count_successful_val, 0) as out_tx_count,
+      COALESCE(agg.out_tx_volume_msat_val, 0) as out_tx_volume_msat,
+      IF(COALESCE(agg.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.out_tx_count_successful_val, 0) * 100.0, COALESCE(agg.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
 
-        COALESCE(agg.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_msat,
-        
-        p.updates.local.fee_base_msat as our_node_fee_base_msat,
-        p.updates.local.fee_proportional_millionths as our_node_fee_ppm
+      COALESCE(agg.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_msat,
+      
+      p.updates.local.fee_base_msat as our_node_fee_base_msat,
+      p.updates.local.fee_proportional_millionths as our_node_fee_ppm
     FROM 
-        \`${projectId}.${datasetId}.peers\` p
+      \`${projectId}.${datasetId}.peers\` p
     CROSS JOIN 
-        AggregatedStats agg
+      AggregatedForwardingStats agg
     WHERE 
-        p.short_channel_id = @shortChannelId
+      p.short_channel_id = @shortChannelId
     LIMIT 1
   `;
 
@@ -720,9 +720,9 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
   }
 }
 
-export async function fetchPaymentAmountDistribution(aggregationPeriod: string): Promise<PaymentAmountDistributionData[]> {
+export async function fetchForwardingAmountDistribution(aggregationPeriod: string): Promise<ForwardingAmountDistributionData[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchPaymentAmountDistribution.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchForwardingAmountDistribution.");
     return [];
   }
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
@@ -766,14 +766,14 @@ export async function fetchPaymentAmountDistribution(aggregationPeriod: string):
       frequency: Number(row.frequency),
     }));
   } catch (error) {
-    logBigQueryError(`fetchPaymentAmountDistribution (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchForwardingAmountDistribution (aggregation: ${aggregationPeriod})`, error);
     return [];
   }
 }
 
-export async function fetchAveragePaymentValueOverTime(aggregationPeriod: string): Promise<AveragePaymentValueData[]> {
+export async function fetchAverageForwardingValueOverTime(aggregationPeriod: string): Promise<AverageForwardingValueData[]> {
     if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchAveragePaymentValueOverTime.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchAverageForwardingValueOverTime.");
     return [];
   }
 
@@ -832,9 +832,9 @@ export async function fetchAveragePaymentValueOverTime(aggregationPeriod: string
     }).filter(item => item !== null)
       .sort((a,b) => new Date(a!.date).getTime() - new Date(b!.date).getTime());
 
-    return formattedAndSortedRows as AveragePaymentValueData[];
+    return formattedAndSortedRows as AverageForwardingValueData[];
   } catch (error) {
-    logBigQueryError(`fetchAveragePaymentValueOverTime (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchAverageForwardingValueOverTime (aggregation: ${aggregationPeriod})`, error);
     return [];
   }
 }

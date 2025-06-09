@@ -5,16 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
 
-import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
+import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart'; // Will be renamed to ForwardingAmountChart conceptually
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
 
 import { 
-  fetchPaymentAmountDistribution,
-  fetchAveragePaymentValueOverTime,
+  fetchForwardingAmountDistribution,
+  fetchAverageForwardingValueOverTime,
 } from '@/services/nodeService';
 
 import { 
-  mockTimingPatternsHeatmapData
+  mockTimingPatternsHeatmapData // This can stay if heatmap data is still mocked
 } from '@/lib/mock-data';
 
 
@@ -29,8 +29,8 @@ export default async function AnalyticsPage({
     currentAggregation = aggregationPeriodOptions[0].value;
   }
 
-  const paymentDistributionData = await fetchPaymentAmountDistribution(currentAggregation);
-  const averagePaymentValueData = await fetchAveragePaymentValueOverTime(currentAggregation);
+  const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
+  const averageForwardingValueData = await fetchAverageForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = mockTimingPatternsHeatmapData;
 
 
@@ -41,7 +41,7 @@ export default async function AnalyticsPage({
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="font-headline">Payment Amount Insights</CardTitle>
+                <CardTitle className="font-headline">Forwarding Amount Insights</CardTitle>
                 <Tabs value={currentAggregation} className="w-full sm:w-auto">
                 <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                     {aggregationPeriodOptions.map(option => (
@@ -54,9 +54,9 @@ export default async function AnalyticsPage({
             </div>
         </CardHeader>
         <CardContent>
-          <PaymentAmountChart 
-            distributionData={paymentDistributionData} 
-            averageValueData={averagePaymentValueData} 
+          <PaymentAmountChart // Component name kept for brevity, but props reflect "forwarding"
+            distributionData={forwardingDistributionData} 
+            averageValueData={averageForwardingValueData} 
           />
         </CardContent>
       </Card>

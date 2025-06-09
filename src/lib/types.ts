@@ -56,12 +56,12 @@ export interface DailyRoutingVolumeData {
   volume: number;
 }
 
-export interface PaymentAmountDistributionData {
+export interface ForwardingAmountDistributionData {
   range: string; 
   frequency: number;
 }
 
-export interface AveragePaymentValueData {
+export interface AverageForwardingValueData {
   date: string;
   averageValue: number;
 }
@@ -93,7 +93,7 @@ export type AiStructuredInput = {
   historicalRoutingData: string; 
   feeDistributionData: string; 
   routingActivityData: string; 
-  paymentAmountDistributionData: string; 
+  paymentAmountDistributionData: string; // Note: This key is used in AI input, might need separate handling if AI expects "payment"
   networkSubsumptionMetricsData: string; 
   timingPatternsHeatmapData: string; 
 };

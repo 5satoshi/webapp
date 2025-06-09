@@ -1,14 +1,14 @@
 
 'use client';
 
-import type { PaymentAmountDistributionData, AveragePaymentValueData } from '@/lib/types';
+import type { ForwardingAmountDistributionData, AverageForwardingValueData } from '@/lib/types';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart";
 
-interface PaymentAmountChartProps {
-  distributionData: PaymentAmountDistributionData[];
-  averageValueData: AveragePaymentValueData[];
+interface PaymentAmountChartProps { // Component name not changed, but props are for forwarding data
+  distributionData: ForwardingAmountDistributionData[];
+  averageValueData: AverageForwardingValueData[];
 }
 
 const distributionConfig = {
@@ -29,7 +29,7 @@ export function PaymentAmountChart({ distributionData, averageValueData }: Payme
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
-        <h3 className="text-md font-semibold mb-2 font-headline text-center">Payment Size Frequency</h3>
+        <h3 className="text-md font-semibold mb-2 font-headline text-center">Forwarding Size Frequency</h3>
          {(!distributionData || distributionData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No distribution data available for this period.</div>
         ) : (
@@ -38,8 +38,19 @@ export function PaymentAmountChart({ distributionData, averageValueData }: Payme
                 <BarChart data={distributionData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
                 <XAxis dataKey="range" tickLine={false} axisLine={false} tickMargin={8} className="text-xs" />
-                <YAxis tickLine={false} axisLine={false} tickMargin={8} className="text-xs" 
-                  tickFormatter={(value) => Number(value).toLocaleString()}
+                <YAxis 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickMargin={8} 
+                  className="text-xs" 
+                  tickFormatter={(value) => {
+                    const num = Number(value);
+                    if (num >= 1000) {
+                      // Show one decimal place if not a round thousand (e.g. 1.2k), no decimal if round (e.g. 15k)
+                      return `${(num / 1000).toFixed(num % 1000 !== 0 ? 1 : 0)}k`;
+                    }
+                    return num.toLocaleString();
+                  }}
                 />
                 <ChartTooltip
                     cursor={false}
@@ -59,7 +70,7 @@ export function PaymentAmountChart({ distributionData, averageValueData }: Payme
         )}
       </div>
       <div>
-        <h3 className="text-md font-semibold mb-2 font-headline text-center">Average Payment Value Over Time</h3>
+        <h3 className="text-md font-semibold mb-2 font-headline text-center">Average Forwarding Value Over Time</h3>
          {(!averageValueData || averageValueData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No average value data available for this period.</div>
         ) : (

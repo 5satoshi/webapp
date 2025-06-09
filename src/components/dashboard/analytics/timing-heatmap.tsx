@@ -24,11 +24,42 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
     intensityMap.set(`${cell.day}-${cell.hour}`, cell.intensity);
   });
 
-  const getIntensityColor = (intensity: number) => {
-    const hue = 262; // Primary color hue (Deep Purple)
-    const saturation = 52; // Primary color saturation
-    const lightness = 13 + (98 - 13) * intensity * 0.8; // Dark gray (13%) to lighter purple (max ~80% of foreground lightness)
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  const getIntensityColor = (intensity: number): string => {
+    // Colors from globals.css theme (approximated for HSL)
+    // Primary Purple: hsl(var(--primary)) which is 277 70% 36%
+    // Secondary Orange: hsl(var(--secondary)) which is 34 100% 50%
+    // White: hsl(0, 0%, 100%)
+    const primaryPurple = { h: 277, s: 70, l: 36 };
+    const secondaryOrange = { h: 34, s: 100, l: 50 };
+    const white = { h: 0, s: 0, l: 100 }; // Standard white for midpoint
+
+    let h, s, l;
+
+    if (intensity <= 0.5) {
+      // Interpolate from Purple (low intensity = 0) to White (mid intensity = 0.5)
+      const t = intensity / 0.5; // Normalize intensity from 0 to 1 for this segment
+      
+      // Interpolate hue from purple to white (0 or any, as saturation will be 0)
+      // To avoid hue jumping across 360/0, if white.h is 0 and purple.h is 277,
+      // interpolate towards 360 instead of 0 for a smoother transition if needed, then normalize.
+      // However, for white, hue doesn't matter when saturation is 0.
+      let targetHueForWhite = white.h;
+      if (primaryPurple.h > 180 && white.h < 180) targetHueForWhite = 360; // Go towards 360 if purple is on the higher side
+
+      h = primaryPurple.h + (targetHueForWhite - primaryPurple.h) * t;
+      s = primaryPurple.s + (white.s - primaryPurple.s) * t;
+      l = primaryPurple.l + (white.l - primaryPurple.l) * t;
+    } else {
+      // Interpolate from White (mid intensity = 0.5) to Orange (high intensity = 1)
+      const t = (intensity - 0.5) / 0.5; // Normalize intensity from 0 to 1 for this segment
+      h = white.h + (secondaryOrange.h - white.h) * t;
+      s = white.s + (secondaryOrange.s - white.s) * t;
+      l = white.l + (secondaryOrange.l - white.l) * t;
+    }
+    
+    h = (Math.round(h) % 360 + 360) % 360; // Normalize hue to be 0-359
+
+    return `hsl(${h}, ${Math.round(s)}%, ${Math.round(l)}%)`;
   };
 
 
@@ -85,7 +116,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
         <span>High Intensity</span>
       </div>
        <CardDescription className="mt-2 text-xs">
-        Heatmap visualizes routing request intensity. Darker shades indicate lower activity, lighter shades indicate higher activity. Based on data from the last 8 weeks.
+        Heatmap visualizes routing request intensity. Purple shades indicate lower activity, transitioning through white to orange shades for higher activity. Based on data from the last 8 weeks.
       </CardDescription>
     </TooltipProvider>
   );
