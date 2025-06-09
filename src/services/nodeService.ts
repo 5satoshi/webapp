@@ -727,16 +727,65 @@ export async function fetchForwardingAmountDistribution(aggregationPeriod: strin
   }
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
 
+  let paymentRangeCaseStatement: string;
+  let paymentRangeOrderByClause: string;
+  const aggregationPeriodLower = aggregationPeriod.toLowerCase();
+
+  if (aggregationPeriodLower === 'day') {
+    paymentRangeCaseStatement = `
+      CASE
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000 THEN '0-1k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 1000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 10000 THEN '1k-10k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 10000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 50000 THEN '10k-50k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 50000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 200000 THEN '50k-200k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 200000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000000 THEN '200k-1M'
+        ELSE '>1M'
+      END
+    `;
+    paymentRangeOrderByClause = `
+      CASE payment_range
+        WHEN '0-1k' THEN 1
+        WHEN '1k-10k' THEN 2
+        WHEN '10k-50k' THEN 3
+        WHEN '50k-200k' THEN 4
+        WHEN '200k-1M' THEN 5
+        WHEN '>1M' THEN 6
+      END
+    `;
+  } else {
+    paymentRangeCaseStatement = `
+      CASE
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000 THEN '0-1k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 1000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 5000 THEN '1k-5k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 5000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 10000 THEN '5k-10k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 10000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 25000 THEN '10k-25k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 25000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 50000 THEN '25k-50k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 50000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 100000 THEN '50k-100k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 100000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 250000 THEN '100k-250k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 250000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 500000 THEN '250k-500k'
+        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 500000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000000 THEN '500k-1M'
+        ELSE '>1M'
+      END
+    `;
+     paymentRangeOrderByClause = `
+      CASE payment_range
+        WHEN '0-1k' THEN 1
+        WHEN '1k-5k' THEN 2
+        WHEN '5k-10k' THEN 3
+        WHEN '10k-25k' THEN 4
+        WHEN '25k-50k' THEN 5
+        WHEN '50k-100k' THEN 6
+        WHEN '100k-250k' THEN 7
+        WHEN '250k-500k' THEN 8
+        WHEN '500k-1M' THEN 9
+        WHEN '>1M' THEN 10
+      END
+    `;
+  }
+
   const query = `
     SELECT
-      CASE
-        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000 THEN '0-1k sats'
-        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 1000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 10000 THEN '1k-10k sats'
-        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 10000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 50000 THEN '10k-50k sats'
-        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 50000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 200000 THEN '50k-200k sats'
-        WHEN SAFE_CAST(out_msat AS NUMERIC) / 1000 > 200000 AND SAFE_CAST(out_msat AS NUMERIC) / 1000 <= 1000000 THEN '200k-1M sats'
-        ELSE '>1M sats'
-      END AS payment_range,
+      ${paymentRangeCaseStatement} AS payment_range,
       COUNT(*) AS frequency
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
@@ -745,14 +794,7 @@ export async function fetchForwardingAmountDistribution(aggregationPeriod: strin
       AND out_msat IS NOT NULL
     GROUP BY payment_range
     ORDER BY
-      CASE payment_range
-        WHEN '0-1k sats' THEN 1
-        WHEN '1k-10k sats' THEN 2
-        WHEN '10k-50k sats' THEN 3
-        WHEN '50k-200k sats' THEN 4
-        WHEN '200k-1M sats' THEN 5
-        WHEN '>1M sats' THEN 6
-      END
+      ${paymentRangeOrderByClause}
   `;
   const options = {
     query: query,
@@ -858,16 +900,13 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     case 'week': // Corresponds to "Last 4 Weeks" title in chart
-      queryStartDate = format(startOfDay(subWeeks(effectiveEndDate, 4 -1 )), "yyyy-MM-dd'T'HH:mm:ssXXX");
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     case 'month': // Corresponds to "Last 3 Months" title in chart
-      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 3 -1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
-      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Corrected for full 3 months
       break;
     case 'quarter': // Corresponds to "Last 12 Months" title in chart
-      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 12 -1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
-      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Corrected for full 12 months
       break;
     default: // Fallback to last 7 days for heatmap if period is unknown
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -916,3 +955,5 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
   }
 }
 
+
+    
