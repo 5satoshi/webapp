@@ -9,7 +9,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 interface PaymentAmountChartProps {
   distributionData: ForwardingAmountDistributionData[];
   averageValueData: AverageForwardingValueData[];
-  aggregationPeriodLabel: string;
+  frequencyChartTitleLabel: string;
 }
 
 const distributionConfig = {
@@ -26,12 +26,12 @@ const averageValueConfig = {
   },
 } satisfies ChartConfig;
 
-export function PaymentAmountChart({ distributionData, averageValueData, aggregationPeriodLabel }: PaymentAmountChartProps) {
+export function PaymentAmountChart({ distributionData, averageValueData, frequencyChartTitleLabel }: PaymentAmountChartProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
       <div>
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
-          Forwarding Size Frequency (Last {aggregationPeriodLabel})
+          Forwarding Size Frequency ({frequencyChartTitleLabel})
         </h3>
          {(!distributionData || distributionData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No distribution data available for this period.</div>
@@ -73,7 +73,7 @@ export function PaymentAmountChart({ distributionData, averageValueData, aggrega
       </div>
       <div>
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
-          Average Forwarding Value Over Time (Last {aggregationPeriodLabel})
+          Average Forwarding Value Over Time
         </h3>
          {(!averageValueData || averageValueData.length === 0) ? (
             <div className="text-center text-muted-foreground p-4 h-[250px] flex items-center justify-center">No average value data available for this period.</div>

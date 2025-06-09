@@ -4,6 +4,7 @@ import { PageTitle } from '@/components/ui/page-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
+import { Separator } from '@/components/ui/separator';
 
 import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
@@ -28,31 +29,31 @@ export default async function AnalyticsPage({
 
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const averageForwardingValueData = await fetchAverageForwardingValueOverTime(currentAggregation);
-  const timingHeatmapData = await fetchTimingHeatmapData();
+  const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
 
-  let descriptiveLabel = 'Day';
+  let chartTitlePeriodLabel = 'Last 7 Days'; // Default for 'day'
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
+
   if (selectedOption) {
     switch (currentAggregation) {
       case 'day':
-        descriptiveLabel = 'Day';
+        chartTitlePeriodLabel = 'Last 7 Days';
         break;
       case 'week':
-        descriptiveLabel = '7 Days';
+        chartTitlePeriodLabel = 'Last 4 Weeks';
         break;
       case 'month':
-        descriptiveLabel = '30 Days';
+        chartTitlePeriodLabel = 'Last 3 Months';
         break;
       case 'quarter':
-        descriptiveLabel = '90 Days';
+        chartTitlePeriodLabel = 'Last 12 Months';
         break;
       default:
-        // Fallback for any other aggregation period to use its label, removing 's' if present
-        descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
+        // Fallback for safety, though currentAggregation should always be one of the above
+        chartTitlePeriodLabel = `Last ${selectedOption.label}`; // e.g., "Last Days"
         break;
     }
   }
-
 
   return (
     <div className="space-y-6">
@@ -61,7 +62,7 @@ export default async function AnalyticsPage({
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="font-headline">Forwarding Amount Insights</CardTitle>
+                <CardTitle className="font-headline">Forwarding &amp; Timing Analysis</CardTitle>
                 <Tabs value={currentAggregation} className="w-full sm:w-auto">
                 <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                     {aggregationPeriodOptions.map(option => (
@@ -73,21 +74,21 @@ export default async function AnalyticsPage({
                 </Tabs>
             </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-8">
           <PaymentAmountChart
             distributionData={forwardingDistributionData} 
             averageValueData={averageForwardingValueData}
-            aggregationPeriodLabel={descriptiveLabel}
+            frequencyChartTitleLabel={chartTitlePeriodLabel}
           />
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline">Timing Patterns Heatmap (Last 8 Weeks)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TimingHeatmap data={timingHeatmapData} />
+        
+          <Separator />
+
+          <div>
+            <h3 className="text-xl font-semibold mb-4 font-headline text-center md:text-left">
+              Timing Patterns Heatmap ({chartTitlePeriodLabel})
+            </h3>
+            <TimingHeatmap data={timingHeatmapData} />
+          </div>
         </CardContent>
       </Card>
     </div>

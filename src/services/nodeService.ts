@@ -840,11 +840,40 @@ export async function fetchAverageForwardingValueOverTime(aggregationPeriod: str
 }
 
 
-export async function fetchTimingHeatmapData(): Promise<HeatmapCell[]> {
+export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week'): Promise<HeatmapCell[]> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchTimingHeatmapData.");
     return [];
   }
+
+  let queryStartDate: string;
+  let queryEndDate: string;
+  const now = new Date();
+  const effectiveEndDate = endOfDay(subDays(now, 1)); // Data up to yesterday (end of day)
+
+  switch (aggregationPeriod.toLowerCase()) {
+    case 'day': // Corresponds to "Last 7 Days" title
+      // Data for the last 7 full days ending yesterday
+      queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      break;
+    case 'week': // Corresponds to "Last 4 Weeks" title
+      // Data for the last 4 full weeks (28 days) ending yesterday
+      queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      break;
+    case 'month': // Corresponds to "Last 3 Months" title
+      // Data for the last 3 full months ending yesterday
+      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 3)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      break;
+    case 'quarter': // Corresponds to "Last 12 Months" title
+      // Data for the last 12 full months ending yesterday
+      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      break;
+    default: // Fallback to last 7 days for heatmap if period is unknown
+      queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      break;
+  }
+  queryEndDate = format(effectiveEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
+
 
   const query = `
     SELECT
@@ -854,7 +883,8 @@ export async function fetchTimingHeatmapData(): Promise<HeatmapCell[]> {
       COUNTIF(status != 'settled') AS failed_forwards
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE
-      received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 56 DAY) -- Last 8 weeks (56 days)
+      received_time >= TIMESTAMP(@startDate) 
+      AND received_time <= TIMESTAMP(@endDate)
     GROUP BY
       day_of_week,
       hour_of_day
@@ -863,8 +893,13 @@ export async function fetchTimingHeatmapData(): Promise<HeatmapCell[]> {
       hour_of_day
   `;
 
+  const options = {
+    query: query,
+    params: { startDate: queryStartDate, endDate: queryEndDate }
+  };
+
   try {
-    const [job] = await bigquery.createQueryJob({ query });
+    const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
     return rows.map(row => ({
@@ -875,7 +910,7 @@ export async function fetchTimingHeatmapData(): Promise<HeatmapCell[]> {
     }));
 
   } catch (error) {
-    logBigQueryError("fetchTimingHeatmapData", error);
+    logBigQueryError(`fetchTimingHeatmapData (aggregation: ${aggregationPeriod})`, error);
     return [];
   }
 }
