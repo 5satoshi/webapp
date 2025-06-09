@@ -22,16 +22,16 @@ export default async function AnalyticsPage({
   searchParams?: { aggregation?: string } 
 }) {
   
-  let currentAggregation = searchParams?.aggregation || aggregationPeriodOptions[0].value;
+  let currentAggregation = searchParams?.aggregation || 'week'; // Default to 'week'
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = aggregationPeriodOptions[0].value;
+    currentAggregation = 'week'; // Fallback if invalid param
   }
 
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
 
-  let chartTitlePeriodLabel = 'Last 7 Days'; 
+  let chartTitlePeriodLabel = 'Last 4 Weeks'; // Default for 'week'
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
 
   if (selectedOption) {

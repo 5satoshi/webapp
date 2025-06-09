@@ -103,9 +103,9 @@ export default async function OverviewPage({
   searchParams?: { aggregation?: string } 
 }) {
   
-  let currentAggregation = searchParams?.aggregation || 'day'; 
+  let currentAggregation = searchParams?.aggregation || 'week'; 
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'day'; 
+    currentAggregation = 'week'; 
   }
 
   const keyMetrics = await fetchKeyMetrics();
@@ -114,7 +114,7 @@ export default async function OverviewPage({
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
   
-  let descriptiveLabel = 'Day';
+  let descriptiveLabel = '7 Days'; // Default for week
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
     switch (currentAggregation) {
