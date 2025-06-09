@@ -24,7 +24,7 @@ const PURPLE_LIGHTNESS_TARGET = 36;
 const BASE_SATURATION_MIN = 20;
 const BASE_LIGHTNESS_MAX = 97; // Represents "white" or very light color
 
-const MOBILE_LAYOUT_BREAKPOINT = 384; 
+const MOBILE_LAYOUT_BREAKPOINT = 461; // Changed from 384
 
 const regionalIndicatorsConfig = [
   { name: 'Asia', start: 6, end: 12 },    // 06:00-11:59 UTC
@@ -61,7 +61,6 @@ const getCellColor = (
   }
 
   // Ensure minValueForMetric isn't greater than maxValueForMetric if dataset is very small
-  // This path should ideally not be hit if the above condition handles single-value non-zero cases.
   const effectiveMin = Math.min(minValueForMetric, maxValueForMetric);
   const range = maxValueForMetric - effectiveMin;
 
@@ -70,7 +69,7 @@ const getCellColor = (
     normalized = 0;
   } else if (range > 0) {
     normalized = (currentValue - effectiveMin) / range;
-  } else { // Should only happen if effectiveMin == maxValueForMetric (and not zero), already handled.
+  } else { // Should only happen if effectiveMin == maxValueForMetric (and not zero)
     normalized = 1; 
   }
   
@@ -148,7 +147,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
     display: 'grid',
     gridTemplateColumns: `min-content repeat(${colLabels.length}, minmax(0, 1fr))`,
     gap: '1px',
-    backgroundColor: 'hsl(var(--card))',
+    backgroundColor: 'hsl(var(--card))', // Changed from border to card for white background
   };
   
   const regionalIndicatorCells: React.ReactNode[] = [];
@@ -237,7 +236,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
                   <Tooltip key={`cell-${dayValue}-${hourValue}`}>
                     <TooltipTrigger asChild>
                       <div
-                        className="w-full h-full rounded-sm"
+                        className="w-full h-full rounded-sm" // Removed aspect-square
                         style={{ backgroundColor: color, minHeight: '1.5rem' }}
                         aria-label={`Data for ${dayLabelForTooltip} ${hourLabelForTooltip}:00`}
                       />
@@ -260,7 +259,7 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
       {!isMobileLayout && regionalIndicatorCells.length > 0 && (
         <div className="grid mt-1" style={{ 
             gridTemplateColumns: `min-content repeat(${ALL_HOURS_NUMERIC.length}, minmax(0, 1fr))`,
-            // No gap or bg-border for this row as per user request (white background implied by card)
+            // No gap or bg-border for this row (white background implied by card)
           }}>
           {/* Spacer cell to align with the Day/Hour labels column of the heatmap above it. */}
           <div className="p-1 bg-card text-xs text-muted-foreground flex items-center justify-center">
@@ -272,3 +271,4 @@ export function TimingHeatmap({ data }: TimingHeatmapProps) {
     </TooltipProvider>
   );
 }
+
