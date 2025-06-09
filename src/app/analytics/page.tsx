@@ -64,7 +64,7 @@ export default async function AnalyticsPage({
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="font-headline">Forwarding &amp; Timing Analysis</CardTitle>
+                <CardTitle className="font-headline">Volume &amp; Timing Analysis</CardTitle>
                 <Tabs value={currentAggregation} className="w-full sm:w-auto">
                 <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                     {aggregationPeriodOptions.map(option => (
