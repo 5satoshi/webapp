@@ -32,13 +32,35 @@ const valueOverTimeConfig = {
 
 export function PaymentAmountChart({ distributionData, forwardingValueData, frequencyChartTitleLabel }: PaymentAmountChartProps) {
   
-  let yAxisMin = 1;
+  let yAxisDomainForValueChart: [number, number] = [1, 1000]; // Default fallback
+
   if (forwardingValueData && forwardingValueData.length > 0) {
-    const positiveMedians = forwardingValueData.map(d => d.medianValue).filter(v => v > 0);
-    if (positiveMedians.length > 0) {
-      yAxisMin = Math.max(1, Math.min(...positiveMedians));
+    const allPositiveValues = forwardingValueData
+      .flatMap(d => [d.medianValue, d.maxValue])
+      .filter(v => typeof v === 'number' && v > 0);
+
+    if (allPositiveValues.length > 0) {
+      const minDataPoint = Math.min(...allPositiveValues);
+      const maxDataPoint = Math.max(...allPositiveValues);
+
+      const domainMin = Math.max(1, Math.floor(minDataPoint / 2));
+      let domainMax = Math.ceil(maxDataPoint * 2);
+
+      // Ensure domainMax is strictly greater than domainMin for a valid range
+      // If minDataPoint and maxDataPoint are the same (e.g., 1), 
+      // domainMin could be 1 and domainMax could be 2.
+      // This check ensures a slightly larger default range if the calculated one is too narrow or invalid.
+      if (domainMax <= domainMin) {
+        domainMax = domainMin * 10; // Default to one order of magnitude if calculated range is too small
+        if (domainMax <= domainMin) { // Further fallback if domainMin was 0 (though filtered) or 1
+            domainMax = Math.max(10, domainMin + 100);
+        }
+      }
+      
+      yAxisDomainForValueChart = [domainMin, domainMax];
     }
   }
+
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
@@ -105,7 +127,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
                 />
                 <YAxis
                     scale="log"
-                    domain={[yAxisMin, 'auto']} 
+                    domain={yAxisDomainForValueChart} 
                     allowDataOverflow={true}
                     tickLine={false}
                     axisLine={false}
