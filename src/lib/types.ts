@@ -74,9 +74,10 @@ export interface NetworkSubsumptionData {
 }
 
 export interface HeatmapCell {
-  day: number; 
-  hour: number; 
-  intensity: number; 
+  day: number; // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
+  hour: number; // 0-23
+  successfulForwards: number;
+  failedForwards: number;
 }
 
 export interface Recommendation {
@@ -93,7 +94,7 @@ export type AiStructuredInput = {
   historicalRoutingData: string; 
   feeDistributionData: string; 
   routingActivityData: string; 
-  paymentAmountDistributionData: string; // Note: This key is used in AI input, might need separate handling if AI expects "payment"
+  paymentAmountDistributionData: string; 
   networkSubsumptionMetricsData: string; 
   timingPatternsHeatmapData: string; 
 };
@@ -128,3 +129,4 @@ export interface ChannelDetails {
   totalFeesEarnedSats: number; // Total fees earned when this channel was the outgoing hop for our node
   ourAdvertisedPolicy: string | null; // Our node's advertised fee policy for this channel (e.g., "X msat + Y ppm")
 }
+

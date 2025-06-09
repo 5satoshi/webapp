@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, AverageForwardingValueData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, AverageForwardingValueData, HeatmapCell } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -835,6 +835,47 @@ export async function fetchAverageForwardingValueOverTime(aggregationPeriod: str
     return formattedAndSortedRows as AverageForwardingValueData[];
   } catch (error) {
     logBigQueryError(`fetchAverageForwardingValueOverTime (aggregation: ${aggregationPeriod})`, error);
+    return [];
+  }
+}
+
+
+export async function fetchTimingHeatmapData(): Promise<HeatmapCell[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchTimingHeatmapData.");
+    return [];
+  }
+
+  const query = `
+    SELECT
+      EXTRACT(DAYOFWEEK FROM received_time) - 1 AS day_of_week, -- 0 (Sun) to 6 (Sat)
+      EXTRACT(HOUR FROM received_time) AS hour_of_day,    -- 0 to 23
+      COUNTIF(status = 'settled') AS successful_forwards,
+      COUNTIF(status != 'settled') AS failed_forwards
+    FROM \`${projectId}.${datasetId}.forwardings\`
+    WHERE
+      received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 56 DAY) -- Last 8 weeks (56 days)
+    GROUP BY
+      day_of_week,
+      hour_of_day
+    ORDER BY
+      day_of_week,
+      hour_of_day
+  `;
+
+  try {
+    const [job] = await bigquery.createQueryJob({ query });
+    const [rows] = await job.getQueryResults();
+
+    return rows.map(row => ({
+      day: Number(row.day_of_week),
+      hour: Number(row.hour_of_day),
+      successfulForwards: Number(row.successful_forwards || 0),
+      failedForwards: Number(row.failed_forwards || 0),
+    }));
+
+  } catch (error) {
+    logBigQueryError("fetchTimingHeatmapData", error);
     return [];
   }
 }

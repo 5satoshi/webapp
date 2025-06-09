@@ -11,11 +11,8 @@ import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
 import { 
   fetchForwardingAmountDistribution,
   fetchAverageForwardingValueOverTime,
+  fetchTimingHeatmapData,
 } from '@/services/nodeService';
-
-import { 
-  mockTimingPatternsHeatmapData // This can stay if heatmap data is still mocked
-} from '@/lib/mock-data';
 
 
 export default async function AnalyticsPage({ 
@@ -31,7 +28,7 @@ export default async function AnalyticsPage({
 
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const averageForwardingValueData = await fetchAverageForwardingValueOverTime(currentAggregation);
-  const timingHeatmapData = mockTimingPatternsHeatmapData;
+  const timingHeatmapData = await fetchTimingHeatmapData();
 
 
   return (
@@ -54,7 +51,7 @@ export default async function AnalyticsPage({
             </div>
         </CardHeader>
         <CardContent>
-          <PaymentAmountChart // Component name kept for brevity, but props reflect "forwarding"
+          <PaymentAmountChart
             distributionData={forwardingDistributionData} 
             averageValueData={averageForwardingValueData} 
           />
