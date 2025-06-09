@@ -43,14 +43,13 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
       const minDataPoint = Math.min(...allPositiveValues);
       const maxDataPoint = Math.max(...allPositiveValues);
 
-      // Domain from half the min to double the max, ensuring min is at least 1.
       const domainMin = Math.max(1, Math.floor(minDataPoint / 2));
       let domainMax = Math.ceil(maxDataPoint * 2);
       
-      if (domainMax <= domainMin) { // Ensure a valid range
+      if (domainMax <= domainMin) { 
         domainMax = Math.max(10, domainMin * 10); 
         if (domainMax <= domainMin) {
-            domainMax = Math.max(100, domainMin + 100); // Further fallback
+            domainMax = Math.max(100, domainMin + 100); 
         }
       }
       
@@ -60,7 +59,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
 
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+    <div className="space-y-8"> {/* Changed from grid to space-y-8 for full-width stacking */}
       <div>
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
           Forwarding Size Frequency ({frequencyChartTitleLabel})
@@ -172,4 +171,3 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
     </div>
   );
 }
-
