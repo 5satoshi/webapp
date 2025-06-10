@@ -62,19 +62,19 @@ export default async function SubsumptionPage({
           {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <ShortestPathCategoryCard 
-                title="Micro Payments" 
+                title="Micro" 
                 paymentSizeLabel="(200 sats)"
                 nodes={topNodesData.micro}
                 categoryType="micro"
               />
               <ShortestPathCategoryCard 
-                title="Common Payments" 
+                title="Common" 
                 paymentSizeLabel="(50k sats)"
                 nodes={topNodesData.common}
                 categoryType="common"
               />
               <ShortestPathCategoryCard 
-                title="Macro Payments" 
+                title="Macro" 
                 paymentSizeLabel="(4M sats)"
                 nodes={topNodesData.macro}
                 categoryType="macro"

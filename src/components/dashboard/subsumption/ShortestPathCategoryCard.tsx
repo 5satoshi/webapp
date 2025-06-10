@@ -2,17 +2,17 @@
 'use client';
 
 import type { SingleCategoryTopNode } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getOrdinalSuffix } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface ShortestPathCategoryCardProps {
   title: string;
   paymentSizeLabel: string;
   nodes: SingleCategoryTopNode[];
-  categoryType: 'micro' | 'common' | 'macro';
+  categoryType: 'micro' | 'common' | 'macro'; // Keep for potential future styling based on type
 }
 
 const formatShare = (share: number | null): string => {
@@ -36,8 +36,10 @@ export function ShortestPathCategoryCard({ title, paymentSizeLabel, nodes, categ
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
-        <CardTitle className="font-headline text-lg md:text-xl">{title}</CardTitle>
-        <CardDescription>{paymentSizeLabel}</CardDescription>
+        <div className="flex items-baseline gap-x-1.5">
+            <CardTitle className="font-headline text-lg md:text-xl">{title}</CardTitle>
+            <p className="text-sm text-muted-foreground">{paymentSizeLabel}</p>
+        </div>
       </CardHeader>
       <CardContent className="flex-grow">
         {nodes.length > 0 ? (
@@ -48,35 +50,31 @@ export function ShortestPathCategoryCard({ title, paymentSizeLabel, nodes, categ
                   <TableRow>
                     <TableHead className="w-[30px] p-2 text-xs">#</TableHead>
                     <TableHead className="p-2 text-xs">Node</TableHead>
-                    <TableHead className="text-right p-2 text-xs">Share</TableHead>
-                    <TableHead className="text-right p-2 text-xs">Rank</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {nodes.map((node, index) => (
-                    <TableRow key={node.nodeid}>
-                      <TableCell className="p-2 text-sm">{index + 1}</TableCell>
-                      <TableCell className="font-medium p-2 text-sm">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-default truncate block max-w-[120px] sm:max-w-[200px] md:max-w-[100px] lg:max-w-[120px]">{getNodeDisplay(node)}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-semibold">{node.alias || 'Unknown Alias'}</p>
-                            <p className="text-xs text-muted-foreground">{node.nodeid}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-right p-2 text-sm">{formatShare(node.share)}</TableCell>
-                      <TableCell className="text-right p-2 text-sm">
-                        <Badge 
-                          variant={categoryType === 'common' ? 'default' : categoryType === 'micro' ? 'outline' : 'secondary'} 
-                          className="text-xs px-1.5 py-0.5"
-                        >
-                          {formatRankDisplay(node.rank)}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
+                    <Tooltip key={node.nodeid}>
+                      <TooltipTrigger asChild>
+                        <TableRow className="cursor-default hover:bg-muted/50 transition-colors">
+                          <TableCell className="p-2 text-sm">{index + 1}</TableCell>
+                          <TableCell className="font-medium p-2 text-sm">
+                            <span className="truncate block">
+                                {getNodeDisplay(node)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="center" className="w-auto p-3 bg-popover text-popover-foreground shadow-md rounded-md border">
+                        <div className="space-y-1 text-sm text-left">
+                            <div className="font-semibold">{node.alias || 'Unknown Alias'}</div>
+                            <div className="text-xs text-muted-foreground break-all">{node.nodeid}</div>
+                            <Separator className="my-1.5 bg-border" />
+                            <div><strong>Share:</strong> {formatShare(node.share)}</div>
+                            <div><strong>Network Rank ({title}):</strong> {formatRankDisplay(node.rank)}</div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
                   ))}
                 </TableBody>
               </Table>
