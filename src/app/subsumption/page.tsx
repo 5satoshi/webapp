@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
 import { NetworkSubsumptionChart } from '@/components/dashboard/analytics/network-subsumption-chart';
-import { TopNodesTable } from '@/components/dashboard/subsumption/top-nodes-table';
+import { SubsumptionCategoryCard } from '@/components/dashboard/subsumption/SubsumptionCategoryCard';
 import { 
   fetchTopNodesBySubsumption,
   fetchNetworkSubsumptionDataForOurNode,
 } from '@/services/nodeService';
-import type { TopNodeSubsumptionEntry, NetworkSubsumptionData } from '@/lib/types';
+import type { AllTopNodes, NetworkSubsumptionData } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 
@@ -25,7 +25,7 @@ export default async function SubsumptionPage({
     currentAggregation = 'week'; // Fallback if invalid param
   }
 
-  const topNodesData: TopNodeSubsumptionEntry[] = await fetchTopNodesBySubsumption(3);
+  const topNodesData: AllTopNodes = await fetchTopNodesBySubsumption(3);
   const ourNodeTimelineData: NetworkSubsumptionData[] = await fetchNetworkSubsumptionDataForOurNode(currentAggregation);
 
   const introText1 = `How do the activity numbers of our node compare to the overall network, how are we doing? We’re trying to bring more light into that by looking at the total network graph, with all its channels and routing fees.`;
@@ -52,20 +52,39 @@ export default async function SubsumptionPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Top Nodes by Common Payment Subsumption</CardTitle>
+          <CardTitle className="font-headline">Top Nodes by Subsumption Share</CardTitle>
           <CardDescription>
-            Ranking of the top 3 nodes based on their latest shortest path share for common (50k sat) payments.
+            Ranking of the top 3 nodes for micro, common, and macro payment sizes based on their latest shortest path share.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">{rankingExplanation}</p>
-          {topNodesData.length > 0 ? (
-            <TopNodesTable nodes={topNodesData} />
+          {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <SubsumptionCategoryCard 
+                title="Micro Payments" 
+                paymentSizeLabel="(200 sats)"
+                nodes={topNodesData.micro}
+                categoryType="micro"
+              />
+              <SubsumptionCategoryCard 
+                title="Common Payments" 
+                paymentSizeLabel="(50k sats)"
+                nodes={topNodesData.common}
+                categoryType="common"
+              />
+              <SubsumptionCategoryCard 
+                title="Macro Payments" 
+                paymentSizeLabel="(4M sats)"
+                nodes={topNodesData.macro}
+                categoryType="macro"
+              />
+            </div>
           ) : (
             <Alert>
               <Info className="h-4 w-4" />
               <AlertTitle>No Top Node Data</AlertTitle>
-              <AlertDescription>Could not retrieve top node subsumption data at this time.</AlertDescription>
+              <AlertDescription>Could not retrieve top node subsumption data at this time for any category.</AlertDescription>
             </Alert>
           )}
         </CardContent>

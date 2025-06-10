@@ -92,6 +92,20 @@ export interface TopNodeSubsumptionEntry {
   macro_rank: number | null;
 }
 
+export interface SingleCategoryTopNode {
+  nodeid: string;
+  alias?: string | null;
+  share: number | null; // Share for THIS specific category
+  rank: number | null;  // Rank for THIS specific category from the betweenness table
+}
+
+export interface AllTopNodes {
+  micro: SingleCategoryTopNode[];
+  common: SingleCategoryTopNode[];
+  macro: SingleCategoryTopNode[];
+}
+
+
 export interface BetweennessRankData {
   latestRank: number | null;
   previousRank: number | null;
@@ -124,3 +138,4 @@ export interface ChannelDetails {
 }
 
 // Removed AiStructuredInput and Recommendation as Insights page is removed
+

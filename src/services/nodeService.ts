@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -361,6 +361,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         status: channelStatus,
         historicalPaymentSuccessRate: successRate, 
         lastUpdate: new Date().toISOString(), 
+        uptime: 0, // Placeholder, as uptime is not directly available from this query
       };
     });
 
@@ -1036,70 +1037,56 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
   }
 }
 
-export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<TopNodeSubsumptionEntry[]> {
+async function fetchTopNodesForCategory(category: 'micro' | 'common' | 'macro', limit: number = 3): Promise<SingleCategoryTopNode[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchTopNodesBySubsumption.");
+    console.error(`BigQuery client not initialized or datasetId missing for fetchTopNodesForCategory (${category}).`);
     return [];
   }
 
   const query = `
-    WITH LatestTimestamps AS (
-        SELECT
-            nodeid,
-            type,
-            MAX(timestamp) as max_ts
-        FROM \`${projectId}.${datasetId}.betweenness\`
-        GROUP BY nodeid, type
+    WITH LatestTimestampsForCategory AS (
+      -- Get the latest timestamp for each node specifically for the given type
+      SELECT
+        nodeid,
+        MAX(timestamp) as max_ts
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE type = @categoryType
+      GROUP BY nodeid
     ),
-    LatestStatsPerType AS (
-        SELECT
-            b.nodeid,
-            b.alias, -- Alias at the time of this specific stat
-            b.type,
-            b.shortest_path_share,
-            b.rank,
-            b.timestamp
-        FROM \`${projectId}.${datasetId}.betweenness\` b
-        INNER JOIN LatestTimestamps lt ON b.nodeid = lt.nodeid AND b.type = lt.type AND b.timestamp = lt.max_ts
+    LatestStatsForCategory AS (
+      -- Get the stats (share, rank, alias at that time) for the latest timestamp for the given type
+      SELECT
+        b.nodeid,
+        b.alias AS stat_alias, -- Alias at the time of this specific stat record
+        b.shortest_path_share,
+        b.rank
+      FROM \`${projectId}.${datasetId}.betweenness\` b
+      INNER JOIN LatestTimestampsForCategory lt ON b.nodeid = lt.nodeid AND b.timestamp = lt.max_ts
+      WHERE b.type = @categoryType
     ),
-    LatestOverallAliases AS ( -- Get the very latest alias for each nodeid, regardless of type
-        SELECT
-            nodeid,
-            alias,
-            ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
-        FROM \`${projectId}.${datasetId}.betweenness\`
-        WHERE alias IS NOT NULL AND TRIM(alias) != ''
-    ),
-    PivotedLatestStats AS (
-        SELECT
-            nodeid,
-            MAX(IF(type = 'micro', shortest_path_share, NULL)) as micro_share,
-            MAX(IF(type = 'micro', rank, NULL)) as micro_rank,
-            MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
-            MAX(IF(type = 'common', rank, NULL)) as common_rank,
-            MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share,
-            MAX(IF(type = 'macro', rank, NULL)) as macro_rank
-        FROM LatestStatsPerType
-        GROUP BY nodeid
+    LatestOverallAliases AS (
+      -- Get the absolute latest alias for each nodeid, regardless of type, to ensure freshest alias displayed
+      SELECT
+        nodeid,
+        alias,
+        ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE alias IS NOT NULL AND TRIM(alias) != ''
     )
     SELECT
-        pls.nodeid,
-        loa.alias,
-        pls.micro_share,
-        pls.micro_rank,
-        pls.common_share,
-        pls.common_rank,
-        pls.macro_share,
-        pls.macro_rank
-    FROM PivotedLatestStats pls
-    LEFT JOIN LatestOverallAliases loa ON pls.nodeid = loa.nodeid AND loa.rn = 1    
-    ORDER BY COALESCE(pls.common_share, 0) DESC, COALESCE(pls.common_rank, POWER(2, 32)) ASC -- Handle NULLs in ordering
-    LIMIT @limit
+      lsfc.nodeid,
+      loa.alias, -- Use the latest overall alias
+      lsfc.shortest_path_share AS share,
+      lsfc.rank AS rank
+    FROM LatestStatsForCategory lsfc
+    LEFT JOIN LatestOverallAliases loa ON lsfc.nodeid = loa.nodeid AND loa.rn = 1
+    ORDER BY lsfc.shortest_path_share DESC, lsfc.rank ASC NULLS LAST
+    LIMIT @limitValue
   `;
 
   const options = {
     query: query,
-    params: { limit: limit }
+    params: { categoryType: category, limitValue: limit }
   };
 
   try {
@@ -1108,18 +1095,37 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<Top
     return rows.map(row => ({
       nodeid: String(row.nodeid),
       alias: row.alias ? String(row.alias) : null,
-      micro_share: row.micro_share !== null ? Number(row.micro_share) : null,
-      micro_rank: row.micro_rank !== null ? Number(row.micro_rank) : null,
-      common_share: row.common_share !== null ? Number(row.common_share) : null,
-      common_rank: row.common_rank !== null ? Number(row.common_rank) : null,
-      macro_share: row.macro_share !== null ? Number(row.macro_share) : null,
-      macro_rank: row.macro_rank !== null ? Number(row.macro_rank) : null,
+      share: row.share !== null && row.share !== undefined ? Number(row.share) : null,
+      rank: row.rank !== null && row.rank !== undefined ? Number(row.rank) : null,
     }));
   } catch (error) {
-    logBigQueryError("fetchTopNodesBySubsumption", error);
+    logBigQueryError(`fetchTopNodesForCategory (category: ${category})`, error);
     return [];
   }
 }
+
+export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchTopNodesBySubsumption.");
+    return { micro: [], common: [], macro: [] };
+  }
+  try {
+    const [microNodes, commonNodes, macroNodes] = await Promise.all([
+      fetchTopNodesForCategory('micro', limit),
+      fetchTopNodesForCategory('common', limit),
+      fetchTopNodesForCategory('macro', limit),
+    ]);
+    return {
+      micro: microNodes,
+      common: commonNodes,
+      macro: macroNodes,
+    };
+  } catch (error) {
+    logBigQueryError("fetchTopNodesBySubsumption (combined)", error);
+    return { micro: [], common: [], macro: [] };
+  }
+}
+
 
 export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
   if (!bigquery || !datasetId) {
