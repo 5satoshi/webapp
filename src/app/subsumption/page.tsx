@@ -20,6 +20,7 @@ import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories,
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
+import { TruncatedText } from '@/components/ui/truncated-text';
 
 export default async function SubsumptionPage({
   searchParams
@@ -44,11 +45,8 @@ export default async function SubsumptionPage({
       if (nodeIdFromAlias) {
         currentNodeIdToUse = nodeIdFromAlias;
       }
-      // If alias not found, currentNodeIdToUse remains specificNodeId (our node)
-      // The NodeSelectorForm will still show the user's attempted alias searchInput.
     }
   }
-
 
   const selectedNodeInfo: NodeDisplayInfo | null = await fetchNodeDisplayInfo(currentNodeIdToUse);
   const displayName = selectedNodeInfo?.alias || (selectedNodeInfo?.nodeId ? `${selectedNodeInfo.nodeId.substring(0,10)}...` : 'Selected Node');
@@ -117,25 +115,12 @@ export default async function SubsumptionPage({
     },
   ];
 
-
   return (
     <div className="space-y-6">
       <PageTitle
         title="Routing Analysis"
         description="Understanding a node's position and performance within the broader Lightning Network by analyzing shortest path shares."
       />
-
-      <NodeSelectorForm currentAggregation={currentAggregation} initialNodeId={searchInput} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline">Shortest Path Share & Network Position</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>{introText1}</p>
-          <p>{introText2}</p>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -145,7 +130,7 @@ export default async function SubsumptionPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">{rankingExplanation}</p>
+          <TruncatedText text={rankingExplanation} charLimit={200} />
           {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <ShortestPathCategoryCard
@@ -179,8 +164,14 @@ export default async function SubsumptionPage({
 
       <Card>
         <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="font-headline">{displayName}'s Shortest Path Share Over Time</CardTitle>
+          <CardTitle className="font-headline">Node-Specific Routing Analysis</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <NodeSelectorForm currentAggregation={currentAggregation} initialNodeId={searchInput} />
+
+          <div className="pt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                <h3 className="text-xl font-semibold font-headline">{displayName}'s Shortest Path Share Over Time</h3>
                 <Tabs value={currentAggregation} className="w-full sm:w-auto">
                 <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                     {aggregationPeriodOptions.map(option => (
@@ -191,39 +182,44 @@ export default async function SubsumptionPage({
                 </TabsList>
                 </Tabs>
             </div>
-            <CardDescription>
+            <p className="text-sm text-muted-foreground mb-4">
                 Historical trend of the selected node's shortest path share for micro (200 sats), common (50k sats), and macro (4M sats) payments.
-            </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <NetworkSubsumptionChart data={nodeTimelineData} />
-           <p className="text-xs text-muted-foreground pt-1">
-            This chart visualizes the likelihood of the selected node being part of the cheapest path for different payment sizes over the selected period. A higher percentage suggests better positioning and fee competitiveness for those transaction types. Fluctuations can indicate changes in network topology, fee strategies of other nodes, or the node's own channel management.
-          </p>
+            </p>
+            <NetworkSubsumptionChart data={nodeTimelineData} />
+            <p className="text-xs text-muted-foreground pt-1">
+              This chart visualizes the likelihood of the selected node being part of the cheapest path for different payment sizes over the selected period. A higher percentage suggests better positioning and fee competitiveness for those transaction types. Fluctuations can indicate changes in network topology, fee strategies of other nodes, or the node's own channel management.
+            </p>
+          </div>
+          
+          <div className="pt-4">
+            <h3 className="text-xl font-semibold font-headline mb-2">{displayName}'s Rank (Last {descriptiveLabel})</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Current network rank of the selected node for different payment sizes compared to the start of the selected period. Lower rank is better.
+            </p>
+            {currentNodeIdToUse ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                {nodeRankMetrics.map((metric) => (
+                  <KeyMetricsCard key={metric.id} metric={metric} />
+                ))}
+              </div>
+            ) : (
+              <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Node Not Selected</AlertTitle>
+                  <AlertDescription>Please enter a Node ID or Alias above to see its rank details.</AlertDescription>
+              </Alert>
+            )}
+          </div>
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">{displayName}'s Rank (Last {descriptiveLabel})</CardTitle>
-          <CardDescription>
-            Current network rank of the selected node for different payment sizes compared to the start of the selected period. Lower rank is better.
-          </CardDescription>
+          <CardTitle className="font-headline">About Shortest Path Share</CardTitle>
         </CardHeader>
-        <CardContent>
-          {currentNodeIdToUse ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              {nodeRankMetrics.map((metric) => (
-                <KeyMetricsCard key={metric.id} metric={metric} />
-              ))}
-            </div>
-          ) : (
-            <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>Node Not Selected</AlertTitle>
-                <AlertDescription>Please enter a Node ID or Alias above to see its rank details.</AlertDescription>
-            </Alert>
-          )}
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <p>{introText1}</p>
+          <p>{introText2}</p>
         </CardContent>
       </Card>
 
