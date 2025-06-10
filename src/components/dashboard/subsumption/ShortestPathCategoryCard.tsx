@@ -12,7 +12,7 @@ interface ShortestPathCategoryCardProps {
   title: string;
   paymentSizeLabel: string;
   nodes: SingleCategoryTopNode[];
-  categoryType: 'micro' | 'common' | 'macro'; // Keep for potential future styling based on type
+  categoryType: 'micro' | 'common' | 'macro';
 }
 
 const formatShare = (share: number | null): string => {
@@ -27,8 +27,9 @@ const formatRankDisplay = (rank: number | null): string => {
 
 const getNodeDisplay = (node: SingleCategoryTopNode): string => {
   if (node.alias) {
-    return node.alias.length > 20 ? `${node.alias.substring(0, 17)}...` : node.alias;
+    return node.alias; // CSS will handle truncation
   }
+  // Fallback to formatted Node ID if no alias
   return `${node.nodeid.substring(0, 8)}...${node.nodeid.substring(node.nodeid.length - 8)}`;
 };
 
@@ -44,12 +45,13 @@ export function ShortestPathCategoryCard({ title, paymentSizeLabel, nodes, categ
       <CardContent className="flex-grow">
         {nodes.length > 0 ? (
           <TooltipProvider>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto"> {/* This div will scroll if table content is too wide */}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[30px] p-2 text-xs">#</TableHead>
                     <TableHead className="p-2 text-xs">Node</TableHead>
+                    <TableHead className="p-2 text-xs text-right md:hidden">Share</TableHead> 
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -59,15 +61,16 @@ export function ShortestPathCategoryCard({ title, paymentSizeLabel, nodes, categ
                         <TableRow className="cursor-default hover:bg-muted/50 transition-colors">
                           <TableCell className="p-2 text-sm">{index + 1}</TableCell>
                           <TableCell className="font-medium p-2 text-sm">
-                            <span className="truncate block">
+                            <span className="block truncate max-w-[18ch] md:max-w-[10ch] lg:max-w-[12ch] xl:max-w-[15ch]">
                                 {getNodeDisplay(node)}
                             </span>
                           </TableCell>
+                          <TableCell className="text-right p-2 text-sm md:hidden">{formatShare(node.share)}</TableCell>
                         </TableRow>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" align="center" className="w-auto p-3 bg-popover text-popover-foreground shadow-md rounded-md border">
+                      <TooltipContent side="bottom" align="center" className="w-auto p-3 bg-popover text-popover-foreground shadow-md rounded-md border max-w-xs sm:max-w-sm">
                         <div className="space-y-1 text-sm text-left">
-                            <div className="font-semibold">{node.alias || 'Unknown Alias'}</div>
+                            <div className="font-semibold truncate">{node.alias || 'Unknown Alias'}</div>
                             <div className="text-xs text-muted-foreground break-all">{node.nodeid}</div>
                             <Separator className="my-1.5 bg-border" />
                             <div><strong>Share:</strong> {formatShare(node.share)}</div>
@@ -87,3 +90,4 @@ export function ShortestPathCategoryCard({ title, paymentSizeLabel, nodes, categ
     </Card>
   );
 }
+
