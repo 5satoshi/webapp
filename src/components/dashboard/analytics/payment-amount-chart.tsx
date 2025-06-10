@@ -35,21 +35,33 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
   let yAxisDomainForValueChart: [number, number] = [1, 1000]; // Default fallback
 
   if (forwardingValueData && forwardingValueData.length > 0) {
-    const allPositiveValues = forwardingValueData
-      .flatMap(d => [d.medianValue, d.maxValue])
+    const allPositiveMedianValues = forwardingValueData
+      .map(d => d.medianValue)
+      .filter(v => typeof v === 'number' && v > 0);
+    
+    const allPositiveMaxValues = forwardingValueData
+      .map(d => d.maxValue)
       .filter(v => typeof v === 'number' && v > 0);
 
-    if (allPositiveValues.length > 0) {
-      const minDataPoint = Math.min(...allPositiveValues);
-      const maxDataPoint = Math.max(...allPositiveValues);
+    const allOverallPositiveValues = [...allPositiveMedianValues, ...allPositiveMaxValues];
 
-      const domainMin = Math.max(1, Math.floor(minDataPoint / 2));
-      let domainMax = Math.ceil(maxDataPoint * 2);
+    if (allOverallPositiveValues.length > 0) {
+      let minMedianPointForScaling = 1; 
+      if (allPositiveMedianValues.length > 0) {
+        minMedianPointForScaling = Math.min(...allPositiveMedianValues);
+      } else { 
+        minMedianPointForScaling = Math.min(...allOverallPositiveValues); // Use overall min if no positive medians
+      }
+      
+      const maxOverallDataPoint = Math.max(...allOverallPositiveValues);
+
+      const domainMin = Math.max(1, Math.floor(minMedianPointForScaling / 4));
+      let domainMax = Math.ceil(maxOverallDataPoint * 2);
       
       if (domainMax <= domainMin) { 
-        domainMax = Math.max(10, domainMin * 10); 
+        domainMax = Math.max(domainMin * 10, 10); 
         if (domainMax <= domainMin) {
-            domainMax = Math.max(100, domainMin + 100); 
+            domainMax = Math.max(domainMin + 100, 100); 
         }
       }
       
@@ -59,7 +71,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
 
 
   return (
-    <div className="space-y-8"> {/* Changed from grid to space-y-8 for full-width stacking */}
+    <div className="space-y-8">
       <div>
         <h3 className="text-md font-semibold mb-2 font-headline text-center">
           Forwarding Size Volume ({frequencyChartTitleLabel})
