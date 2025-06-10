@@ -3,18 +3,17 @@
 
 import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
-import { 
-  format, 
-  startOfWeek, startOfMonth, startOfQuarter, 
-  endOfDay, endOfWeek, endOfMonth, endOfQuarter, 
-  parseISO, 
+import {
+  format,
+  startOfWeek, startOfMonth, startOfQuarter,
+  endOfDay, endOfWeek, endOfMonth, endOfQuarter,
+  parseISO,
   subDays, subWeeks, subMonths, subQuarters, startOfDay
 } from 'date-fns';
-import { specificNodeId } from '@/lib/constants'; // Import the constant
+import { specificNodeId } from '@/lib/constants';
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
-// specificNodeId is now imported
 
 let bigquery: BigQuery | undefined;
 
@@ -70,14 +69,14 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
 
   if (typeof (timestamp as { value: string }).value === 'string') {
     const bqValue = (timestamp as { value: string }).value;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) { 
-        dateToFormat = parseISO(bqValue + 'T00:00:00Z'); 
+    if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) {
+        dateToFormat = parseISO(bqValue + 'T00:00:00Z');
     } else {
-        dateToFormat = parseISO(bqValue); 
+        dateToFormat = parseISO(bqValue);
     }
   } else if (typeof timestamp === 'string') {
-     if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) { 
-        dateToFormat = parseISO(timestamp + 'T00:00:00Z'); 
+     if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+        dateToFormat = parseISO(timestamp + 'T00:00:00Z');
     } else {
         dateToFormat = parseISO(timestamp);
     }
@@ -87,12 +86,12 @@ function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | stri
     console.warn("Unexpected date format in formatDateFromBQ. Received:", JSON.stringify(timestamp), "Returning today's date as fallback.");
     dateToFormat = new Date();
   }
-  
+
   if (isNaN(dateToFormat.getTime())) {
     console.warn("Failed to parse date in formatDateFromBQ. Original value:", JSON.stringify(timestamp), "Returning today's date as fallback.");
     return format(new Date(), 'yyyy-MM-dd');
   }
-  
+
   return format(dateToFormat, 'yyyy-MM-dd');
 }
 
@@ -100,22 +99,22 @@ function mapChannelStatus(state: string | null | undefined): Channel['status'] {
   if (!state) return 'inactive';
   const normalizedState = state.toUpperCase();
   switch (normalizedState) {
-    case 'CHANNELD_NORMAL': 
-    case 'DUALOPEND_NORMAL': 
+    case 'CHANNELD_NORMAL':
+    case 'DUALOPEND_NORMAL':
       return 'active';
-    case 'OPENINGD': 
-    case 'CHANNELD_AWAITING_LOCKIN': 
-    case 'DUALOPEND_OPEN_INIT': 
-    case 'DUALOPEND_AWAITING_LOCKIN': 
+    case 'OPENINGD':
+    case 'CHANNELD_AWAITING_LOCKIN':
+    case 'DUALOPEND_OPEN_INIT':
+    case 'DUALOPEND_AWAITING_LOCKIN':
       return 'pending';
-    case 'CHANNELD_SHUTTING_DOWN': 
-    case 'CLOSINGD_SIGEXCHANGE': 
-    case 'CLOSINGD_COMPLETE': 
-    case 'AWAITING_UNILATERAL': 
-    case 'FUNDING_SPEND_SEEN': 
-    case 'ONCHAIN': 
-    case 'DISCONNECTED': 
-    case 'CLOSED': 
+    case 'CHANNELD_SHUTTING_DOWN':
+    case 'CLOSINGD_SIGEXCHANGE':
+    case 'CLOSINGD_COMPLETE':
+    case 'AWAITING_UNILATERAL':
+    case 'FUNDING_SPEND_SEEN':
+    case 'ONCHAIN':
+    case 'DISCONNECTED':
+    case 'CLOSED':
       return 'inactive';
     default:
       return 'inactive';
@@ -150,24 +149,24 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     WHERE status = 'settled'
   `;
   const connectedPeersQuery = `
-    SELECT COUNT(DISTINCT id) as connected_peers 
-    FROM \`${projectId}.${datasetId}.peers\` 
+    SELECT COUNT(DISTINCT id) as connected_peers
+    FROM \`${projectId}.${datasetId}.peers\`
     WHERE state = 'CHANNELD_NORMAL' OR state = 'DUALOPEND_NORMAL'
   `;
-  
+
   try {
     const [forwardsJob] = await bigquery.createQueryJob({ query: forwardsQuery });
     const [[forwardsResult]] = await forwardsJob.getQueryResults();
-    
+
     const [feesJob] = await bigquery.createQueryJob({ query: feesQuery });
     const [[feesResult]] = await feesJob.getQueryResults();
 
     const [totalForwardingVolumeJob] = await bigquery.createQueryJob({ query: totalForwardingVolumeQuery });
     const [[totalForwardingVolumeResult]] = await totalForwardingVolumeJob.getQueryResults();
-    
+
     const [connectedPeersJob] = await bigquery.createQueryJob({ query: connectedPeersQuery });
     const [[connectedPeersResult]] = await connectedPeersJob.getQueryResults();
-        
+
     const totalForwards = Number(forwardsResult?.total_forwards || 0);
     const totalFeesMsat = Number(feesResult?.total_fees_msat || 0);
     const totalForwardingVolumeMsat = Number(totalForwardingVolumeResult?.total_volume_msat || 0);
@@ -234,7 +233,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
     ORDER BY date_group DESC
     LIMIT ${limit}
   `;
-  
+
   try {
     const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
@@ -245,21 +244,21 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
 
     const formattedAndSortedRows = rows.map(row => {
       if (!row || row.date_group === null || row.date_group === undefined) {
-        return null; 
+        return null;
       }
       return {
-        date: formatDateFromBQ(row.date_group), 
+        date: formatDateFromBQ(row.date_group),
         forwardingVolume: Number(row.total_volume_msat || 0) / 100000000000, // msat to BTC
         transactionCount: Number(row.transaction_count || 0),
       };
     }).filter(item => item !== null)
-      .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime()); 
-    
+      .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime());
+
     return formattedAndSortedRows as TimeSeriesData[];
 
   } catch (error) {
     logBigQueryError(`fetchHistoricalForwardingVolume (aggregation: ${aggregationPeriod})`, error);
-    return []; 
+    return [];
   }
 }
 
@@ -293,7 +292,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         GROUP BY in_channel
         UNION ALL
         SELECT
-          out_channel as scid, 
+          out_channel as scid,
           COUNTIF(status = 'settled') as successful_forwards,
           COUNT(*) as total_forwards
         FROM \`${projectId}.${datasetId}.forwardings\`
@@ -304,16 +303,16 @@ export async function fetchChannels(): Promise<Channel[]> {
       GROUP BY scid
     )
     SELECT
-      p.id as peer_node_id,        
-      p.funding_txid,        
+      p.id as peer_node_id,
+      p.funding_txid,
       p.funding_outnum,
-      p.short_channel_id, 
-      p.msatoshi_total,      
-      p.msatoshi_to_us,      
+      p.short_channel_id,
+      p.msatoshi_total,
+      p.msatoshi_to_us,
       p.state,
       la.alias AS peer_alias,
       COALESCE(cfs.successful_forwards, 0) as successful_forwards_count,
-      COALESCE(cfs.total_forwards, 0) as total_forwards_count           
+      COALESCE(cfs.total_forwards, 0) as total_forwards_count
     FROM \`${projectId}.${datasetId}.peers\` p
     LEFT JOIN LatestAliases la ON p.id = la.nodeid AND la.rn = 1
     LEFT JOIN ChannelForwardingStats cfs ON p.short_channel_id = cfs.scid
@@ -331,13 +330,13 @@ export async function fetchChannels(): Promise<Channel[]> {
     return rows.map(row => {
       const msatTotal = Number(row.msatoshi_total || 0);
       const msatToUs = Number(row.msatoshi_to_us || 0);
-      
+
       const capacitySats = Math.floor(msatTotal / 1000);
       const localBalanceSats = Math.floor(msatToUs / 1000);
       const remoteBalanceSats = Math.floor((msatTotal - msatToUs) / 1000);
-      
-      const channelIdString = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined) 
-                        ? `${row.funding_txid}:${row.funding_outnum}` 
+
+      const channelIdString = (row.funding_txid && row.funding_outnum !== null && row.funding_outnum !== undefined)
+                        ? `${row.funding_txid}:${row.funding_outnum}`
                         : `peer-${row.peer_node_id || 'unknown'}-${Math.random().toString(36).substring(2, 9)}`;
 
       const successfulForwards = Number(row.successful_forwards_count || 0);
@@ -350,9 +349,9 @@ export async function fetchChannels(): Promise<Channel[]> {
       } else {
         successRate = channelStatus === 'active' ? 100 : 0;
       }
-      
+
       return {
-        id: channelIdString, 
+        id: channelIdString,
         shortChannelId: row.short_channel_id ? String(row.short_channel_id) : null,
         peerNodeId: String(row.peer_node_id || 'unknown-peer-id'),
         peerAlias: row.peer_alias || undefined,
@@ -360,15 +359,15 @@ export async function fetchChannels(): Promise<Channel[]> {
         localBalance: localBalanceSats,
         remoteBalance: remoteBalanceSats,
         status: channelStatus,
-        historicalPaymentSuccessRate: successRate, 
-        lastUpdate: new Date().toISOString(), 
+        historicalPaymentSuccessRate: successRate,
+        lastUpdate: new Date().toISOString(),
         uptime: 0, // Placeholder, as uptime is not directly available from this query
       };
     });
 
   } catch (error) {
     logBigQueryError("fetchChannels", error);
-    return []; 
+    return [];
   }
 }
 
@@ -396,7 +395,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
       SELECT
         MIN(IF(f.status = 'settled', f.received_time, NULL)) AS first_tx_timestamp_bq_val,
         MAX(IF(f.status = 'settled', COALESCE(f.resolved_time, f.received_time), NULL)) AS last_tx_timestamp_bq_val,
-        
+
         COUNTIF(f.status = 'settled') AS total_tx_count_val,
 
         SUM(IF(f.in_channel = @shortChannelId AND f.status = 'settled', 1, 0)) AS in_tx_count_successful_val,
@@ -406,7 +405,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         SUM(IF(f.out_channel = @shortChannelId AND f.status = 'settled', 1, 0)) AS out_tx_count_successful_val,
         SUM(IF(f.out_channel = @shortChannelId, 1, 0)) AS out_tx_count_total_attempts_val,
         SUM(IF(f.out_channel = @shortChannelId AND f.status = 'settled', COALESCE(f.out_msat, 0), 0)) AS out_tx_volume_msat_val,
-        
+
         SUM(IF(f.out_channel = @shortChannelId AND f.status = 'settled', COALESCE(f.fee_msat, 0), 0)) AS total_fees_earned_on_this_channel_msat_val
       FROM ForwardingsForChannel f
     )
@@ -414,24 +413,24 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
       agg.first_tx_timestamp_bq_val AS first_tx_timestamp_bq,
       agg.last_tx_timestamp_bq_val AS last_tx_timestamp_bq,
       COALESCE(agg.total_tx_count_val, 0) as total_tx_count,
-      
+
       COALESCE(agg.in_tx_count_successful_val, 0) as in_tx_count,
       COALESCE(agg.in_tx_volume_msat_val, 0) as in_tx_volume_msat,
       IF(COALESCE(agg.in_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.in_tx_count_successful_val, 0) * 100.0, COALESCE(agg.in_tx_count_total_attempts_val, 0)), 0) AS in_success_rate,
-      
+
       COALESCE(agg.out_tx_count_successful_val, 0) as out_tx_count,
       COALESCE(agg.out_tx_volume_msat_val, 0) as out_tx_volume_msat,
       IF(COALESCE(agg.out_tx_count_total_attempts_val, 0) > 0, SAFE_DIVIDE(COALESCE(agg.out_tx_count_successful_val, 0) * 100.0, COALESCE(agg.out_tx_count_total_attempts_val, 0)), 0) AS out_success_rate,
 
       COALESCE(agg.total_fees_earned_on_this_channel_msat_val, 0) as total_fees_earned_msat,
-      
+
       p.updates.local.fee_base_msat as our_node_fee_base_msat,
       p.updates.local.fee_proportional_millionths as our_node_fee_ppm
-    FROM 
+    FROM
       \`${projectId}.${datasetId}.peers\` p
-    CROSS JOIN 
+    CROSS JOIN
       AggregatedForwardingStats agg
-    WHERE 
+    WHERE
       p.short_channel_id = @shortChannelId
     LIMIT 1
   `;
@@ -446,7 +445,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
     const [rows] = await job.getQueryResults();
 
     if (!rows || rows.length === 0 || !rows[0]) {
-      return { 
+      return {
         shortChannelId: shortChannelId,
         firstTxTimestamp: null,
         lastTxTimestamp: null,
@@ -461,7 +460,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
         ourAdvertisedPolicy: null,
       };
     }
-    
+
     const result = rows[0];
 
     const ourNodeBaseMsat = result.our_node_fee_base_msat;
@@ -500,29 +499,29 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
 
 function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
-  const yesterday = endOfDay(subDays(now, 1)); 
+  const yesterday = endOfDay(subDays(now, 1));
   let startOfPeriod: Date;
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': 
+    case 'day':
       startOfPeriod = startOfDay(subDays(now, 1));
       break;
-    case 'week': 
+    case 'week':
       startOfPeriod = startOfDay(subDays(now, 7));
       break;
-    case 'month': 
+    case 'month':
       startOfPeriod = startOfDay(subDays(now, 30));
       break;
-    case 'quarter': 
+    case 'quarter':
       startOfPeriod = startOfDay(subDays(now, 90));
       break;
-    default: 
-      startOfPeriod = startOfDay(subDays(now, 1)); 
+    default:
+      startOfPeriod = startOfDay(subDays(now, 1));
       break;
   }
-  return { 
-    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"), 
-    endDate: format(yesterday, "yyyy-MM-dd'T'HH:mm:ssXXX") 
+  return {
+    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+    endDate: format(yesterday, "yyyy-MM-dd'T'HH:mm:ssXXX")
   };
 }
 
@@ -531,7 +530,7 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
     console.error("BigQuery client not initialized or datasetId missing for fetchPeriodForwardingSummary.");
     return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, forwardsProcessedCount: 0 };
   }
-  
+
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
 
   const query = `
@@ -575,21 +574,21 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
 
   const openingOrActiveStates = [
-    'OPENINGD', 'CHANNELD_AWAITING_LOCKIN', 'DUALOPEND_OPEN_INIT', 
+    'OPENINGD', 'CHANNELD_AWAITING_LOCKIN', 'DUALOPEND_OPEN_INIT',
     'DUALOPEND_AWAITING_LOCKIN', 'CHANNELD_NORMAL', 'DUALOPEND_NORMAL'
   ];
   const closingOrClosedStates = [
-    'CHANNELD_SHUTTING_DOWN', 'CLOSINGD_SIGEXCHANGE', 'CLOSINGD_COMPLETE', 
+    'CHANNELD_SHUTTING_DOWN', 'CLOSINGD_SIGEXCHANGE', 'CLOSINGD_COMPLETE',
     'AWAITING_UNILATERAL', 'FUNDING_SPEND_SEEN', 'ONCHAIN', 'CLOSED'
   ];
 
   const query = `
     WITH ChannelStateChangesInPeriod AS (
       SELECT
-        p.id as peer_id, 
+        p.id as peer_id,
         p.funding_txid,
         p.funding_outnum,
-        TIMESTAMP(change.timestamp) as change_timestamp, 
+        TIMESTAMP(change.timestamp) as change_timestamp,
         change.new_state
       FROM
         \`${projectId}.${datasetId}.peers\` p,
@@ -600,11 +599,11 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
       (SELECT COUNT(DISTINCT CONCAT(csc.funding_txid, ':', CAST(csc.funding_outnum AS STRING))) FROM ChannelStateChangesInPeriod csc WHERE csc.new_state IN UNNEST(@openingOrActiveStates)) as opened_count,
       (SELECT COUNT(DISTINCT CONCAT(csc.funding_txid, ':', CAST(csc.funding_outnum AS STRING))) FROM ChannelStateChangesInPeriod csc WHERE csc.new_state IN UNNEST(@closingOrClosedStates)) as closed_count
   `;
-  
+
   const options = {
     query: query,
-    params: { 
-      startDate: startDate, 
+    params: {
+      startDate: startDate,
       endDate: endDate,
       openingOrActiveStates: openingOrActiveStates,
       closingOrClosedStates: closingOrClosedStates
@@ -615,7 +614,7 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
     const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
     const result = rows[0] || {};
-    
+
     return {
       openedCount: Number(result.opened_count || 0),
       closedCount: Number(result.closed_count || 0),
@@ -665,7 +664,7 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
     });
     const [[previousRankResult]] = await previousRankJob.getQueryResults();
     const previousRank = previousRankResult?.rank !== undefined && previousRankResult?.rank !== null ? Number(previousRankResult.rank) : null;
-    
+
     return { latestRank, previousRank };
 
   } catch (error) {
@@ -843,7 +842,7 @@ export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod
       limit = 30; // Approx 1 month of daily data
       break;
   }
-  
+
   const query = `
     SELECT
       ${dateGroupingExpression} AS date_group,
@@ -865,7 +864,7 @@ export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod
     if (!rows || rows.length === 0) {
       return [];
     }
-    
+
     const formattedAndSortedRows = rows.map(row => {
        if (!row || row.date_group === null || row.date_group === undefined) {
         return null;
@@ -905,10 +904,10 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     case 'month': // Corresponds to "Last 3 Months" title in chart
-      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3-1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     case 'quarter': // Corresponds to "Last 12 Months" title in chart
-      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12-1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
+      queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12-1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
     default: // Fallback to last 7 days for heatmap if period is unknown
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -925,7 +924,7 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
       COUNTIF(status != 'settled') AS failed_forwards
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE
-      received_time >= TIMESTAMP(@startDate) 
+      received_time >= TIMESTAMP(@startDate)
       AND received_time <= TIMESTAMP(@endDate)
     GROUP BY
       day_of_week,
@@ -1017,7 +1016,7 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
   try {
     const [job] = await bigquery.createQueryJob({ query });
     const [rows] = await job.getQueryResults();
-    
+
     if (!rows || rows.length === 0) {
         return [];
     }
@@ -1158,7 +1157,7 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
       startDate = format(startOfDay(subDays(now, 30)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 30 days
       break;
   }
-  
+
   const query = `
     SELECT
       DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}) AS date_group,
@@ -1166,17 +1165,17 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
       MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
       MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share
     FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @nodeId
+    WHERE nodeid = @nodeIdToQuery
       AND timestamp >= TIMESTAMP(@startDate)
       AND timestamp <= TIMESTAMP(@endDate)
     GROUP BY date_group
     ORDER BY date_group ASC
   `;
-  
+
   const options = {
     query: query,
     params: {
-      nodeId: nodeId,
+      nodeIdToQuery: nodeId,
       startDate: startDate,
       endDate: endDate,
     }
@@ -1216,7 +1215,7 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
   }
 
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
-  
+
   const categories: Array<'micro' | 'common' | 'macro'> = ['micro', 'common', 'macro'];
 
   for (const category of categories) {
@@ -1243,7 +1242,7 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
       });
       const [[latestRankResult]] = await latestRankJob.getQueryResults();
       const latestRank = latestRankResult?.rank !== undefined && latestRankResult?.rank !== null ? Number(latestRankResult.rank) : null;
-      
+
       result[category].latestRank = latestRank;
 
       const [previousRankJob] = await bigquery.createQueryJob({
@@ -1275,6 +1274,7 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
     SELECT alias
     FROM \`${projectId}.${datasetId}.betweenness\`
     WHERE nodeid = @nodeIdToQuery
+      AND alias IS NOT NULL AND TRIM(alias) != ''
     ORDER BY timestamp DESC
     LIMIT 1
   `;
@@ -1287,15 +1287,47 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
     const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
-    if (rows && rows.length > 0 && rows[0]) {
+    if (rows && rows.length > 0 && rows[0] && rows[0].alias) {
       return {
         nodeId: nodeId,
-        alias: rows[0].alias ? String(rows[0].alias) : null,
+        alias: String(rows[0].alias),
       };
     }
-    return { nodeId: nodeId, alias: null }; // Return with Node ID even if alias not found
+    return { nodeId: nodeId, alias: null }; // Return with Node ID even if alias not found or is empty
   } catch (error) {
     logBigQueryError(`fetchNodeDisplayInfo (nodeId: ${nodeId})`, error);
     return { nodeId: nodeId, alias: null }; // Return with Node ID on error
+  }
+}
+
+export async function fetchNodeIdByAlias(alias: string): Promise<string | null> {
+  if (!bigquery || !datasetId || !alias || alias.trim() === '') {
+    console.error("BigQuery client not initialized, datasetId missing, or alias not provided for fetchNodeIdByAlias.");
+    return null;
+  }
+
+  const query = `
+    SELECT nodeid
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE alias = @aliasToQuery
+    ORDER BY timestamp DESC
+    LIMIT 1
+  `;
+  const options = {
+    query: query,
+    params: { aliasToQuery: alias.trim() }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    if (rows && rows.length > 0 && rows[0] && rows[0].nodeid) {
+      return String(rows[0].nodeid);
+    }
+    return null; // Alias not found
+  } catch (error) {
+    logBigQueryError(`fetchNodeIdByAlias (alias: ${alias})`, error);
+    return null;
   }
 }

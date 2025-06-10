@@ -8,43 +8,61 @@ import { NetworkSubsumptionChart } from '@/components/dashboard/analytics/networ
 import { ShortestPathCategoryCard } from '@/components/dashboard/subsumption/ShortestPathCategoryCard';
 import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card';
 import { NodeSelectorForm } from '@/components/dashboard/subsumption/NodeSelectorForm';
-import { 
+import {
   fetchTopNodesBySubsumption,
-  fetchNetworkSubsumptionDataForNode, 
-  fetchNodeRankForCategories,       
-  fetchNodeDisplayInfo
+  fetchNetworkSubsumptionDataForNode,
+  fetchNodeRankForCategories,
+  fetchNodeDisplayInfo,
+  fetchNodeIdByAlias
 } from '@/services/nodeService';
-import { specificNodeId } from '@/lib/constants'; // Import the default node ID from constants
+import { specificNodeId } from '@/lib/constants';
 import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric, NodeDisplayInfo } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
 
-export default async function SubsumptionPage({ 
-  searchParams 
-}: { 
-  searchParams?: { aggregation?: string; nodeId?: string; } 
+export default async function SubsumptionPage({
+  searchParams
+}: {
+  searchParams?: { aggregation?: string; nodeId?: string; }
 }) {
-  
-  let currentAggregation = searchParams?.aggregation || 'week'; // Default to 'week'
+
+  let currentAggregation = searchParams?.aggregation || 'week';
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'week'; // Fallback if invalid param
+    currentAggregation = 'week';
   }
 
-  const currentNodeId = searchParams?.nodeId || specificNodeId;
-  const selectedNodeInfo: NodeDisplayInfo | null = await fetchNodeDisplayInfo(currentNodeId);
+  const searchInput = searchParams?.nodeId || specificNodeId;
+  let currentNodeIdToUse = specificNodeId;
+
+  if (searchInput && searchInput !== specificNodeId) {
+    const isLikelyNodeId = searchInput.length === 66 && /^(02|03)[0-9a-fA-F]{64}$/.test(searchInput);
+    if (isLikelyNodeId) {
+      currentNodeIdToUse = searchInput;
+    } else {
+      const nodeIdFromAlias = await fetchNodeIdByAlias(searchInput);
+      if (nodeIdFromAlias) {
+        currentNodeIdToUse = nodeIdFromAlias;
+      }
+      // If alias not found, currentNodeIdToUse remains specificNodeId (our node)
+      // The NodeSelectorForm will still show the user's attempted alias searchInput.
+    }
+  }
+
+
+  const selectedNodeInfo: NodeDisplayInfo | null = await fetchNodeDisplayInfo(currentNodeIdToUse);
   const displayName = selectedNodeInfo?.alias || (selectedNodeInfo?.nodeId ? `${selectedNodeInfo.nodeId.substring(0,10)}...` : 'Selected Node');
 
   const topNodesData: AllTopNodes = await fetchTopNodesBySubsumption(3);
-  const nodeTimelineData: NetworkSubsumptionData[] = await fetchNetworkSubsumptionDataForNode(currentNodeId, currentAggregation);
-  const nodeRanks: OurNodeRanksForAllCategories = await fetchNodeRankForCategories(currentNodeId, currentAggregation);
+  const nodeTimelineData: NetworkSubsumptionData[] = await fetchNetworkSubsumptionDataForNode(currentNodeIdToUse, currentAggregation);
+  const nodeRanks: OurNodeRanksForAllCategories = await fetchNodeRankForCategories(currentNodeIdToUse, currentAggregation);
 
   const introText1 = `How do the activity numbers of a node compare to the overall network? This section brings more light into that by looking at the total network graph, with all its channels and routing fees.`;
   const introText2 = `It’s possible to calculate the share of 'cheapest' (shortest) paths per node a transaction is optimally taking through the network. This calculation is dependent on the size of the transaction. We’re presenting the share for a common transaction (50,000sat), a micro transaction (200sat) and a macro transaction (4,000,000sat). Also we show, how this share changes over time for these payment sizes.`;
-  
+
   const rankingExplanation = `There are a couple of node ranking solutions available that try to introduce some arbitrary logic to define good quality of a node. Some of them are proprietary and closed, which opens the door for manipulation. Here we’re introducing another ranking mechanism that is leveraging standard graph analytics tools. Because every sender is aiming to find the cheapest route, it is most obvious to make use of shortest path finding algorithms for weighted directed graphs. The "Shortest Path Share" indicates how often a node is part of such an optimal, cheapest path for a given payment size.`;
 
-  let descriptiveLabel = '7 Days'; // Default for week
+  let descriptiveLabel = '7 Days';
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
     switch (currentAggregation) {
@@ -61,7 +79,7 @@ export default async function SubsumptionPage({
         descriptiveLabel = '90 Days';
         break;
       default:
-        descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
+        descriptiveLabel = selectedOption.label.replace(/s$/, '');
         break;
     }
   }
@@ -73,7 +91,7 @@ export default async function SubsumptionPage({
       displayValue: nodeRanks.micro.latestRank !== null ? `${nodeRanks.micro.latestRank}${getOrdinalSuffix(nodeRanks.micro.latestRank)}` : 'N/A',
       iconName: 'LineChart',
       absoluteChange: nodeRanks.micro.rankChange,
-      absoluteChangeDescription: ``, 
+      absoluteChangeDescription: ``,
       absoluteChangeDirection: 'lower_is_better',
       description: `Rank for micro (200 sats) payments.`,
     },
@@ -102,12 +120,12 @@ export default async function SubsumptionPage({
 
   return (
     <div className="space-y-6">
-      <PageTitle 
-        title="Routing Analysis" 
-        description="Understanding a node's position and performance within the broader Lightning Network by analyzing shortest path shares." 
+      <PageTitle
+        title="Routing Analysis"
+        description="Understanding a node's position and performance within the broader Lightning Network by analyzing shortest path shares."
       />
 
-      <NodeSelectorForm currentAggregation={currentAggregation} initialNodeId={currentNodeId} />
+      <NodeSelectorForm currentAggregation={currentAggregation} initialNodeId={searchInput} />
 
       <Card>
         <CardHeader>
@@ -130,20 +148,20 @@ export default async function SubsumptionPage({
           <p className="text-sm text-muted-foreground">{rankingExplanation}</p>
           {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <ShortestPathCategoryCard 
-                title="Micro" 
+              <ShortestPathCategoryCard
+                title="Micro"
                 paymentSizeLabel="(200 sats)"
                 nodes={topNodesData.micro}
                 categoryType="micro"
               />
-              <ShortestPathCategoryCard 
-                title="Common" 
+              <ShortestPathCategoryCard
+                title="Common"
                 paymentSizeLabel="(50k sats)"
                 nodes={topNodesData.common}
                 categoryType="common"
               />
-              <ShortestPathCategoryCard 
-                title="Macro" 
+              <ShortestPathCategoryCard
+                title="Macro"
                 paymentSizeLabel="(4M sats)"
                 nodes={topNodesData.macro}
                 categoryType="macro"
@@ -167,7 +185,7 @@ export default async function SubsumptionPage({
                 <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                     {aggregationPeriodOptions.map(option => (
                     <TabsTrigger key={option.value} value={option.value} asChild>
-                        <Link href={`/subsumption?aggregation=${option.value}${currentNodeId !== specificNodeId ? `&nodeId=${currentNodeId}` : ''}`}>{option.label}</Link>
+                        <Link href={`/subsumption?aggregation=${option.value}${searchInput !== specificNodeId ? `&nodeId=${encodeURIComponent(searchInput)}` : ''}`}>{option.label}</Link>
                     </TabsTrigger>
                     ))}
                 </TabsList>
@@ -193,7 +211,7 @@ export default async function SubsumptionPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {currentNodeId ? (
+          {currentNodeIdToUse ? (
             <div className="grid gap-4 md:grid-cols-3">
               {nodeRankMetrics.map((metric) => (
                 <KeyMetricsCard key={metric.id} metric={metric} />
@@ -203,7 +221,7 @@ export default async function SubsumptionPage({
             <Alert>
                 <Info className="h-4 w-4" />
                 <AlertTitle>Node Not Selected</AlertTitle>
-                <AlertDescription>Please enter a Node ID above to see its rank details.</AlertDescription>
+                <AlertDescription>Please enter a Node ID or Alias above to see its rank details.</AlertDescription>
             </Alert>
           )}
         </CardContent>
