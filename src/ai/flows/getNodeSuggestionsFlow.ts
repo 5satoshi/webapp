@@ -4,9 +4,9 @@
  * @fileOverview Provides autocomplete suggestions for node IDs and aliases.
  *
  * - getNodeSuggestions - Fetches suggestions based on a search term.
- * - GetNodeSuggestionsInputSchema - Input schema for the flow.
- * - NodeSuggestionSchema - Schema for a single suggestion.
- * - GetNodeSuggestionsOutputSchema - Output schema for the flow.
+ * - GetNodeSuggestionsInput - Input type for the getNodeSuggestions function.
+ * - NodeSuggestion - Type for a single suggestion.
+ * - GetNodeSuggestionsOutput - Output type for the getNodeSuggestions function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,7 +17,6 @@ const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
 
 // Initialize BigQuery client.
-// This might be better configured globally or passed if running in diverse Genkit environments.
 let bqInstance: BigQuery | undefined;
 function getBigQueryClient() {
   if (!bqInstance) {
@@ -31,19 +30,19 @@ function getBigQueryClient() {
   return bqInstance;
 }
 
-export const GetNodeSuggestionsInputSchema = z.object({
+const GetNodeSuggestionsInputSchema = z.object({
   searchTerm: z.string().min(2, "Search term must be at least 2 characters long."),
 });
 export type GetNodeSuggestionsInput = z.infer<typeof GetNodeSuggestionsInputSchema>;
 
-export const NodeSuggestionSchema = z.object({
+const NodeSuggestionSchema = z.object({
   value: z.string(), // The actual node ID or full alias
   display: z.string(), // What's shown in the dropdown (e.g., truncated ID or alias)
   type: z.enum(['alias', 'nodeId']),
 });
 export type NodeSuggestion = z.infer<typeof NodeSuggestionSchema>;
 
-export const GetNodeSuggestionsOutputSchema = z.array(NodeSuggestionSchema);
+const GetNodeSuggestionsOutputSchema = z.array(NodeSuggestionSchema);
 export type GetNodeSuggestionsOutput = z.infer<typeof GetNodeSuggestionsOutputSchema>;
 
 
@@ -156,7 +155,9 @@ export async function getNodeSuggestions(input: GetNodeSuggestionsInput): Promis
   if (!input.searchTerm || input.searchTerm.trim().length < 2) {
     return [];
   }
-  // Directly call the BQ fetch logic for server actions to ensure proper context
-  // This avoids potential issues with Genkit flow runner context in Next.js server actions.
+  // Directly call the BQ fetch logic. For server actions, Genkit flow runner isn't strictly necessary
+  // if this is the only operation. If more complex Genkit features were used (e.g., traces, auth handling specific to Genkit),
+  // then calling 'getNodeSuggestionsFlowRunner(input)' would be preferable.
+  // For direct BQ query like this, direct call is fine and avoids potential issues with Genkit flow runner context in Next.js server actions.
   return fetchSuggestionsFromBQ(input.searchTerm);
 }
