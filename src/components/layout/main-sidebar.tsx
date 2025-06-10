@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/channels', label: 'Channels', icon: Users },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/analytics', label: 'Network Insights', icon: BarChart3 },
   { href: '/subsumption', label: 'Routing Analysis', icon: GitCompareArrows },
   { href: '/alerts', label: 'Alerts', icon: Bell },
 ];
