@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
 import { NetworkSubsumptionChart } from '@/components/dashboard/analytics/network-subsumption-chart';
-import { SubsumptionCategoryCard } from '@/components/dashboard/subsumption/SubsumptionCategoryCard';
+import { ShortestPathCategoryCard } from '@/components/dashboard/subsumption/ShortestPathCategoryCard';
 import { 
   fetchTopNodesBySubsumption,
   fetchNetworkSubsumptionDataForOurNode,
@@ -36,13 +36,13 @@ export default async function SubsumptionPage({
   return (
     <div className="space-y-6">
       <PageTitle 
-        title="Subsumption Analysis" 
+        title="Routing Analysis" 
         description="Understanding our node's position and performance within the broader Lightning Network by analyzing shortest path shares." 
       />
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Subsumption & Network Position</CardTitle>
+          <CardTitle className="font-headline">Shortest Path Share & Network Position</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p>{introText1}</p>
@@ -52,7 +52,7 @@ export default async function SubsumptionPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Top Nodes by Subsumption Share</CardTitle>
+          <CardTitle className="font-headline">Top Nodes by Shortest Path Share</CardTitle>
           <CardDescription>
             Ranking of the top 3 nodes for micro, common, and macro payment sizes based on their latest shortest path share.
           </CardDescription>
@@ -61,19 +61,19 @@ export default async function SubsumptionPage({
           <p className="text-sm text-muted-foreground">{rankingExplanation}</p>
           {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <SubsumptionCategoryCard 
+              <ShortestPathCategoryCard 
                 title="Micro Payments" 
                 paymentSizeLabel="(200 sats)"
                 nodes={topNodesData.micro}
                 categoryType="micro"
               />
-              <SubsumptionCategoryCard 
+              <ShortestPathCategoryCard 
                 title="Common Payments" 
                 paymentSizeLabel="(50k sats)"
                 nodes={topNodesData.common}
                 categoryType="common"
               />
-              <SubsumptionCategoryCard 
+              <ShortestPathCategoryCard 
                 title="Macro Payments" 
                 paymentSizeLabel="(4M sats)"
                 nodes={topNodesData.macro}
@@ -84,7 +84,7 @@ export default async function SubsumptionPage({
             <Alert>
               <Info className="h-4 w-4" />
               <AlertTitle>No Top Node Data</AlertTitle>
-              <AlertDescription>Could not retrieve top node subsumption data at this time for any category.</AlertDescription>
+              <AlertDescription>Could not retrieve top node data at this time for any category.</AlertDescription>
             </Alert>
           )}
         </CardContent>
@@ -93,7 +93,7 @@ export default async function SubsumptionPage({
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="font-headline">Our Node's Subsumption Share Over Time</CardTitle>
+                <CardTitle className="font-headline">Our Node's Shortest Path Share Over Time</CardTitle>
                 <Tabs value={currentAggregation} className="w-full sm:w-auto">
                 <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
                     {aggregationPeriodOptions.map(option => (

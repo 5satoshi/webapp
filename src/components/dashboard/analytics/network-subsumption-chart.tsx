@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { NetworkSubsumptionData } from '@/lib/types';
@@ -17,7 +18,7 @@ const chartConfig = {
 
 export function NetworkSubsumptionChart({ data }: NetworkSubsumptionChartProps) {
   if (!data || data.length === 0) {
-    return <div className="text-center text-muted-foreground p-4 h-[300px] flex items-center justify-center">No subsumption data available.</div>;
+    return <div className="text-center text-muted-foreground p-4 h-[300px] flex items-center justify-center">No shortest path share data available.</div>;
   }
 
   return (
@@ -57,7 +58,7 @@ export function NetworkSubsumptionChart({ data }: NetworkSubsumptionChartProps) 
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color }} />
                       <span>{chartConfig[name as keyof typeof chartConfig]?.label}: <strong>{value}%</strong></span>
                     </div>
-                    {name === "micro" && <p className="text-xs text-muted-foreground pt-1">Subsumption: How often this node is the cheapest route for a given payment size.</p>}
+                    {name === "micro" && <p className="text-xs text-muted-foreground pt-1">Shortest Path Share: How often this node is part of the cheapest route for a given payment size.</p>}
                   </>
                 )}
               />
