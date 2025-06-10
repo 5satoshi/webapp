@@ -193,7 +193,7 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   }
 }
 
-export async function fetchHistoricalForwardingVolume(aggregationPeriod: string = 'day'): Promise<TimeSeriesData[]> {
+export async function fetchHistoricalForwardingVolume(aggregationPeriod: string = 'week'): Promise<TimeSeriesData[]> {
   if (!bigquery || !datasetId) {
     console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalForwardingVolume. Returning empty time series.");
     return [];
@@ -1092,8 +1092,8 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<Top
         pls.macro_share,
         pls.macro_rank
     FROM PivotedLatestStats pls
-    LEFT JOIN LatestOverallAliases loa ON pls.nodeid = loa.nodeid AND loa.rn = 1
-    ORDER BY COALESCE(pls.common_share, 0) DESC, COALESCE(pls.common_rank, CASTPOW(2,32) AS INT64) ASC -- Handle NULLs in ordering
+    LEFT JOIN LatestOverallAliases loa ON pls.nodeid = loa.nodeid AND loa.rn = 1    
+    ORDER BY COALESCE(pls.common_share, 0) DESC, COALESCE(pls.common_rank, POWER(2, 32)) ASC -- Handle NULLs in ordering
     LIMIT @limit
   `;
 
@@ -1225,3 +1225,4 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
     return [];
   }
 }
+
