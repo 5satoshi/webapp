@@ -59,7 +59,7 @@ export function ShortestPathCategoryCard({ title, paymentSizeLabel, nodes, categ
                       <TableCell className="font-medium p-2 text-sm">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-default truncate block max-w-[100px] xs:max-w-[120px] sm:max-w-none">{getNodeDisplay(node)}</span>
+                            <span className="cursor-default truncate block max-w-[120px] sm:max-w-[200px] md:max-w-[100px] lg:max-w-[120px]">{getNodeDisplay(node)}</span>
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="font-semibold">{node.alias || 'Unknown Alias'}</p>
