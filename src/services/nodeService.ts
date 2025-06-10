@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -1036,3 +1036,192 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
   }
 }
 
+export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<TopNodeSubsumptionEntry[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchTopNodesBySubsumption.");
+    return [];
+  }
+
+  const query = `
+    WITH LatestTimestamps AS (
+        SELECT
+            nodeid,
+            type,
+            MAX(timestamp) as max_ts
+        FROM \`${projectId}.${datasetId}.betweenness\`
+        GROUP BY nodeid, type
+    ),
+    LatestStatsPerType AS (
+        SELECT
+            b.nodeid,
+            b.alias, -- Alias at the time of this specific stat
+            b.type,
+            b.shortest_path_share,
+            b.rank,
+            b.timestamp
+        FROM \`${projectId}.${datasetId}.betweenness\` b
+        INNER JOIN LatestTimestamps lt ON b.nodeid = lt.nodeid AND b.type = lt.type AND b.timestamp = lt.max_ts
+    ),
+    LatestOverallAliases AS ( -- Get the very latest alias for each nodeid, regardless of type
+        SELECT
+            nodeid,
+            alias,
+            ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
+        FROM \`${projectId}.${datasetId}.betweenness\`
+        WHERE alias IS NOT NULL AND TRIM(alias) != ''
+    ),
+    PivotedLatestStats AS (
+        SELECT
+            nodeid,
+            MAX(IF(type = 'micro', shortest_path_share, NULL)) as micro_share,
+            MAX(IF(type = 'micro', rank, NULL)) as micro_rank,
+            MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
+            MAX(IF(type = 'common', rank, NULL)) as common_rank,
+            MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share,
+            MAX(IF(type = 'macro', rank, NULL)) as macro_rank
+        FROM LatestStatsPerType
+        GROUP BY nodeid
+    )
+    SELECT
+        pls.nodeid,
+        loa.alias,
+        pls.micro_share,
+        pls.micro_rank,
+        pls.common_share,
+        pls.common_rank,
+        pls.macro_share,
+        pls.macro_rank
+    FROM PivotedLatestStats pls
+    LEFT JOIN LatestOverallAliases loa ON pls.nodeid = loa.nodeid AND loa.rn = 1
+    ORDER BY COALESCE(pls.common_share, 0) DESC, COALESCE(pls.common_rank, CASTPOW(2,32) AS INT64) ASC -- Handle NULLs in ordering
+    LIMIT @limit
+  `;
+
+  const options = {
+    query: query,
+    params: { limit: limit }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+    return rows.map(row => ({
+      nodeid: String(row.nodeid),
+      alias: row.alias ? String(row.alias) : null,
+      micro_share: row.micro_share !== null ? Number(row.micro_share) : null,
+      micro_rank: row.micro_rank !== null ? Number(row.micro_rank) : null,
+      common_share: row.common_share !== null ? Number(row.common_share) : null,
+      common_rank: row.common_rank !== null ? Number(row.common_rank) : null,
+      macro_share: row.macro_share !== null ? Number(row.macro_share) : null,
+      macro_rank: row.macro_rank !== null ? Number(row.macro_rank) : null,
+    }));
+  } catch (error) {
+    logBigQueryError("fetchTopNodesBySubsumption", error);
+    return [];
+  }
+}
+
+export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchNetworkSubsumptionDataForOurNode.");
+    return [];
+  }
+
+  let datePeriodUnit: string;
+  let startDate: string;
+  const now = new Date();
+  const endDate = format(endOfDay(subDays(now, 1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Data up to yesterday
+
+  switch (aggregationPeriod.toLowerCase()) {
+    case 'week':
+      datePeriodUnit = 'WEEK(MONDAY)';
+      startDate = format(startOfDay(subWeeks(now, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 12 weeks
+      break;
+    case 'month':
+      datePeriodUnit = 'MONTH';
+      startDate = format(startOfDay(subMonths(now, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 12 months
+      break;
+    case 'quarter':
+      datePeriodUnit = 'QUARTER';
+      startDate = format(startOfDay(subQuarters(now, 8)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 8 quarters (2 years)
+      break;
+    case 'day':
+    default:
+      datePeriodUnit = 'DAY';
+      startDate = format(startOfDay(subDays(now, 30)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 30 days
+      break;
+  }
+  
+  const query = `
+    SELECT
+      DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}) AS date_group,
+      -- For each date_group, get the LATEST share within that group by type
+      MAX(IF(type = 'micro', shortest_path_share, NULL)) as micro_share,
+      MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
+      MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share
+      -- This MAX might not be ideal if multiple entries exist per day/week/month/quarter.
+      -- A more robust approach would be to select the share from the latest timestamp within each group.
+      -- However, for simplicity and assuming data isn't overly dense for a single node on the same day for same type:
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE nodeid = @specificNodeId
+      AND timestamp >= TIMESTAMP(@startDate)
+      AND timestamp <= TIMESTAMP(@endDate)
+    GROUP BY date_group
+    ORDER BY date_group ASC
+  `;
+  
+  // A more robust query for latest share within period (more complex):
+  /*
+  const query_robust = `
+    WITH RankedDaily AS (
+      SELECT
+        DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}) AS date_group,
+        type,
+        shortest_path_share,
+        ROW_NUMBER() OVER(PARTITION BY DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}), type ORDER BY timestamp DESC) as rn
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE nodeid = @specificNodeId
+        AND timestamp >= TIMESTAMP(@startDate)
+        AND timestamp <= TIMESTAMP(@endDate)
+    )
+    SELECT
+      date_group,
+      MAX(IF(type = 'micro', shortest_path_share, NULL)) as micro_share,
+      MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
+      MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share
+    FROM RankedDaily
+    WHERE rn = 1
+    GROUP BY date_group
+    ORDER BY date_group ASC
+  `;
+  */
+
+
+  const options = {
+    query: query, // Using the simpler query first
+    params: {
+      specificNodeId: specificNodeId,
+      startDate: startDate,
+      endDate: endDate,
+    }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    if (!rows || rows.length === 0) {
+      return [];
+    }
+
+    return rows.map(row => ({
+      date: formatDateFromBQ(row.date_group),
+      micro: row.micro_share !== null ? parseFloat((Number(row.micro_share) * 100).toFixed(2)) : 0,
+      common: row.common_share !== null ? parseFloat((Number(row.common_share) * 100).toFixed(2)) : 0,
+      macro: row.macro_share !== null ? parseFloat((Number(row.macro_share) * 100).toFixed(2)) : 0,
+    }));
+  } catch (error) {
+    logBigQueryError(`fetchNetworkSubsumptionDataForOurNode (period: ${aggregationPeriod})`, error);
+    return [];
+  }
+}

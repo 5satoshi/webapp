@@ -13,14 +13,14 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { LayoutDashboard, Users, BarChart3, Lightbulb, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, GitCompareArrows, Bell } from 'lucide-react'; // Changed Lightbulb to GitCompareArrows
 import { Separator } from '@/components/ui/separator';
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/channels', label: 'Channels', icon: Users },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/insights', label: 'Insights', icon: Lightbulb },
+  { href: '/subsumption', label: 'Subsumption', icon: GitCompareArrows }, // Changed from Insights
   { href: '/alerts', label: 'Alerts', icon: Bell },
 ];
 

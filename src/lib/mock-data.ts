@@ -11,7 +11,6 @@ import type {
   AveragePaymentValueData,
   NetworkSubsumptionData,
   HeatmapCell,
-  AiStructuredInput,
 } from './types';
 // Icons are no longer directly in mock data for KeyMetric, but iconName strings are used.
 
@@ -23,10 +22,10 @@ export const mockKeyMetrics: KeyMetric[] = [
 ];
 
 export const mockChannels: Channel[] = [
-  { id: '1', peerNodeId: '02_alpha_node_long_id_string', capacity: 5000000, localBalance: 2000000, remoteBalance: 3000000, uptime: 99.5, historicalPaymentSuccessRate: 98.2, lastUpdate: '2023-10-26T10:00:00Z', status: 'active' },
-  { id: '2', peerNodeId: '03_beta_node_other_id_string', capacity: 10000000, localBalance: 7000000, remoteBalance: 3000000, uptime: 99.9, historicalPaymentSuccessRate: 99.1, lastUpdate: '2023-10-26T11:00:00Z', status: 'active' },
-  { id: '3', peerNodeId: '02_gamma_node_test_id_string', capacity: 2000000, localBalance: 500000, remoteBalance: 1500000, uptime: 95.0, historicalPaymentSuccessRate: 90.5, lastUpdate: '2023-10-25T09:00:00Z', status: 'inactive' },
-  { id: '4', peerNodeId: '03_delta_node_another_id_val', capacity: 20000000, localBalance: 10000000, remoteBalance: 10000000, uptime: 100, historicalPaymentSuccessRate: 99.7, lastUpdate: '2023-10-26T12:00:00Z', status: 'active' },
+  { id: '1', peerNodeId: '02_alpha_node_long_id_string', capacity: 5000000, localBalance: 2000000, remoteBalance: 3000000, uptime: 99.5, historicalPaymentSuccessRate: 98.2, lastUpdate: '2023-10-26T10:00:00Z', status: 'active', shortChannelId: 'scid1' },
+  { id: '2', peerNodeId: '03_beta_node_other_id_string', capacity: 10000000, localBalance: 7000000, remoteBalance: 3000000, uptime: 99.9, historicalPaymentSuccessRate: 99.1, lastUpdate: '2023-10-26T11:00:00Z', status: 'active', shortChannelId: 'scid2' },
+  { id: '3', peerNodeId: '02_gamma_node_test_id_string', capacity: 2000000, localBalance: 500000, remoteBalance: 1500000, uptime: 95.0, historicalPaymentSuccessRate: 90.5, lastUpdate: '2023-10-25T09:00:00Z', status: 'inactive', shortChannelId: 'scid3' },
+  { id: '4', peerNodeId: '03_delta_node_another_id_val', capacity: 20000000, localBalance: 10000000, remoteBalance: 10000000, uptime: 100, historicalPaymentSuccessRate: 99.7, lastUpdate: '2023-10-26T12:00:00Z', status: 'active', shortChannelId: 'scid4' },
 ];
 
 export const mockAlertSettings: AlertSetting[] = [
@@ -42,14 +41,19 @@ const generateTimeSeries = (days: number, startValue: number, fluctuation: numbe
   for (let i = 0; i < days; i++) {
     data.push({
       date: currentDate.toISOString().split('T')[0],
-      value: Math.max(0, startValue + (Math.random() - 0.5) * fluctuation * (i / 5)),
+      forwardingVolume: Math.max(0, startValue + (Math.random() - 0.5) * fluctuation * (i / 5)), // Example property
+      transactionCount: Math.floor(Math.random() * 100) + 50, // Example property
     });
     currentDate.setDate(currentDate.getDate() + 1);
   }
   return data;
 };
 
-export const mockHistoricalPaymentVolume: TimeSeriesData[] = generateTimeSeries(30, 500000, 100000);
+export const mockHistoricalPaymentVolume: TimeSeriesData[] = generateTimeSeries(30, 0.5, 0.2).map(d => ({
+    ...d, 
+    forwardingVolume: d.forwardingVolume // Assuming 'value' was BTC
+}));
+
 
 export const mockFeeDistributionData: FeeDistributionData[] = [
   { type: 'remote', ppm: 150 },
@@ -83,7 +87,7 @@ export const mockPaymentAmountDistributionData: PaymentAmountDistributionData[] 
   { range: '>1M', frequency: 30 },
 ];
 
-export const mockAveragePaymentValueData: AveragePaymentValueData[] = generateTimeSeries(30, 25000, 5000).map(d => ({date: d.date, averageValue: d.value}));
+export const mockAveragePaymentValueData: AveragePaymentValueData[] = generateTimeSeries(30, 25000, 5000).map(d => ({date: d.date, averageValue: d.forwardingVolume})); // Using forwardingVolume as averageValue for mock
 
 
 export const mockNetworkSubsumptionData: NetworkSubsumptionData[] = Array.from({ length: 30 }, (_, i) => {
@@ -104,30 +108,28 @@ const hoursOfDay = 24;
 for (let day = 0; day < daysOfWeek; day++) {
   for (let hour = 0; hour < hoursOfDay; hour++) {
     // Simulate higher traffic during business hours and evenings, lower at night
-    let intensity = Math.random() * 0.3; // Base intensity
-    if (hour >= 9 && hour <= 17) intensity += Math.random() * 0.4; // Daytime
-    if (hour >= 18 && hour <= 22) intensity += Math.random() * 0.3; // Evening
-    if (day >= 0 && day <= 4) intensity += Math.random() * 0.2; // Weekdays
+    let successfulForwards = Math.random() * 30; 
+    let failedForwards = Math.random() * 5; 
+    
+    if (hour >= 9 && hour <= 17) { // Daytime
+      successfulForwards += Math.random() * 40;
+      failedForwards += Math.random() * 10;
+    }
+    if (hour >= 18 && hour <= 22) { // Evening
+      successfulForwards += Math.random() * 30;
+      failedForwards += Math.random() * 8;
+    }
+    if (day >= 0 && day <= 4) successfulForwards += Math.random() * 20; // Weekdays
+
     mockTimingPatternsHeatmapData.push({
       day,
       hour,
-      intensity: Math.min(1, intensity),
+      successfulForwards: Math.floor(successfulForwards),
+      failedForwards: Math.floor(failedForwards),
     });
   }
 }
 
-export const mockAiInput: AiStructuredInput = {
-  totalPaymentsProcessed: 12560, // From mockKeyMetrics
-  forwardingFeesEarned: 853020, // From mockKeyMetrics
-  nodeUptime: 99.98, // From mockKeyMetrics
-  numberOfChannels: 78, // From mockKeyMetrics
-  historicalRoutingData: "Over the past month, the node routed 15,000 payments with an average success rate of 97.5%. Peak routing times were weekdays 14:00-17:00 UTC. Average fee per successful route: 3.5 sats.",
-  feeDistributionData: "Current median remote channel fee: 150ppm, local channel fee: 50ppm. 80% of revenue comes from remote channels. Trend shows increasing remote fees over last 3 months.",
-  routingActivityData: "Monthly routing count peaked at 5,200 in July, current month at 4,800. Daily routing volume averages 500,000 sats, with spikes up to 1.5M sats on high-activity days.",
-  paymentAmountDistributionData: "Most frequent payments (60%) are micro-payments (<1k sats). Payments between 1k-50k sats account for 30%. Large payments (>200k sats) are infrequent but contribute significantly to volume. Average payment value is trending slightly upwards from 22k sats to 28k sats over the last quarter.",
-  networkSubsumptionMetricsData: "Node is the cheapest route for 85% of micro payments (200 sats), 55% for common payments (50k sats), and 15% for macro payments (4M sats). Subsumption for common payments has slightly decreased in the last week.",
-  timingPatternsHeatmapData: "Highest traffic intensity observed on weekdays between 10:00-12:00 UTC and 14:00-17:00 UTC. Weekend traffic is generally lower but shows a small peak on Saturday afternoons."
-};
 
 export const aggregationPeriodOptions = [
   { value: 'day', label: 'Days' },
@@ -144,3 +146,5 @@ export const timescaleOptions = [
   { value: '1y', label: '1 Year' },
   { value: 'all', label: 'All Time' },
 ];
+
+// mockAiInput removed

@@ -68,10 +68,10 @@ export interface ForwardingValueOverTimeData {
 }
 
 export interface NetworkSubsumptionData {
-  date: string;
-  micro: number; 
-  common: number; 
-  macro: number; 
+  date: string; // YYYY-MM-DD
+  micro: number;  // Percentage value for micro tx
+  common: number; // Percentage value for common tx
+  macro: number;  // Percentage value for macro tx
 }
 
 export interface HeatmapCell {
@@ -81,24 +81,16 @@ export interface HeatmapCell {
   failedForwards: number;
 }
 
-export interface Recommendation {
-  title: string;
-  description: string;
-  priority: 'High' | 'Medium' | 'Low';
+export interface TopNodeSubsumptionEntry {
+  nodeid: string;
+  alias?: string | null;
+  micro_share: number | null;
+  micro_rank: number | null;
+  common_share: number | null;
+  common_rank: number | null;
+  macro_share: number | null;
+  macro_rank: number | null;
 }
-
-export type AiStructuredInput = {
-  totalPaymentsProcessed: number;
-  forwardingFeesEarned: number;
-  nodeUptime: number; 
-  numberOfChannels: number;
-  historicalRoutingData: string; 
-  feeDistributionData: string; 
-  routingActivityData: string; 
-  paymentAmountDistributionData: string; 
-  networkSubsumptionMetricsData: string; 
-  timingPatternsHeatmapData: string; 
-};
 
 export interface BetweennessRankData {
   latestRank: number | null;
@@ -131,3 +123,4 @@ export interface ChannelDetails {
   ourAdvertisedPolicy: string | null; // Our node's advertised fee policy for this channel (e.g., "X msat + Y ppm")
 }
 
+// Removed AiStructuredInput and Recommendation as Insights page is removed
