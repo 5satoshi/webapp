@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -1161,13 +1161,9 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
   const query = `
     SELECT
       DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}) AS date_group,
-      -- For each date_group, get the LATEST share within that group by type
       MAX(IF(type = 'micro', shortest_path_share, NULL)) as micro_share,
       MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
       MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share
-      -- This MAX might not be ideal if multiple entries exist per day/week/month/quarter.
-      -- A more robust approach would be to select the share from the latest timestamp within each group.
-      -- However, for simplicity and assuming data isn't overly dense for a single node on the same day for same type:
     FROM \`${projectId}.${datasetId}.betweenness\`
     WHERE nodeid = @specificNodeId
       AND timestamp >= TIMESTAMP(@startDate)
@@ -1176,35 +1172,8 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
     ORDER BY date_group ASC
   `;
   
-  // A more robust query for latest share within period (more complex):
-  /*
-  const query_robust = `
-    WITH RankedDaily AS (
-      SELECT
-        DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}) AS date_group,
-        type,
-        shortest_path_share,
-        ROW_NUMBER() OVER(PARTITION BY DATE_TRUNC(DATE(timestamp), ${datePeriodUnit}), type ORDER BY timestamp DESC) as rn
-      FROM \`${projectId}.${datasetId}.betweenness\`
-      WHERE nodeid = @specificNodeId
-        AND timestamp >= TIMESTAMP(@startDate)
-        AND timestamp <= TIMESTAMP(@endDate)
-    )
-    SELECT
-      date_group,
-      MAX(IF(type = 'micro', shortest_path_share, NULL)) as micro_share,
-      MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
-      MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share
-    FROM RankedDaily
-    WHERE rn = 1
-    GROUP BY date_group
-    ORDER BY date_group ASC
-  `;
-  */
-
-
   const options = {
-    query: query, // Using the simpler query first
+    query: query,
     params: {
       specificNodeId: specificNodeId,
       startDate: startDate,
@@ -1232,3 +1201,66 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
   }
 }
 
+export async function fetchOurNodeRankForCategories(aggregationPeriod: string): Promise<OurNodeRanksForAllCategories> {
+  const defaultCategoryRank: OurNodeCategoryRank = { latestRank: null, rankChange: null };
+  const result: OurNodeRanksForAllCategories = {
+    micro: { ...defaultCategoryRank },
+    common: { ...defaultCategoryRank },
+    macro: { ...defaultCategoryRank },
+  };
+
+  if (!bigquery || !datasetId) {
+    console.error("BigQuery client not initialized or datasetId missing for fetchOurNodeRankForCategories.");
+    return result;
+  }
+
+  const nodeId = specificNodeId;
+  const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
+  
+  const categories: Array<'micro' | 'common' | 'macro'> = ['micro', 'common', 'macro'];
+
+  for (const category of categories) {
+    const latestRankQuery = `
+      SELECT rank
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE nodeid = @nodeId AND type = @categoryType
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `;
+
+    const previousRankQuery = `
+      SELECT rank
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE nodeid = @nodeId AND type = @categoryType AND timestamp < TIMESTAMP(@periodStartDate)
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `;
+
+    try {
+      const [latestRankJob] = await bigquery.createQueryJob({
+        query: latestRankQuery,
+        params: { nodeId: nodeId, categoryType: category }
+      });
+      const [[latestRankResult]] = await latestRankJob.getQueryResults();
+      const latestRank = latestRankResult?.rank !== undefined && latestRankResult?.rank !== null ? Number(latestRankResult.rank) : null;
+      
+      result[category].latestRank = latestRank;
+
+      const [previousRankJob] = await bigquery.createQueryJob({
+        query: previousRankQuery,
+        params: { nodeId: nodeId, categoryType: category, periodStartDate: periodStartDateString }
+      });
+      const [[previousRankResult]] = await previousRankJob.getQueryResults();
+      const previousRank = previousRankResult?.rank !== undefined && previousRankResult?.rank !== null ? Number(previousRankResult.rank) : null;
+
+      if (latestRank !== null && previousRank !== null) {
+        result[category].rankChange = latestRank - previousRank;
+      }
+
+    } catch (error) {
+      logBigQueryError(`fetchOurNodeRankForCategories (nodeId: ${nodeId}, category: ${category}, period: ${aggregationPeriod})`, error);
+      // Keep default nulls for this category on error
+    }
+  }
+  return result;
+}

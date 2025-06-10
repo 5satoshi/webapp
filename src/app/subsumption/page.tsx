@@ -2,17 +2,20 @@
 import Link from 'next/link';
 import { PageTitle } from '@/components/ui/page-title';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data';
 import { NetworkSubsumptionChart } from '@/components/dashboard/analytics/network-subsumption-chart';
 import { ShortestPathCategoryCard } from '@/components/dashboard/subsumption/ShortestPathCategoryCard';
+import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card';
 import { 
   fetchTopNodesBySubsumption,
   fetchNetworkSubsumptionDataForOurNode,
+  fetchOurNodeRankForCategories,
 } from '@/services/nodeService';
-import type { AllTopNodes, NetworkSubsumptionData } from '@/lib/types';
+import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
+import { getOrdinalSuffix } from '@/lib/utils';
 
 export default async function SubsumptionPage({ 
   searchParams 
@@ -27,11 +30,68 @@ export default async function SubsumptionPage({
 
   const topNodesData: AllTopNodes = await fetchTopNodesBySubsumption(3);
   const ourNodeTimelineData: NetworkSubsumptionData[] = await fetchNetworkSubsumptionDataForOurNode(currentAggregation);
+  const ourNodeRanks: OurNodeRanksForAllCategories = await fetchOurNodeRankForCategories(currentAggregation);
 
   const introText1 = `How do the activity numbers of our node compare to the overall network, how are we doing? We’re trying to bring more light into that by looking at the total network graph, with all its channels and routing fees.`;
   const introText2 = `It’s possible to calculate the share of 'cheapest' (shortest) paths per node a transaction is optimally taking through the network. This calculation is dependent on the size of the transaction. We’re presenting the share of our node for a common transaction (50,000sat), a micro transaction (200sat) and a macro transaction (4,000,000sat). Also we show, how this share is changing over time for these payment sizes.`;
   
   const rankingExplanation = `There are a couple of node ranking solutions available that try to introduce some arbitrary logic to define good quality of a node. Some of them are proprietary and closed, which opens the door for manipulation. Here we’re introducing another ranking mechanism that is leveraging standard graph analytics tools. Because every sender is aiming to find the cheapest route, it is most obvious to make use of shortest path finding algorithms for weighted directed graphs. The "Shortest Path Share" indicates how often a node is part of such an optimal, cheapest path for a given payment size.`;
+
+  let descriptiveLabel = '7 Days'; // Default for week
+  const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
+  if (selectedOption) {
+    switch (currentAggregation) {
+      case 'day':
+        descriptiveLabel = 'Day';
+        break;
+      case 'week':
+        descriptiveLabel = '7 Days';
+        break;
+      case 'month':
+        descriptiveLabel = '30 Days';
+        break;
+      case 'quarter':
+        descriptiveLabel = '90 Days';
+        break;
+      default:
+        descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
+        break;
+    }
+  }
+
+  const ourNodeRankMetrics: KeyMetric[] = [
+    {
+      id: 'our_node_micro_rank',
+      title: `Our Micro Rank (last ${descriptiveLabel})`,
+      displayValue: ourNodeRanks.micro.latestRank !== null ? `${ourNodeRanks.micro.latestRank}${getOrdinalSuffix(ourNodeRanks.micro.latestRank)}` : 'N/A',
+      iconName: 'LineChart',
+      absoluteChange: ourNodeRanks.micro.rankChange,
+      absoluteChangeDescription: ``, 
+      absoluteChangeDirection: 'lower_is_better',
+      description: `Current rank for micro (200 sats) payments.`,
+    },
+    {
+      id: 'our_node_common_rank',
+      title: `Our Common Rank (last ${descriptiveLabel})`,
+      displayValue: ourNodeRanks.common.latestRank !== null ? `${ourNodeRanks.common.latestRank}${getOrdinalSuffix(ourNodeRanks.common.latestRank)}` : 'N/A',
+      iconName: 'LineChart',
+      absoluteChange: ourNodeRanks.common.rankChange,
+      absoluteChangeDescription: ``,
+      absoluteChangeDirection: 'lower_is_better',
+      description: `Current rank for common (50k sats) payments.`,
+    },
+    {
+      id: 'our_node_macro_rank',
+      title: `Our Macro Rank (last ${descriptiveLabel})`,
+      displayValue: ourNodeRanks.macro.latestRank !== null ? `${ourNodeRanks.macro.latestRank}${getOrdinalSuffix(ourNodeRanks.macro.latestRank)}` : 'N/A',
+      iconName: 'LineChart',
+      absoluteChange: ourNodeRanks.macro.rankChange,
+      absoluteChangeDescription: ``,
+      absoluteChangeDirection: 'lower_is_better',
+      description: `Current rank for macro (4M sats) payments.`,
+    },
+  ];
+
 
   return (
     <div className="space-y-6">
@@ -115,6 +175,25 @@ export default async function SubsumptionPage({
           </p>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">Our Node's Rank (Last {descriptiveLabel})</CardTitle>
+          <CardDescription>
+            Current network rank of our node for different payment sizes compared to the start of the selected period. Lower rank is better.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            {ourNodeRankMetrics.map((metric) => (
+              <KeyMetricsCard key={metric.id} metric={metric} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
+
+```

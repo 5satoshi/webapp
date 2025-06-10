@@ -137,5 +137,16 @@ export interface ChannelDetails {
   ourAdvertisedPolicy: string | null; // Our node's advertised fee policy for this channel (e.g., "X msat + Y ppm")
 }
 
-// Removed AiStructuredInput and Recommendation as Insights page is removed
 
+export interface OurNodeCategoryRank {
+  latestRank: number | null;
+  rankChange: number | null; // Positive means rank got worse (higher number), negative means better
+}
+
+export interface OurNodeRanksForAllCategories {
+  micro: OurNodeCategoryRank;
+  common: OurNodeCategoryRank;
+  macro: OurNodeCategoryRank;
+}
+
+```
