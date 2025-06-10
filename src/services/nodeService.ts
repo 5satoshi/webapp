@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
 import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
 import { 
   format, 
@@ -10,10 +10,11 @@ import {
   parseISO, 
   subDays, subWeeks, subMonths, subQuarters, startOfDay
 } from 'date-fns';
+import { specificNodeId } from '@/lib/constants'; // Import the constant
 
 const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
 const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
-const specificNodeId = '03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69';
+// specificNodeId is now imported
 
 let bigquery: BigQuery | undefined;
 
@@ -631,7 +632,7 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
     return { latestRank: null, previousRank: null };
   }
 
-  const nodeId = specificNodeId; 
+  const nodeId = specificNodeId; // This uses the imported constant for "our node"
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
 
   const latestRankQuery = `
@@ -679,7 +680,7 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
     return { latestShare: null, previousShare: null };
   }
 
-  const nodeId = specificNodeId;
+  const nodeId = specificNodeId; // This uses the imported constant for "our node"
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
 
   const latestShareQuery = `
@@ -1127,9 +1128,9 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
 }
 
 
-export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
+export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchNetworkSubsumptionDataForOurNode.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchNetworkSubsumptionDataForNode.");
     return [];
   }
 
@@ -1165,7 +1166,7 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
       MAX(IF(type = 'common', shortest_path_share, NULL)) as common_share,
       MAX(IF(type = 'macro', shortest_path_share, NULL)) as macro_share
     FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @specificNodeId
+    WHERE nodeid = @nodeId
       AND timestamp >= TIMESTAMP(@startDate)
       AND timestamp <= TIMESTAMP(@endDate)
     GROUP BY date_group
@@ -1175,7 +1176,7 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
   const options = {
     query: query,
     params: {
-      specificNodeId: specificNodeId,
+      nodeId: nodeId,
       startDate: startDate,
       endDate: endDate,
     }
@@ -1196,12 +1197,12 @@ export async function fetchNetworkSubsumptionDataForOurNode(aggregationPeriod: s
       macro: row.macro_share !== null ? parseFloat((Number(row.macro_share) * 100).toFixed(2)) : 0,
     }));
   } catch (error) {
-    logBigQueryError(`fetchNetworkSubsumptionDataForOurNode (period: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchNetworkSubsumptionDataForNode (nodeId: ${nodeId}, period: ${aggregationPeriod})`, error);
     return [];
   }
 }
 
-export async function fetchOurNodeRankForCategories(aggregationPeriod: string): Promise<OurNodeRanksForAllCategories> {
+export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregationPeriod: string): Promise<OurNodeRanksForAllCategories> {
   const defaultCategoryRank: OurNodeCategoryRank = { latestRank: null, rankChange: null };
   const result: OurNodeRanksForAllCategories = {
     micro: { ...defaultCategoryRank },
@@ -1210,11 +1211,10 @@ export async function fetchOurNodeRankForCategories(aggregationPeriod: string): 
   };
 
   if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchOurNodeRankForCategories.");
+    console.error("BigQuery client not initialized or datasetId missing for fetchNodeRankForCategories.");
     return result;
   }
 
-  const nodeId = specificNodeId;
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
   
   const categories: Array<'micro' | 'common' | 'macro'> = ['micro', 'common', 'macro'];
@@ -1223,7 +1223,7 @@ export async function fetchOurNodeRankForCategories(aggregationPeriod: string): 
     const latestRankQuery = `
       SELECT rank
       FROM \`${projectId}.${datasetId}.betweenness\`
-      WHERE nodeid = @nodeId AND type = @categoryType
+      WHERE nodeid = @nodeIdToQuery AND type = @categoryType
       ORDER BY timestamp DESC
       LIMIT 1
     `;
@@ -1231,7 +1231,7 @@ export async function fetchOurNodeRankForCategories(aggregationPeriod: string): 
     const previousRankQuery = `
       SELECT rank
       FROM \`${projectId}.${datasetId}.betweenness\`
-      WHERE nodeid = @nodeId AND type = @categoryType AND timestamp < TIMESTAMP(@periodStartDate)
+      WHERE nodeid = @nodeIdToQuery AND type = @categoryType AND timestamp < TIMESTAMP(@periodStartDate)
       ORDER BY timestamp DESC
       LIMIT 1
     `;
@@ -1239,7 +1239,7 @@ export async function fetchOurNodeRankForCategories(aggregationPeriod: string): 
     try {
       const [latestRankJob] = await bigquery.createQueryJob({
         query: latestRankQuery,
-        params: { nodeId: nodeId, categoryType: category }
+        params: { nodeIdToQuery: nodeIdToFetch, categoryType: category }
       });
       const [[latestRankResult]] = await latestRankJob.getQueryResults();
       const latestRank = latestRankResult?.rank !== undefined && latestRankResult?.rank !== null ? Number(latestRankResult.rank) : null;
@@ -1248,7 +1248,7 @@ export async function fetchOurNodeRankForCategories(aggregationPeriod: string): 
 
       const [previousRankJob] = await bigquery.createQueryJob({
         query: previousRankQuery,
-        params: { nodeId: nodeId, categoryType: category, periodStartDate: periodStartDateString }
+        params: { nodeIdToQuery: nodeIdToFetch, categoryType: category, periodStartDate: periodStartDateString }
       });
       const [[previousRankResult]] = await previousRankJob.getQueryResults();
       const previousRank = previousRankResult?.rank !== undefined && previousRankResult?.rank !== null ? Number(previousRankResult.rank) : null;
@@ -1258,9 +1258,44 @@ export async function fetchOurNodeRankForCategories(aggregationPeriod: string): 
       }
 
     } catch (error) {
-      logBigQueryError(`fetchOurNodeRankForCategories (nodeId: ${nodeId}, category: ${category}, period: ${aggregationPeriod})`, error);
+      logBigQueryError(`fetchNodeRankForCategories (nodeId: ${nodeIdToFetch}, category: ${category}, period: ${aggregationPeriod})`, error);
       // Keep default nulls for this category on error
     }
   }
   return result;
+}
+
+export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayInfo | null> {
+  if (!bigquery || !datasetId || !nodeId) {
+    console.error("BigQuery client not initialized, datasetId, or nodeId missing for fetchNodeDisplayInfo.");
+    return null;
+  }
+
+  const query = `
+    SELECT alias
+    FROM \`${projectId}.${datasetId}.betweenness\`
+    WHERE nodeid = @nodeIdToQuery
+    ORDER BY timestamp DESC
+    LIMIT 1
+  `;
+  const options = {
+    query: query,
+    params: { nodeIdToQuery: nodeId }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    if (rows && rows.length > 0 && rows[0]) {
+      return {
+        nodeId: nodeId,
+        alias: rows[0].alias ? String(rows[0].alias) : null,
+      };
+    }
+    return { nodeId: nodeId, alias: null }; // Return with Node ID even if alias not found
+  } catch (error) {
+    logBigQueryError(`fetchNodeDisplayInfo (nodeId: ${nodeId})`, error);
+    return { nodeId: nodeId, alias: null }; // Return with Node ID on error
+  }
 }

@@ -149,4 +149,7 @@ export interface OurNodeRanksForAllCategories {
   macro: OurNodeCategoryRank;
 }
 
-```
+export interface NodeDisplayInfo {
+  nodeId: string;
+  alias?: string | null;
+}
