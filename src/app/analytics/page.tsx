@@ -57,7 +57,7 @@ export default async function AnalyticsPage({
   return (
     <div className="space-y-6">
       <PageTitle 
-        title="Network Analytics" 
+        title="Network Insights" 
         description="We can learn something from our node about the usage of the overall network, how much and when the network is used." 
       />
 
