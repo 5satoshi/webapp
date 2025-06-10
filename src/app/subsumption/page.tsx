@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { TruncatedText } from '@/components/ui/truncated-text';
+import { TooltipProvider } from '@/components/ui/tooltip'; // Added TooltipProvider
 
 export default async function SubsumptionPage({
   searchParams
@@ -132,26 +133,28 @@ export default async function SubsumptionPage({
         <CardContent className="space-y-4">
           <TruncatedText text={rankingExplanation} charLimit={200} />
           {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <ShortestPathCategoryCard
-                title="Micro"
-                paymentSizeLabel="(200 sats)"
-                nodes={topNodesData.micro}
-                categoryType="micro"
-              />
-              <ShortestPathCategoryCard
-                title="Common"
-                paymentSizeLabel="(50k sats)"
-                nodes={topNodesData.common}
-                categoryType="common"
-              />
-              <ShortestPathCategoryCard
-                title="Macro"
-                paymentSizeLabel="(4M sats)"
-                nodes={topNodesData.macro}
-                categoryType="macro"
-              />
-            </div>
+            <TooltipProvider> {/* Added TooltipProvider here */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <ShortestPathCategoryCard
+                  title="Micro"
+                  paymentSizeLabel="(200 sats)"
+                  nodes={topNodesData.micro}
+                  categoryType="micro"
+                />
+                <ShortestPathCategoryCard
+                  title="Common"
+                  paymentSizeLabel="(50k sats)"
+                  nodes={topNodesData.common}
+                  categoryType="common"
+                />
+                <ShortestPathCategoryCard
+                  title="Macro"
+                  paymentSizeLabel="(4M sats)"
+                  nodes={topNodesData.macro}
+                  categoryType="macro"
+                />
+              </div>
+            </TooltipProvider>
           ) : (
             <Alert>
               <Info className="h-4 w-4" />
@@ -197,11 +200,13 @@ export default async function SubsumptionPage({
               Current network rank of the selected node for different payment sizes compared to the start of the selected period. Lower rank is better.
             </p>
             {currentNodeIdToUse ? (
-              <div className="grid gap-4 md:grid-cols-3">
-                {nodeRankMetrics.map((metric) => (
-                  <KeyMetricsCard key={metric.id} metric={metric} />
-                ))}
-              </div>
+              <TooltipProvider> {/* Added TooltipProvider for KeyMetricsCard tooltips */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {nodeRankMetrics.map((metric) => (
+                    <KeyMetricsCard key={metric.id} metric={metric} />
+                  ))}
+                </div>
+              </TooltipProvider>
             ) : (
               <Alert>
                   <Info className="h-4 w-4" />
