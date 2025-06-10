@@ -1037,72 +1037,155 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
   }
 }
 
-async function fetchTopNodesForCategory(category: 'micro' | 'common' | 'macro', limit: number = 3): Promise<SingleCategoryTopNode[]> {
+async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'macro', limit: number = 3): Promise<SingleCategoryTopNode[]> {
   if (!bigquery || !datasetId) {
-    console.error(`BigQuery client not initialized or datasetId missing for fetchTopNodesForCategory (${category}).`);
+    console.error(`BigQuery client not initialized or datasetId missing for fetchTopNodesForCategory (${primaryCategory}).`);
     return [];
   }
 
-  const query = `
-    WITH LatestTimestampsForCategory AS (
-      -- Get the latest timestamp for each node specifically for the given type
+  // Step 1: Identify top N node IDs for the primaryCategory along with their primary share and rank.
+  const topNodeIdsQuery = `
+    WITH RankedNodesForPrimaryCategory AS (
       SELECT
         nodeid,
-        MAX(timestamp) as max_ts
+        alias, -- Alias at the time of this primary category record
+        shortest_path_share,
+        rank,
+        ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn_latest_for_node_in_category
       FROM \`${projectId}.${datasetId}.betweenness\`
-      WHERE type = @categoryType
-      GROUP BY nodeid
-    ),
-    LatestStatsForCategory AS (
-      -- Get the stats (share, rank, alias at that time) for the latest timestamp for the given type
-      SELECT
-        b.nodeid,
-        b.alias AS stat_alias, -- Alias at the time of this specific stat record
-        b.shortest_path_share,
-        b.rank
-      FROM \`${projectId}.${datasetId}.betweenness\` b
-      INNER JOIN LatestTimestampsForCategory lt ON b.nodeid = lt.nodeid AND b.timestamp = lt.max_ts
-      WHERE b.type = @categoryType
-    ),
-    LatestOverallAliases AS (
-      -- Get the absolute latest alias for each nodeid, regardless of type, to ensure freshest alias displayed
-      SELECT
-        nodeid,
-        alias,
-        ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
-      FROM \`${projectId}.${datasetId}.betweenness\`
-      WHERE alias IS NOT NULL AND TRIM(alias) != ''
+      WHERE type = @primaryCategoryType
     )
-    SELECT
-      lsfc.nodeid,
-      loa.alias, -- Use the latest overall alias
-      lsfc.shortest_path_share AS share,
-      lsfc.rank AS rank
-    FROM LatestStatsForCategory lsfc
-    LEFT JOIN LatestOverallAliases loa ON lsfc.nodeid = loa.nodeid AND loa.rn = 1
-    ORDER BY lsfc.shortest_path_share DESC, lsfc.rank ASC NULLS LAST
+    SELECT nodeid, alias as primary_alias, shortest_path_share as primary_share, rank as primary_rank
+    FROM RankedNodesForPrimaryCategory
+    WHERE rn_latest_for_node_in_category = 1 -- Only consider the latest record for each node for this category
+    ORDER BY primary_share DESC, primary_rank ASC NULLS LAST, nodeid ASC
     LIMIT @limitValue
   `;
 
-  const options = {
-    query: query,
-    params: { categoryType: category, limitValue: limit }
-  };
-
+  let topNodesPrimaryData: Array<{ nodeid: string, primary_alias: string | null, primary_share: number | null, primary_rank: number | null }> = [];
   try {
-    const [job] = await bigquery.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-    return rows.map(row => ({
-      nodeid: String(row.nodeid),
-      alias: row.alias ? String(row.alias) : null,
-      share: row.share !== null && row.share !== undefined ? Number(row.share) : null,
-      rank: row.rank !== null && row.rank !== undefined ? Number(row.rank) : null,
-    }));
+    const [job] = await bigquery.createQueryJob({
+      query: topNodeIdsQuery,
+      params: { primaryCategoryType: primaryCategory, limitValue: limit }
+    });
+    topNodesPrimaryData = (await job.getQueryResults())[0] as Array<{ nodeid: string, primary_alias: string | null, primary_share: number | null, primary_rank: number | null }>;
   } catch (error) {
-    logBigQueryError(`fetchTopNodesForCategory (category: ${category})`, error);
+    logBigQueryError(`fetchTopNodesForCategory (${primaryCategory}) - Step 1: Identifying top nodes`, error);
     return [];
   }
+
+  if (topNodesPrimaryData.length === 0) {
+    return [];
+  }
+
+  const nodeIds = topNodesPrimaryData.map(n => n.nodeid);
+
+  // Step 2: For these node IDs, get their latest stats for ALL categories
+  const allStatsForTopNodesQuery = `
+    WITH LatestStatsForAllTypes AS (
+      SELECT
+        nodeid,
+        type,
+        alias,
+        shortest_path_share,
+        rank,
+        ROW_NUMBER() OVER(PARTITION BY nodeid, type ORDER BY timestamp DESC) as rn_latest_for_type
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE nodeid IN UNNEST(@nodeIdList)
+        AND type IN ('micro', 'common', 'macro')
+    ),
+    LatestOverallAlias AS ( -- Get the single most recent alias for each node, regardless of type
+      SELECT
+        nodeid,
+        alias,
+        ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn_overall_alias
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE nodeid IN UNNEST(@nodeIdList) AND alias IS NOT NULL AND TRIM(alias) != ''
+    )
+    SELECT
+      s.nodeid,
+      loa.alias AS display_alias, -- Use the absolute latest alias
+      MAX(IF(s.type = 'micro', s.shortest_path_share, NULL)) as micro_share,
+      MAX(IF(s.type = 'micro', s.rank, NULL)) as micro_rank,
+      MAX(IF(s.type = 'common', s.shortest_path_share, NULL)) as common_share,
+      MAX(IF(s.type = 'common', s.rank, NULL)) as common_rank,
+      MAX(IF(s.type = 'macro', s.shortest_path_share, NULL)) as macro_share,
+      MAX(IF(s.type = 'macro', s.rank, NULL)) as macro_rank
+    FROM LatestStatsForAllTypes s
+    LEFT JOIN LatestOverallAlias loa ON s.nodeid = loa.nodeid AND loa.rn_overall_alias = 1
+    WHERE s.rn_latest_for_type = 1
+    GROUP BY s.nodeid, loa.alias
+  `;
+
+  let allStatsRows: Array<any> = [];
+  try {
+    const [job] = await bigquery.createQueryJob({
+      query: allStatsForTopNodesQuery,
+      params: { nodeIdList: nodeIds }
+    });
+    allStatsRows = (await job.getQueryResults())[0];
+  } catch (error) {
+    logBigQueryError(`fetchTopNodesForCategory (${primaryCategory}) - Step 2: Fetching all stats`, error);
+    // Continue with potentially partial data if topNodesPrimaryData exists
+  }
+
+  // Step 3: Combine results and map
+  const results: SingleCategoryTopNode[] = topNodesPrimaryData.map(primaryNode => {
+    const allStats = allStatsRows.find(s => s.nodeid === primaryNode.nodeid);
+    
+    let categoryShare: number | null = null;
+    let categoryRank: number | null = null;
+
+    if (allStats) {
+        switch (primaryCategory) {
+            case 'micro':
+                categoryShare = allStats.micro_share !== null ? Number(allStats.micro_share) : null;
+                categoryRank = allStats.micro_rank !== null ? Number(allStats.micro_rank) : null;
+                break;
+            case 'common':
+                categoryShare = allStats.common_share !== null ? Number(allStats.common_share) : null;
+                categoryRank = allStats.common_rank !== null ? Number(allStats.common_rank) : null;
+                break;
+            case 'macro':
+                categoryShare = allStats.macro_share !== null ? Number(allStats.macro_share) : null;
+                categoryRank = allStats.macro_rank !== null ? Number(allStats.macro_rank) : null;
+                break;
+        }
+    } else { // Fallback to primary data if allStats lookup fails for some reason
+        categoryShare = primaryNode.primary_share;
+        categoryRank = primaryNode.primary_rank;
+    }
+
+
+    return {
+      nodeid: primaryNode.nodeid,
+      alias: allStats?.display_alias || primaryNode.primary_alias || null,
+      categoryShare: categoryShare,
+      categoryRank: categoryRank,
+      microShare: allStats?.micro_share !== null && allStats?.micro_share !== undefined ? Number(allStats.micro_share) : null,
+      microRank: allStats?.micro_rank !== null && allStats?.micro_rank !== undefined ? Number(allStats.micro_rank) : null,
+      commonShare: allStats?.common_share !== null && allStats?.common_share !== undefined ? Number(allStats.common_share) : null,
+      commonRank: allStats?.common_rank !== null && allStats?.common_rank !== undefined ? Number(allStats.common_rank) : null,
+      macroShare: allStats?.macro_share !== null && allStats?.macro_share !== undefined ? Number(allStats.macro_share) : null,
+      macroRank: allStats?.macro_rank !== null && allStats?.macro_rank !== undefined ? Number(allStats.macro_rank) : null,
+    };
+  });
+  
+  // Re-sort based on the primary category's share, as the GROUP BY in step 2 might alter order
+  results.sort((a, b) => {
+    const aShare = a.categoryShare ?? -1;
+    const bShare = b.categoryShare ?? -1;
+    if (bShare !== aShare) {
+      return bShare - aShare; // Higher share first
+    }
+    const aRank = a.categoryRank ?? Infinity;
+    const bRank = b.categoryRank ?? Infinity;
+    return aRank - bRank; // Lower rank first (if shares are equal)
+  });
+
+  return results;
 }
+
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   if (!bigquery || !datasetId) {

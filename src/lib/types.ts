@@ -95,8 +95,16 @@ export interface TopNodeSubsumptionEntry {
 export interface SingleCategoryTopNode {
   nodeid: string;
   alias?: string | null;
-  share: number | null; // Share for THIS specific category
-  rank: number | null;  // Rank for THIS specific category from the betweenness table
+  categoryShare: number | null; // Share for the specific category this card represents
+  categoryRank: number | null;  // Rank for the specific category this card represents
+
+  // Full details for tooltip
+  microShare: number | null;
+  microRank: number | null;
+  commonShare: number | null;
+  commonRank: number | null;
+  macroShare: number | null;
+  macroRank: number | null;
 }
 
 export interface AllTopNodes {
