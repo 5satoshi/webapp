@@ -195,5 +195,3 @@ export default async function SubsumptionPage({
     </div>
   );
 }
-
-```
