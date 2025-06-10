@@ -1,11 +1,11 @@
 
 'use server';
 /**
- * @fileOverview Provides autocomplete suggestions for node IDs and aliases.
+ * @fileOverview Provides autocomplete suggestions for node IDs and aliases, including their latest common rank.
  *
  * - getNodeSuggestions - Fetches suggestions based on a search term.
  * - GetNodeSuggestionsInput - Input type for the getNodeSuggestions function.
- * - NodeSuggestion - Type for a single suggestion.
+ * - NodeSuggestion - Type for a single suggestion, now includes optional rank.
  * - GetNodeSuggestionsOutput - Output type for the getNodeSuggestions function.
  */
 
@@ -39,6 +39,7 @@ const NodeSuggestionSchema = z.object({
   value: z.string(), // The actual node ID or full alias
   display: z.string(), // What's shown in the dropdown (e.g., truncated ID or alias)
   type: z.enum(['alias', 'nodeId']),
+  rank: z.number().optional().nullable(), // Latest 'common' rank
 });
 export type NodeSuggestion = z.infer<typeof NodeSuggestionSchema>;
 
@@ -58,13 +59,23 @@ async function fetchSuggestionsFromBQ(searchTerm: string): Promise<GetNodeSugges
   if (cleanedSearchTerm.length < 2) return [];
 
   const aliasQuery = `
-    SELECT DISTINCT
+    WITH RankedAliases AS (
+      SELECT
+        alias,
+        rank,
+        ROW_NUMBER() OVER(PARTITION BY alias ORDER BY timestamp DESC) as rn
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE LOWER(alias) LIKE LOWER(@searchTermWildcard)
+        AND alias IS NOT NULL AND TRIM(alias) != ''
+        AND type = 'common'
+    )
+    SELECT
       alias AS value,
       alias AS display,
-      'alias' AS type
-    FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE LOWER(alias) LIKE LOWER(@searchTermWildcard)
-      AND alias IS NOT NULL AND TRIM(alias) != ''
+      'alias' AS type,
+      rank
+    FROM RankedAliases
+    WHERE rn = 1
     ORDER BY
       CASE
         WHEN LOWER(alias) = LOWER(@searchTermExact) THEN 1
@@ -77,12 +88,22 @@ async function fetchSuggestionsFromBQ(searchTerm: string): Promise<GetNodeSugges
   `;
 
   const nodeIdQuery = `
-    SELECT DISTINCT
+    WITH RankedNodeIDs AS (
+      SELECT
+        nodeid,
+        rank,
+        ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn
+      FROM \`${projectId}.${datasetId}.betweenness\`
+      WHERE nodeid LIKE @searchTermPrefix
+        AND type = 'common'
+    )
+    SELECT
       nodeid AS value,
       CONCAT(SUBSTR(nodeid, 1, 8), '...', SUBSTR(nodeid, LENGTH(nodeid) - 7)) AS display,
-      'nodeId' AS type
-    FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid LIKE @searchTermPrefix -- Node IDs are hex, typically no need for LOWER() unless input varies
+      'nodeId' AS type,
+      rank
+    FROM RankedNodeIDs
+    WHERE rn = 1
     LIMIT @nodeIdLimit
   `;
 
@@ -99,7 +120,8 @@ async function fetchSuggestionsFromBQ(searchTerm: string): Promise<GetNodeSugges
     const aliasResults: NodeSuggestion[] = aliasRows.map((r: any) => ({
         value: String(r.value),
         display: String(r.display),
-        type: 'alias'
+        type: 'alias',
+        rank: r.rank !== null && r.rank !== undefined ? Number(r.rank) : null,
     }));
 
 
@@ -119,7 +141,8 @@ async function fetchSuggestionsFromBQ(searchTerm: string): Promise<GetNodeSugges
         const nodeIdResults: NodeSuggestion[] = nodeIdRows.map((r: any) => ({
             value: String(r.value),
             display: String(r.display),
-            type: 'nodeId'
+            type: 'nodeId',
+            rank: r.rank !== null && r.rank !== undefined ? Number(r.rank) : null,
         }));
 
         const existingValues = new Set(combinedResults.map(r => r.value));
@@ -155,9 +178,5 @@ export async function getNodeSuggestions(input: GetNodeSuggestionsInput): Promis
   if (!input.searchTerm || input.searchTerm.trim().length < 2) {
     return [];
   }
-  // Directly call the BQ fetch logic. For server actions, Genkit flow runner isn't strictly necessary
-  // if this is the only operation. If more complex Genkit features were used (e.g., traces, auth handling specific to Genkit),
-  // then calling 'getNodeSuggestionsFlowRunner(input)' would be preferable.
-  // For direct BQ query like this, direct call is fine and avoids potential issues with Genkit flow runner context in Next.js server actions.
   return fetchSuggestionsFromBQ(input.searchTerm);
 }

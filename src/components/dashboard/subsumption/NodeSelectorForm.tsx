@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Search, Loader2 } from 'lucide-react';
-import { getNodeSuggestions, type GetNodeSuggestionsInput, type NodeSuggestion } from '@/ai/flows/getNodeSuggestionsFlow';
+import { getNodeSuggestions, type NodeSuggestion } from '@/ai/flows/getNodeSuggestionsFlow';
 import { cn } from '@/lib/utils';
+import { getOrdinalSuffix } from '@/lib/utils';
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -45,7 +46,6 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
     }
     setIsLoadingSuggestions(true);
     try {
-      // getNodeSuggestions is a server action
       const result = await getNodeSuggestions({ searchTerm });
       setSuggestions(result);
       setShowSuggestions(result.length > 0);
@@ -69,7 +69,6 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
       debouncedFetchSuggestions(nodeInput);
     } else if (document.activeElement !== inputRef.current) {
       // If input is not focused, don't show suggestions unless explicitly opened
-      // This part might need refinement based on desired UX for re-opening suggestions
     } else {
        setSuggestions([]); // Clear suggestions if input is too short
        setShowSuggestions(false);
@@ -130,11 +129,9 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
           value={nodeInput}
           onChange={(e) => setNodeInput(e.target.value)}
           onFocus={() => {
-            // Show suggestions if input is valid and suggestions exist
             if (nodeInput.trim().length >= 2 && suggestions.length > 0) {
               setShowSuggestions(true);
             } else if (nodeInput.trim().length >=2) {
-              // If no suggestions yet but input is valid, trigger a fetch
               debouncedFetchSuggestions(nodeInput);
             }
           }}
@@ -163,7 +160,14 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
                     }
                   }}
                 >
-                  <span className="truncate group-hover:text-accent-foreground">{suggestion.display}</span>
+                  <span className="truncate group-hover:text-accent-foreground">
+                    {suggestion.display}
+                    {suggestion.rank !== null && suggestion.rank !== undefined && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        (Rank: {suggestion.rank}{getOrdinalSuffix(suggestion.rank)})
+                      </span>
+                    )}
+                  </span>
                   <span className={cn(
                     "text-xs px-1.5 py-0.5 rounded-full ml-2 shrink-0",
                     suggestion.type === 'alias' ? 'bg-primary/10 text-primary group-hover:bg-primary/20' : 'bg-secondary/10 text-secondary group-hover:bg-secondary/20'
