@@ -11,24 +11,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { BigQuery } from '@google-cloud/bigquery';
+import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from '@/services/bigqueryClient';
+import { logBigQueryError } from '@/lib/bigqueryUtils';
 
-const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
-const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
-
-// Initialize BigQuery client.
-let bqInstance: BigQuery | undefined;
-function getBigQueryClient() {
-  if (!bqInstance) {
-    try {
-      bqInstance = new BigQuery({ projectId });
-    } catch (error) {
-      console.error("Failed to initialize BigQuery client in getNodeSuggestionsFlow:", error);
-      throw error; // Rethrow to indicate failure
-    }
-  }
-  return bqInstance;
-}
 
 const GetNodeSuggestionsInputSchema = z.object({
   searchTerm: z.string().min(2, "Search term must be at least 2 characters long."),
@@ -36,10 +21,10 @@ const GetNodeSuggestionsInputSchema = z.object({
 export type GetNodeSuggestionsInput = z.infer<typeof GetNodeSuggestionsInputSchema>;
 
 const NodeSuggestionSchema = z.object({
-  value: z.string(), // The actual node ID or full alias
-  display: z.string(), // What's shown in the dropdown (e.g., truncated ID or alias)
+  value: z.string(), 
+  display: z.string(), 
   type: z.enum(['alias', 'nodeId']),
-  rank: z.number().optional().nullable(), // Latest 'common' rank
+  rank: z.number().optional().nullable(), 
 });
 export type NodeSuggestion = z.infer<typeof NodeSuggestionSchema>;
 
@@ -48,11 +33,12 @@ export type GetNodeSuggestionsOutput = z.infer<typeof GetNodeSuggestionsOutputSc
 
 
 async function fetchSuggestionsFromBQ(searchTerm: string): Promise<GetNodeSuggestionsOutput> {
-  let bigquery;
-  try {
-    bigquery = getBigQueryClient();
-  } catch (error) {
-    return []; // Return empty if BQ client failed to init
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+  
+  if (!bigquery) {
+    logBigQueryError("getNodeSuggestionsFlow (fetchSuggestionsFromBQ)", new Error("BigQuery client not available."));
+    return []; 
   }
 
   const cleanedSearchTerm = searchTerm.trim();
@@ -157,8 +143,7 @@ async function fetchSuggestionsFromBQ(searchTerm: string): Promise<GetNodeSugges
     }
     return combinedResults.slice(0, 5);
   } catch (error: any) {
-    console.error(`BigQuery Error in getNodeSuggestionsFlow for term "${searchTerm}":`, error.message);
-    if (error.errors) console.error('Detailed BQ Errors:', JSON.stringify(error.errors, null, 2));
+    logBigQueryError(`getNodeSuggestionsFlow for term "${searchTerm}"`, error);
     return [];
   }
 }
@@ -178,5 +163,6 @@ export async function getNodeSuggestions(input: GetNodeSuggestionsInput): Promis
   if (!input.searchTerm || input.searchTerm.trim().length < 2) {
     return [];
   }
+  // Directly call fetchSuggestionsFromBQ as it now handles ensureBigQueryClientInitialized
   return fetchSuggestionsFromBQ(input.searchTerm);
 }

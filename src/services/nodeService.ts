@@ -1,130 +1,19 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, TopNodeSubsumptionEntry, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
-import { BigQuery, type BigQueryTimestamp, type BigQueryDatetime } from '@google-cloud/bigquery';
-import {
-  format,
-  startOfWeek, startOfMonth, startOfQuarter,
-  endOfDay, endOfWeek, endOfMonth, endOfQuarter,
-  parseISO,
-  subDays, subWeeks, subMonths, subQuarters, startOfDay
-} from 'date-fns';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
+import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
+import { formatDateFromBQ, formatTimestampFromBQValue, mapChannelStatus, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
+import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { specificNodeId } from '@/lib/constants';
-
-const projectId = process.env.BIGQUERY_PROJECT_ID || 'lightning-fee-optimizer';
-const datasetId = process.env.BIGQUERY_DATASET_ID || 'version_1';
-
-let bigquery: BigQuery | undefined;
-
-function logBigQueryError(context: string, error: any) {
-  console.error(`BigQuery Error in ${context}:`, error.message);
-  if (error.code) {
-    console.error(`Error Code: ${error.code}`);
-  }
-  if (error.errors) {
-    console.error('Detailed Errors:', JSON.stringify(error.errors, null, 2));
-  }
-  if (error.response?.data) {
-    console.error('Error Response Data:', JSON.stringify(error.response.data, null, 2));
-  }
-  if (error.message.includes("Could not refresh access token")) {
-    console.error("This 'Could not refresh access token' error often indicates an issue with the service account credentials (GOOGLE_APPLICATION_CREDENTIALS), its permissions (IAM roles for BigQuery), or that the BigQuery API is not enabled for the project.");
-  }
-}
-
-
-try {
-  console.log(`Initializing BigQuery client with projectId: ${projectId}, datasetId: ${datasetId}`);
-  bigquery = new BigQuery({ projectId });
-  console.log("BigQuery client initialized successfully.");
-} catch (error) {
-  logBigQueryError("BigQuery client initialization", error);
-}
-
-function formatTimestampFromBQValue(timestampValue: string | null | undefined): string | null {
-  if (!timestampValue) {
-    return null;
-  }
-  try {
-    const date = parseISO(timestampValue);
-    if (isNaN(date.getTime())) {
-      return null;
-    }
-    return format(date, "yyyy-MM-dd HH:mm:ss");
-  } catch (e) {
-    console.warn("Failed to parse timestamp from BQ value:", timestampValue, e);
-    return null;
-  }
-}
-
-
-function formatDateFromBQ(timestamp: BigQueryTimestamp | BigQueryDatetime | string | Date | { value: string }): string {
-  if (!timestamp) {
-    console.warn("formatDateFromBQ received null or undefined timestamp. Returning today's date as fallback.");
-    return format(new Date(), 'yyyy-MM-dd');
-  }
-
-  let dateToFormat: Date;
-
-  if (typeof (timestamp as { value: string }).value === 'string') {
-    const bqValue = (timestamp as { value: string }).value;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(bqValue)) {
-        dateToFormat = parseISO(bqValue + 'T00:00:00Z');
-    } else {
-        dateToFormat = parseISO(bqValue);
-    }
-  } else if (typeof timestamp === 'string') {
-     if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
-        dateToFormat = parseISO(timestamp + 'T00:00:00Z');
-    } else {
-        dateToFormat = parseISO(timestamp);
-    }
-  } else if (timestamp instanceof Date) {
-    dateToFormat = timestamp;
-  } else {
-    console.warn("Unexpected date format in formatDateFromBQ. Received:", JSON.stringify(timestamp), "Returning today's date as fallback.");
-    dateToFormat = new Date();
-  }
-
-  if (isNaN(dateToFormat.getTime())) {
-    console.warn("Failed to parse date in formatDateFromBQ. Original value:", JSON.stringify(timestamp), "Returning today's date as fallback.");
-    return format(new Date(), 'yyyy-MM-dd');
-  }
-
-  return format(dateToFormat, 'yyyy-MM-dd');
-}
-
-function mapChannelStatus(state: string | null | undefined): Channel['status'] {
-  if (!state) return 'inactive';
-  const normalizedState = state.toUpperCase();
-  switch (normalizedState) {
-    case 'CHANNELD_NORMAL':
-    case 'DUALOPEND_NORMAL':
-      return 'active';
-    case 'OPENINGD':
-    case 'CHANNELD_AWAITING_LOCKIN':
-    case 'DUALOPEND_OPEN_INIT':
-    case 'DUALOPEND_AWAITING_LOCKIN':
-      return 'pending';
-    case 'CHANNELD_SHUTTING_DOWN':
-    case 'CLOSINGD_SIGEXCHANGE':
-    case 'CLOSINGD_COMPLETE':
-    case 'AWAITING_UNILATERAL':
-    case 'FUNDING_SPEND_SEEN':
-    case 'ONCHAIN':
-    case 'DISCONNECTED':
-    case 'CLOSED':
-      return 'inactive';
-    default:
-      return 'inactive';
-  }
-}
 
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchKeyMetrics. Returning N/A metrics.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchKeyMetrics", new Error("BigQuery client not available after initialization attempt."));
     return [
         { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: 'N/A', unit: 'Forwards', iconName: 'Zap' },
         { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'N/A', unit: 'sats', iconName: 'Activity' },
@@ -194,8 +83,11 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
 }
 
 export async function fetchHistoricalForwardingVolume(aggregationPeriod: string = 'week'): Promise<TimeSeriesData[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchHistoricalForwardingVolume. Returning empty time series.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchHistoricalForwardingVolume", new Error("BigQuery client not available."));
     return [];
   }
 
@@ -263,8 +155,11 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
 }
 
 export async function fetchChannels(): Promise<Channel[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchChannels. Returning empty channel list.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchChannels", new Error("BigQuery client not available."));
     return [];
   }
 
@@ -360,7 +255,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         remoteBalance: remoteBalanceSats,
         status: channelStatus,
         historicalPaymentSuccessRate: successRate,
-        lastUpdate: new Date().toISOString(),
+        lastUpdate: new Date().toISOString(), // This is a placeholder; consider if actual last update is needed
         uptime: 0, // Placeholder, as uptime is not directly available from this query
       };
     });
@@ -372,8 +267,11 @@ export async function fetchChannels(): Promise<Channel[]> {
 }
 
 export async function fetchChannelDetails(shortChannelId: string): Promise<ChannelDetails | null> {
-  if (!bigquery || !datasetId || !shortChannelId) {
-    console.error("BigQuery client not initialized, datasetId missing, or shortChannelId not provided for fetchChannelDetails.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery || !shortChannelId) {
+    logBigQueryError("fetchChannelDetails", new Error(`BigQuery client not available or shortChannelId not provided (ID: ${shortChannelId}).`));
     return null;
   }
 
@@ -445,6 +343,7 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
     const [rows] = await job.getQueryResults();
 
     if (!rows || rows.length === 0 || !rows[0]) {
+       console.warn(`No channel details found for shortChannelId: ${shortChannelId}. Returning default structure.`);
       return {
         shortChannelId: shortChannelId,
         firstTxTimestamp: null,
@@ -496,38 +395,12 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
   }
 }
 
-
-function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
-  const now = new Date();
-  const yesterday = endOfDay(subDays(now, 1));
-  let startOfPeriod: Date;
-
-  switch (aggregationPeriod.toLowerCase()) {
-    case 'day':
-      startOfPeriod = startOfDay(subDays(now, 1));
-      break;
-    case 'week':
-      startOfPeriod = startOfDay(subDays(now, 7));
-      break;
-    case 'month':
-      startOfPeriod = startOfDay(subDays(now, 30));
-      break;
-    case 'quarter':
-      startOfPeriod = startOfDay(subDays(now, 90));
-      break;
-    default:
-      startOfPeriod = startOfDay(subDays(now, 1));
-      break;
-  }
-  return {
-    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"),
-    endDate: format(yesterday, "yyyy-MM-dd'T'HH:mm:ssXXX")
-  };
-}
-
 export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; forwardsProcessedCount: number; }> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchPeriodForwardingSummary.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchPeriodForwardingSummary", new Error("BigQuery client not available."));
     return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, forwardsProcessedCount: 0 };
   }
 
@@ -566,8 +439,11 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
 }
 
 export async function fetchPeriodChannelActivity(aggregationPeriod: string): Promise<{ openedCount: number; closedCount: number; }> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchPeriodChannelActivity.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchPeriodChannelActivity", new Error("BigQuery client not available."));
     return { openedCount: 0, closedCount: 0 };
   }
 
@@ -626,12 +502,15 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
 }
 
 export async function fetchBetweennessRank(aggregationPeriod: string): Promise<BetweennessRankData> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchBetweennessRank.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchBetweennessRank", new Error("BigQuery client not available."));
     return { latestRank: null, previousRank: null };
   }
 
-  const nodeId = specificNodeId; // This uses the imported constant for "our node"
+  const nodeId = specificNodeId; 
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
 
   const latestRankQuery = `
@@ -674,12 +553,15 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
 }
 
 export async function fetchShortestPathShare(aggregationPeriod: string): Promise<ShortestPathShareData> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchShortestPathShare.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+  
+  if (!bigquery) {
+    logBigQueryError("fetchShortestPathShare", new Error("BigQuery client not available."));
     return { latestShare: null, previousShare: null };
   }
 
-  const nodeId = specificNodeId; // This uses the imported constant for "our node"
+  const nodeId = specificNodeId; 
   const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
 
   const latestShareQuery = `
@@ -721,9 +603,13 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
   }
 }
 
+
 export async function fetchForwardingAmountDistribution(aggregationPeriod: string): Promise<ForwardingAmountDistributionData[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchForwardingAmountDistribution.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+  
+  if (!bigquery) {
+    logBigQueryError("fetchForwardingAmountDistribution", new Error("BigQuery client not available."));
     return [];
   }
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
@@ -815,31 +701,34 @@ export async function fetchForwardingAmountDistribution(aggregationPeriod: strin
 }
 
 export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod: string): Promise<ForwardingValueOverTimeData[]> {
-    if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchMedianAndMaxForwardingValueOverTime.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchMedianAndMaxForwardingValueOverTime", new Error("BigQuery client not available."));
     return [];
   }
 
   let dateGroupingExpression = "";
-  let limit = 20; // Default limit
+  let limit = 20; 
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'week':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))";
-      limit = 12; // Approx 3 months of weekly data
+      limit = 12; 
       break;
     case 'month':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
-      limit = 12; // 1 year of monthly data
+      limit = 12; 
       break;
     case 'quarter':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), QUARTER)";
-      limit = 8; // 2 years of quarterly data
+      limit = 8; 
       break;
     case 'day':
     default:
       dateGroupingExpression = "DATE(received_time)";
-      limit = 30; // Approx 1 month of daily data
+      limit = 30; 
       break;
   }
 
@@ -886,40 +775,42 @@ export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod
 
 
 export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week'): Promise<HeatmapCell[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchTimingHeatmapData.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchTimingHeatmapData", new Error("BigQuery client not available."));
     return [];
   }
 
   let queryStartDate: string;
-  let queryEndDate: string;
   const now = new Date();
-  const effectiveEndDate = endOfDay(subDays(now, 1)); // Data up to yesterday (end of day)
+  const effectiveEndDate = endOfDay(subDays(now, 1)); 
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': // Corresponds to "Last 7 Days" title in chart
+    case 'day': 
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'week': // Corresponds to "Last 4 Weeks" title in chart
+    case 'week': 
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'month': // Corresponds to "Last 3 Months" title in chart
+    case 'month': 
       queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 3-1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'quarter': // Corresponds to "Last 12 Months" title in chart
+    case 'quarter': 
       queryStartDate = format(startOfDay(subMonths(startOfDay(effectiveEndDate), 12-1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    default: // Fallback to last 7 days for heatmap if period is unknown
+    default: 
       queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
   }
-  queryEndDate = format(effectiveEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
+  const queryEndDate = format(effectiveEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
 
 
   const query = `
     SELECT
-      EXTRACT(DAYOFWEEK FROM received_time) - 1 AS day_of_week, -- 0 (Sun) to 6 (Sat)
-      EXTRACT(HOUR FROM received_time) AS hour_of_day,    -- 0 to 23
+      EXTRACT(DAYOFWEEK FROM received_time) - 1 AS day_of_week, 
+      EXTRACT(HOUR FROM received_time) AS hour_of_day,    
       COUNTIF(status = 'settled') AS successful_forwards,
       COUNTIF(status != 'settled') AS failed_forwards
     FROM \`${projectId}.${datasetId}.forwardings\`
@@ -957,8 +848,11 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
 }
 
 export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchMonthlyRoutingCount.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchMonthlyRoutingCount", new Error("BigQuery client not available."));
     return [];
   }
   const query = `
@@ -970,13 +864,12 @@ export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]>
       AND received_time >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH))
       AND received_time IS NOT NULL
     GROUP BY month
-    ORDER BY MIN(DATE_TRUNC(DATE(received_time), MONTH)) -- Order by actual month sequence
+    ORDER BY MIN(DATE_TRUNC(DATE(received_time), MONTH)) 
   `;
   try {
     const [job] = await bigquery.createQueryJob({ query });
     const [rows] = await job.getQueryResults();
 
-    // Ensure we have 12 months, even if some have 0 count
     const monthMap = new Map<string, number>();
     for (let i = 11; i >= 0; i--) {
       const date = subMonths(new Date(), i);
@@ -984,7 +877,7 @@ export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]>
       monthMap.set(monthName, 0);
     }
     rows.forEach(row => {
-        if (row.month) { // Check if month is not null or undefined
+        if (row.month) { 
             monthMap.set(String(row.month), Number(row.count));
         }
     });
@@ -998,8 +891,11 @@ export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]>
 }
 
 export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchDailyRoutingVolume.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchDailyRoutingVolume", new Error("BigQuery client not available."));
     return [];
   }
   const query = `
@@ -1008,7 +904,7 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
       SUM(out_msat) AS volume_msat
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE status = 'settled'
-      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 42 DAY) -- 6 weeks
+      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 42 DAY) 
       AND received_time IS NOT NULL
     GROUP BY date
     ORDER BY date
@@ -1027,7 +923,7 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
       }
       return {
         date: formatDateFromBQ(row.date),
-        volume: Math.floor(Number(row.volume_msat || 0) / 1000), // msat to sat
+        volume: Math.floor(Number(row.volume_msat || 0) / 1000), 
       };
     }).filter(item => item !== null) as DailyRoutingVolumeData[];
 
@@ -1038,17 +934,19 @@ export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[
 }
 
 async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'macro', limit: number = 3): Promise<SingleCategoryTopNode[]> {
-  if (!bigquery || !datasetId) {
-    console.error(`BigQuery client not initialized or datasetId missing for fetchTopNodesForCategory (${primaryCategory}).`);
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError(`fetchTopNodesForCategory (${primaryCategory})`, new Error("BigQuery client not available."));
     return [];
   }
 
-  // Step 1: Identify top N node IDs for the primaryCategory along with their primary share and rank.
   const topNodeIdsQuery = `
     WITH RankedNodesForPrimaryCategory AS (
       SELECT
         nodeid,
-        alias, -- Alias at the time of this primary category record
+        alias, 
         shortest_path_share,
         rank,
         ROW_NUMBER() OVER(PARTITION BY nodeid ORDER BY timestamp DESC) as rn_latest_for_node_in_category
@@ -1057,7 +955,7 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
     )
     SELECT nodeid, alias as primary_alias, shortest_path_share as primary_share, rank as primary_rank
     FROM RankedNodesForPrimaryCategory
-    WHERE rn_latest_for_node_in_category = 1 -- Only consider the latest record for each node for this category
+    WHERE rn_latest_for_node_in_category = 1 
     ORDER BY primary_share DESC, primary_rank ASC NULLS LAST, nodeid ASC
     LIMIT @limitValue
   `;
@@ -1080,7 +978,6 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
 
   const nodeIds = topNodesPrimaryData.map(n => n.nodeid);
 
-  // Step 2: For these node IDs, get their latest stats for ALL categories
   const allStatsForTopNodesQuery = `
     WITH LatestStatsForAllTypes AS (
       SELECT
@@ -1094,7 +991,7 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
       WHERE nodeid IN UNNEST(@nodeIdList)
         AND type IN ('micro', 'common', 'macro')
     ),
-    LatestOverallAlias AS ( -- Get the single most recent alias for each node, regardless of type
+    LatestOverallAlias AS ( 
       SELECT
         nodeid,
         alias,
@@ -1104,7 +1001,7 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
     )
     SELECT
       s.nodeid,
-      loa.alias AS display_alias, -- Use the absolute latest alias
+      loa.alias AS display_alias, 
       MAX(IF(s.type = 'micro', s.shortest_path_share, NULL)) as micro_share,
       MAX(IF(s.type = 'micro', s.rank, NULL)) as micro_rank,
       MAX(IF(s.type = 'common', s.shortest_path_share, NULL)) as common_share,
@@ -1126,10 +1023,8 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
     allStatsRows = (await job.getQueryResults())[0];
   } catch (error) {
     logBigQueryError(`fetchTopNodesForCategory (${primaryCategory}) - Step 2: Fetching all stats`, error);
-    // Continue with potentially partial data if topNodesPrimaryData exists
   }
-
-  // Step 3: Combine results and map
+  
   const results: SingleCategoryTopNode[] = topNodesPrimaryData.map(primaryNode => {
     const allStats = allStatsRows.find(s => s.nodeid === primaryNode.nodeid);
     
@@ -1151,11 +1046,10 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
                 categoryRank = allStats.macro_rank !== null ? Number(allStats.macro_rank) : null;
                 break;
         }
-    } else { // Fallback to primary data if allStats lookup fails for some reason
+    } else { 
         categoryShare = primaryNode.primary_share;
         categoryRank = primaryNode.primary_rank;
     }
-
 
     return {
       nodeid: primaryNode.nodeid,
@@ -1171,16 +1065,15 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
     };
   });
   
-  // Re-sort based on the primary category's share, as the GROUP BY in step 2 might alter order
   results.sort((a, b) => {
     const aShare = a.categoryShare ?? -1;
     const bShare = b.categoryShare ?? -1;
     if (bShare !== aShare) {
-      return bShare - aShare; // Higher share first
+      return bShare - aShare; 
     }
     const aRank = a.categoryRank ?? Infinity;
     const bRank = b.categoryRank ?? Infinity;
-    return aRank - bRank; // Lower rank first (if shares are equal)
+    return aRank - bRank; 
   });
 
   return results;
@@ -1188,8 +1081,10 @@ async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'm
 
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchTopNodesBySubsumption.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient(); // Check client, though fetchTopNodesForCategory will also check
+  if (!bigquery) {
+    logBigQueryError("fetchTopNodesBySubsumption", new Error("BigQuery client not available."));
     return { micro: [], common: [], macro: [] };
   }
   try {
@@ -1211,33 +1106,36 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
 
 
 export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchNetworkSubsumptionDataForNode.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchNetworkSubsumptionDataForNode", new Error("BigQuery client not available."));
     return [];
   }
 
   let datePeriodUnit: string;
   let startDate: string;
   const now = new Date();
-  const endDate = format(endOfDay(subDays(now, 1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Data up to yesterday
+  const endDate = format(endOfDay(subDays(now, 1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'week':
       datePeriodUnit = 'WEEK(MONDAY)';
-      startDate = format(startOfDay(subWeeks(now, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 12 weeks
+      startDate = format(startOfDay(subDays(now, 7 * 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // 12 weeks
       break;
     case 'month':
       datePeriodUnit = 'MONTH';
-      startDate = format(startOfDay(subMonths(now, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 12 months
+      startDate = format(startOfDay(subMonths(now, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
       break;
     case 'quarter':
       datePeriodUnit = 'QUARTER';
-      startDate = format(startOfDay(subQuarters(now, 8)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 8 quarters (2 years)
+      startDate = format(startOfDay(subMonths(now, 3 * 8)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // 8 quarters
       break;
     case 'day':
     default:
       datePeriodUnit = 'DAY';
-      startDate = format(startOfDay(subDays(now, 30)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // Approx 30 days
+      startDate = format(startOfDay(subDays(now, 30)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
       break;
   }
 
@@ -1285,6 +1183,9 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
 }
 
 export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregationPeriod: string): Promise<OurNodeRanksForAllCategories> {
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+  
   const defaultCategoryRank: OurNodeCategoryRank = { latestRank: null, rankChange: null };
   const result: OurNodeRanksForAllCategories = {
     micro: { ...defaultCategoryRank },
@@ -1292,8 +1193,8 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
     macro: { ...defaultCategoryRank },
   };
 
-  if (!bigquery || !datasetId) {
-    console.error("BigQuery client not initialized or datasetId missing for fetchNodeRankForCategories.");
+  if (!bigquery) {
+    logBigQueryError("fetchNodeRankForCategories", new Error("BigQuery client not available."));
     return result;
   }
 
@@ -1341,15 +1242,17 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
 
     } catch (error) {
       logBigQueryError(`fetchNodeRankForCategories (nodeId: ${nodeIdToFetch}, category: ${category}, period: ${aggregationPeriod})`, error);
-      // Keep default nulls for this category on error
     }
   }
   return result;
 }
 
 export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayInfo | null> {
-  if (!bigquery || !datasetId || !nodeId) {
-    console.error("BigQuery client not initialized, datasetId, or nodeId missing for fetchNodeDisplayInfo.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery || !nodeId) {
+    logBigQueryError("fetchNodeDisplayInfo", new Error("BigQuery client not available or nodeId not provided."));
     return null;
   }
 
@@ -1376,16 +1279,19 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
         alias: String(rows[0].alias),
       };
     }
-    return { nodeId: nodeId, alias: null }; // Return with Node ID even if alias not found or is empty
+    return { nodeId: nodeId, alias: null }; 
   } catch (error) {
     logBigQueryError(`fetchNodeDisplayInfo (nodeId: ${nodeId})`, error);
-    return { nodeId: nodeId, alias: null }; // Return with Node ID on error
+    return { nodeId: nodeId, alias: null }; 
   }
 }
 
 export async function fetchNodeIdByAlias(alias: string): Promise<string | null> {
-  if (!bigquery || !datasetId || !alias || alias.trim() === '') {
-    console.error("BigQuery client not initialized, datasetId missing, or alias not provided for fetchNodeIdByAlias.");
+  await ensureBigQueryClientInitialized();
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery || !alias || alias.trim() === '') {
+    logBigQueryError("fetchNodeIdByAlias", new Error("BigQuery client not available or alias not provided."));
     return null;
   }
 
@@ -1408,7 +1314,7 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
     if (rows && rows.length > 0 && rows[0] && rows[0].nodeid) {
       return String(rows[0].nodeid);
     }
-    return null; // Alias not found
+    return null; 
   } catch (error) {
     logBigQueryError(`fetchNodeIdByAlias (alias: ${alias})`, error);
     return null;
