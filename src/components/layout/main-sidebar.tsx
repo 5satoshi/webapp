@@ -13,7 +13,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { LayoutDashboard, Users, BarChart3, GitCompareArrows, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, GitCompareArrows } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 const navItems = [
@@ -21,7 +21,6 @@ const navItems = [
   { href: '/channels', label: 'Channels', icon: Users },
   { href: '/analytics', label: 'Network Insights', icon: BarChart3 },
   { href: '/subsumption', label: 'Routing Analysis', icon: GitCompareArrows },
-  { href: '/alerts', label: 'Alerts', icon: Bell },
 ];
 
 export function MainSidebar() {
