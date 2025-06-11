@@ -18,6 +18,8 @@ import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/li
 import { getOrdinalSuffix } from '@/lib/utils';
 import { BarChart3 } from 'lucide-react'; 
 
+export const dynamic = 'force-dynamic'; // Explicitly set page to dynamic rendering
+
 // Define the custom LN Router SVG icon
 const LnRouterLogoIcon = ({ className }: { className?: string }) => (
   <svg
