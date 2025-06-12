@@ -1,3 +1,4 @@
+
 'use server';
 
 import type { KeyMetric, TimeSeriesData, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
@@ -64,7 +65,7 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     return [
       { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: totalForwards.toLocaleString('en-US'), unit: 'Forwards', iconName: 'Zap' },
       { id: 'fees', title: 'Forwarding Fees Earned', displayValue: totalFeesSats.toLocaleString('en-US'), unit: 'sats', iconName: 'Activity' },
-      { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: totalForwardingVolumeBtc.toFixed(4), unit: 'BTC', iconName: 'BarChart3' },
+      { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: totalForwardingVolumeBtc.toFixed(1), unit: 'BTC', iconName: 'BarChart3' },
       { id: 'connected_peers', title: 'Connected Peers', displayValue: connectedPeers.toLocaleString('en-US'), unit: 'Peers', iconName: 'Users' },
     ];
 
