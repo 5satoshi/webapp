@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Info } from 'lucide-react';
 import type { ChannelDetails } from '@/lib/types';
-import { fetchChannelDetails } from '@/services/nodeService';
+import { fetchChannelDetails } from '@/services/channelsService'; // Updated import
 
 interface ChannelDetailModalProps {
   isOpen: boolean;
@@ -148,3 +148,5 @@ export function ChannelDetailModal({
     </Dialog>
   );
 }
+
+    

@@ -13,14 +13,13 @@ import {
   fetchPeriodChannelActivity,
   fetchBetweennessRank,
   fetchShortestPathShare
-} from '@/services/nodeService';
+} from '@/services/overviewService'; // Updated import
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { BarChart3 } from 'lucide-react'; 
 
-export const dynamic = 'force-dynamic'; // Explicitly set page to dynamic rendering
+export const dynamic = 'force-dynamic'; 
 
-// Define the custom LN Router SVG icon
 const LnRouterLogoIcon = ({ className }: { className?: string }) => (
   <svg
     width="24" 
@@ -28,7 +27,7 @@ const LnRouterLogoIcon = ({ className }: { className?: string }) => (
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
     className={className} 
-    fill="#00C4B3" // Teal color for LN Router icon
+    fill="#00C4B3" 
   >
     <path
       d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"
@@ -36,7 +35,6 @@ const LnRouterLogoIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Define the custom Amboss SVG icon
 const AmbossLogoIcon = ({ className }: { className?: string }) => (
   <svg 
     width="24" 
@@ -58,7 +56,6 @@ const AmbossLogoIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Define the custom LN+ SVG icon
 const LnPlusLogoIcon = ({ className }: { className?: string }) => (
   <svg
     width="24"
@@ -75,14 +72,13 @@ const LnPlusLogoIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Define the custom 1ML SVG icon
 const OneMlLogoIcon = ({ className }: { className?: string }) => (
   <svg
     viewBox="0 0 80 80"
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <rect width="80" height="80" rx="8" ry="8" fill="#1E88E5" /> {/* Blue background */}
+    <rect width="80" height="80" rx="8" ry="8" fill="#1E88E5" /> 
     <text
       x="50%"
       y="52%"
@@ -116,7 +112,7 @@ export default async function OverviewPage({
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
   
-  let descriptiveLabel = '7 Days'; // Default for week
+  let descriptiveLabel = '7 Days'; 
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
     switch (currentAggregation) {
@@ -296,3 +292,5 @@ export default async function OverviewPage({
     </div>
   );
 }
+
+    

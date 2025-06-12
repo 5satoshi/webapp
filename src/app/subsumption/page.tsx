@@ -14,14 +14,14 @@ import {
   fetchNodeRankForCategories,
   fetchNodeDisplayInfo,
   fetchNodeIdByAlias
-} from '@/services/nodeService';
+} from '@/services/subsumptionService'; // Updated import
 import { specificNodeId } from '@/lib/constants';
 import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric, NodeDisplayInfo } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { TruncatedText } from '@/components/ui/truncated-text';
-import { TooltipProvider } from '@/components/ui/tooltip'; // Added TooltipProvider
+import { TooltipProvider } from '@/components/ui/tooltip'; 
 
 export default async function SubsumptionPage({
   searchParams
@@ -133,7 +133,7 @@ export default async function SubsumptionPage({
         <CardContent className="space-y-4">
           <TruncatedText text={rankingExplanation} charLimit={200} />
           {(topNodesData.micro.length > 0 || topNodesData.common.length > 0 || topNodesData.macro.length > 0) ? (
-            <TooltipProvider> {/* Added TooltipProvider here */}
+            <TooltipProvider> 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <ShortestPathCategoryCard
                   title="Micro"
@@ -200,7 +200,7 @@ export default async function SubsumptionPage({
               Current network rank of the selected node for different payment sizes compared to the start of the selected period. Lower rank is better.
             </p>
             {currentNodeIdToUse ? (
-              <TooltipProvider> {/* Added TooltipProvider for KeyMetricsCard tooltips */}
+              <TooltipProvider> 
                 <div className="grid gap-4 md:grid-cols-3">
                   {nodeRankMetrics.map((metric) => (
                     <KeyMetricsCard key={metric.id} metric={metric} />
@@ -231,3 +231,5 @@ export default async function SubsumptionPage({
     </div>
   );
 }
+
+    

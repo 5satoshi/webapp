@@ -13,7 +13,7 @@ import {
   fetchForwardingAmountDistribution,
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
-} from '@/services/nodeService';
+} from '@/services/analyticsService'; // Updated import
 
 
 export default async function AnalyticsPage({ 
@@ -22,16 +22,16 @@ export default async function AnalyticsPage({
   searchParams?: { aggregation?: string } 
 }) {
   
-  let currentAggregation = searchParams?.aggregation || 'week'; // Default to 'week'
+  let currentAggregation = searchParams?.aggregation || 'week'; 
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'week'; // Fallback if invalid param
+    currentAggregation = 'week'; 
   }
 
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);
   const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
 
-  let chartTitlePeriodLabel = 'Last 4 Weeks'; // Default for 'week'
+  let chartTitlePeriodLabel = 'Last 4 Weeks'; 
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
 
   if (selectedOption) {
@@ -102,3 +102,5 @@ export default async function AnalyticsPage({
     </div>
   );
 }
+
+    

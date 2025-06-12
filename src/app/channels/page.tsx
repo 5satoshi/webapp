@@ -1,7 +1,7 @@
 
 import { PageTitle } from '@/components/ui/page-title';
 import { ChannelListTable } from '@/components/dashboard/channels/channel-list-table';
-import { fetchChannels } from '@/services/nodeService';
+import { fetchChannels } from '@/services/channelsService'; // Updated import
 
 export default async function ChannelsPage() {
   const channels = await fetchChannels();
@@ -17,3 +17,5 @@ With that said, we at 5satoshi follow a no-re-balancing policy. Each channel is 
     </div>
   );
 }
+
+    
