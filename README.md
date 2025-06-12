@@ -7,7 +7,7 @@ The Lightning Stats Dashboard is a comprehensive web application designed for Li
 
 - **Key Metrics Display**: Shows overall lightning node statistics such as total payments processed, forwarding fees earned, node uptime, and number of active channels.
 - **Historical Trend Visualizations**: Presents historical trends via interactive charts for node performance over time, with selectable aggregation periods (days, weeks, months, quarters).
-- **AI-Powered Insights**: Includes an AI-powered "Insights Generator" tool that analyzes statistics to offer custom recommendations (e.g., channel adjustments, fee optimization). *Currently, this involves summarizing recent activity and providing node ID/alias suggestions.*
+- **AI-Powered Insights**: The application infrastructure supports AI-powered analysis. *Currently, this includes providing node ID/alias suggestions with rank information.*
 - **Channel Network Monitoring**: Displays channel details, including peer node IDs, capacity, balance, and historical payment success rates.
 - **Routing Analysis (Shortest Path Share)**: Analyzes how often the node is part of the cheapest route for micro, common, and macro payments, showing trends over time and ranking against other nodes.
 - **Network Insights**: Provides analytics on payment amount distribution and transaction timing patterns using heatmaps.
@@ -128,10 +128,9 @@ The Genkit server usually starts on `http://localhost:3100`.
 
 The application integrates AI capabilities using Genkit:
 
--   **Recent Activity Summarization**: Generates a natural language summary of node activity for a selected period.
--   **Node ID/Alias Autocomplete**: Provides suggestions for node IDs and aliases when searching/filtering, including their latest common rank from BigQuery.
+-   **Node ID/Alias Autocomplete**: Provides suggestions for node IDs and aliases when searching/filtering, including their latest common rank from BigQuery. This is used in the Routing Analysis page.
 
-These features are implemented as Genkit flows, which can be found in `src/ai/flows/`.
+These features are implemented as Genkit flows, which can be found in `src/ai/flows/`. The `summarizeRecentActivityFlow.ts` also exists but is not currently surfaced in the UI.
 
 ## Data Source
 
