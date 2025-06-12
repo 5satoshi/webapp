@@ -227,7 +227,7 @@ export default async function OverviewPage({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle className="font-headline">Historical Forwarding Volume & Period Activity</CardTitle>
             <Tabs value={currentAggregation} className="w-full sm:w-auto">
-              <TabsList className="flex flex-wrap gap-1 sm:gap-2 justify-center sm:justify-end">
+              <TabsList className="flex flex-wrap h-auto min-h-10 items-center justify-center sm:justify-end rounded-md bg-muted p-1 text-muted-foreground gap-1">
                 {aggregationPeriodOptions.map(option => (
                   <TabsTrigger key={option.value} value={option.value} asChild>
                     <Link href={`/?aggregation=${option.value}`}>{option.label}</Link>
