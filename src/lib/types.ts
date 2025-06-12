@@ -37,7 +37,7 @@ export interface AlertSetting {
 export interface TimeSeriesData {
   date: string; 
   forwardingVolume: number; 
-  transactionCount?: number;
+  transactionCount?: number; // Changed back from successRate
   [key: string]: any; 
 }
 

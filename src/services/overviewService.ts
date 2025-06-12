@@ -116,8 +116,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
     SELECT
       ${dateGroupingExpression} AS date_group,
       SUM(IF(status = 'settled', out_msat, 0)) AS total_volume_msat,
-      COUNTIF(status = 'settled') AS successful_forwards_count,
-      COUNTIF(status = 'local_failed') AS local_fails_count
+      COUNTIF(status = 'settled') AS successful_forwards_count
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE received_time IS NOT NULL
     GROUP BY date_group
@@ -137,15 +136,10 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
       if (!row || row.date_group === null || row.date_group === undefined) {
         return null;
       }
-      const successfulForwards = Number(row.successful_forwards_count || 0);
-      const localFails = Number(row.local_fails_count || 0);
-      const relevantAttempts = successfulForwards + localFails;
-      const successRate = relevantAttempts > 0 ? (successfulForwards / relevantAttempts) * 100 : 0;
-
       return {
         date: formatDateFromBQ(row.date_group),
         forwardingVolume: Number(row.total_volume_msat || 0) / 100000000000, // msat to BTC
-        successRate: parseFloat(successRate.toFixed(1)),
+        transactionCount: Number(row.successful_forwards_count || 0),
       };
     }).filter(item => item !== null)
       .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime());
