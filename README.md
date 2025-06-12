@@ -120,7 +120,7 @@ The Genkit server usually starts on `http://localhost:3100`.
     -   `constants.ts`: Application-wide constants.
 -   `src/ai/`: Genkit AI related code.
     -   `genkit.ts`: Genkit global configuration.
-    -   `flows/`: Genkit flows for AI-powered features (e.g., `summarizeRecentActivityFlow.ts`, `getNodeSuggestionsFlow.ts`).
+    -   `flows/`: Genkit flows for AI-powered features (e.g., `getNodeSuggestionsFlow.ts`).
 -   `public/`: Static assets.
 -   `src/app/globals.css`: Global styles and Tailwind CSS theme configuration (ShadCN).
 
@@ -130,7 +130,7 @@ The application integrates AI capabilities using Genkit:
 
 -   **Node ID/Alias Autocomplete**: Provides suggestions for node IDs and aliases when searching/filtering, including their latest common rank from BigQuery. This is used in the Routing Analysis page.
 
-These features are implemented as Genkit flows, which can be found in `src/ai/flows/`. The `summarizeRecentActivityFlow.ts` also exists but is not currently surfaced in the UI.
+These features are implemented as Genkit flows, which can be found in `src/ai/flows/`.
 
 ## Data Source
 
@@ -142,4 +142,3 @@ All statistical data for the dashboard is sourced from Google BigQuery. The quer
 -   **ShadCN UI** provides the base components.
 -   The color scheme and theme variables (CSS HSL) are defined in `src/app/globals.css`, adhering to the project's style guidelines (Deep Purple primary, Burnt Orange secondary, Dark Gray background).
 -   Fonts: 'Inter' for body text, 'Space Grotesk' for headlines.
-
