@@ -108,6 +108,7 @@ export default async function OverviewPage({
 
   const keyMetrics = await fetchKeyMetrics();
   const historicalForwardingVolume = await fetchHistoricalForwardingVolume(currentAggregation);
+  const periodSummaryData = await fetchPeriodForwardingSummary(currentAggregation);
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
@@ -169,12 +170,11 @@ export default async function OverviewPage({
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
     {
-      id: 'forwards_processed_period',
-      title: `Forwards Processed (last ${descriptiveLabel})`,
-      displayValue: (await fetchPeriodForwardingSummary(currentAggregation)).forwardsProcessedCount.toLocaleString(),
-      unit: 'Forwards',
-      iconName: 'Zap',
-      description: `Total forwards successfully processed in the last ${descriptiveLabel.toLowerCase()}.`,
+      id: 'overall_success_rate_period',
+      title: `Overall Success Rate (last ${descriptiveLabel})`,
+      displayValue: periodSummaryData.successRate !== null ? `${periodSummaryData.successRate.toFixed(1)}%` : 'N/A',
+      iconName: 'PieChart', // Changed from Zap to PieChart
+      description: `Overall forwarding success rate in the last ${descriptiveLabel.toLowerCase()}.`,
     },
     {
       id: 'channel_changes_period',

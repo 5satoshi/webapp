@@ -114,11 +114,11 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
   const query = `
     SELECT
       ${dateGroupingExpression} AS date_group,
-      SUM(out_msat) AS total_volume_msat,
-      COUNT(*) AS transaction_count
+      SUM(IF(status = 'settled', out_msat, 0)) AS total_volume_msat,
+      COUNTIF(status = 'settled') AS successful_forwards_count,
+      COUNT(*) AS total_forwards_attempts
     FROM \`${projectId}.${datasetId}.forwardings\`
-    WHERE status = 'settled'
-      AND received_time IS NOT NULL
+    WHERE received_time IS NOT NULL
     GROUP BY date_group
     ORDER BY date_group DESC
     LIMIT ${limit}
@@ -136,10 +136,14 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
       if (!row || row.date_group === null || row.date_group === undefined) {
         return null;
       }
+      const successfulForwards = Number(row.successful_forwards_count || 0);
+      const totalAttempts = Number(row.total_forwards_attempts || 0);
+      const successRate = totalAttempts > 0 ? (successfulForwards / totalAttempts) * 100 : 0;
+
       return {
         date: formatDateFromBQ(row.date_group),
         forwardingVolume: Number(row.total_volume_msat || 0) / 100000000000, // msat to BTC
-        transactionCount: Number(row.transaction_count || 0),
+        successRate: parseFloat(successRate.toFixed(1)),
       };
     }).filter(item => item !== null)
       .sort((a, b) => new Date(a!.date).getTime() - new Date(b!.date).getTime());
@@ -152,25 +156,25 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
   }
 }
 
-export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; forwardsProcessedCount: number; }> {
+export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; successRate: number | null; }> {
   await ensureBigQueryClientInitialized();
   const bigquery = getBigQueryClient();
 
   if (!bigquery) {
     logBigQueryError("fetchPeriodForwardingSummary", new Error("BigQuery client not available."));
-    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, forwardsProcessedCount: 0 };
+    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, successRate: null };
   }
 
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
 
   const query = `
     SELECT
-      MAX(out_msat) as max_payment_msat,
-      SUM(fee_msat) as total_fees_msat,
-      COUNT(*) as forwards_count
+      MAX(IF(status = 'settled', out_msat, NULL)) as max_payment_msat,
+      SUM(IF(status = 'settled', fee_msat, 0)) as total_fees_msat,
+      COUNTIF(status = 'settled') as successful_forwards_count,
+      COUNT(*) as total_forwards_attempts
     FROM \`${projectId}.${datasetId}.forwardings\`
-    WHERE status = 'settled'
-      AND received_time >= TIMESTAMP(@startDate)
+    WHERE received_time >= TIMESTAMP(@startDate)
       AND received_time <= TIMESTAMP(@endDate)
   `;
 
@@ -184,14 +188,18 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
     const [rows] = await job.getQueryResults();
     const result = rows[0] || {};
 
+    const successfulForwards = Number(result.successful_forwards_count || 0);
+    const totalAttempts = Number(result.total_forwards_attempts || 0);
+    const successRate = totalAttempts > 0 ? (successfulForwards / totalAttempts) * 100 : null;
+
     return {
       maxPaymentForwardedSats: Math.floor(Number(result.max_payment_msat || 0) / 1000),
       totalFeesEarnedSats: Math.floor(Number(result.total_fees_msat || 0) / 1000),
-      forwardsProcessedCount: Number(result.forwards_count || 0),
+      successRate: successRate !== null ? parseFloat(successRate.toFixed(1)) : null,
     };
   } catch (error) {
     logBigQueryError(`fetchPeriodForwardingSummary (aggregation: ${aggregationPeriod})`, error);
-    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, forwardsProcessedCount: 0 };
+    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, successRate: null };
   }
 }
 
