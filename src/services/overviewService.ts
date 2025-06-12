@@ -116,7 +116,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
       ${dateGroupingExpression} AS date_group,
       SUM(IF(status = 'settled', out_msat, 0)) AS total_volume_msat,
       COUNTIF(status = 'settled') AS successful_forwards_count,
-      COUNT(*) AS total_forwards_attempts
+      COUNTIF(status = 'local_failed') AS local_fails_count
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE received_time IS NOT NULL
     GROUP BY date_group
@@ -137,8 +137,9 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
         return null;
       }
       const successfulForwards = Number(row.successful_forwards_count || 0);
-      const totalAttempts = Number(row.total_forwards_attempts || 0);
-      const successRate = totalAttempts > 0 ? (successfulForwards / totalAttempts) * 100 : 0;
+      const localFails = Number(row.local_fails_count || 0);
+      const relevantAttempts = successfulForwards + localFails;
+      const successRate = relevantAttempts > 0 ? (successfulForwards / relevantAttempts) * 100 : 0; // Default to 0 if no relevant attempts
 
       return {
         date: formatDateFromBQ(row.date_group),
@@ -167,13 +168,12 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
 
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
 
-  // Assumes a 'fail_type' column exists with 'LOCAL' for local failures.
   const query = `
     SELECT
       MAX(IF(status = 'settled', out_msat, NULL)) as max_payment_msat,
       SUM(IF(status = 'settled', fee_msat, 0)) as total_fees_msat,
       COUNTIF(status = 'settled') as successful_forwards_count,
-      COUNTIF(status != 'settled' AND fail_type = 'LOCAL') as local_fails_count
+      COUNTIF(status = 'local_failed') as local_fails_count
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE received_time >= TIMESTAMP(@startDate)
       AND received_time <= TIMESTAMP(@endDate)
