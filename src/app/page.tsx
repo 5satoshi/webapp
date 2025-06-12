@@ -146,6 +146,11 @@ export default async function OverviewPage({
     shortestPathAbsoluteChange = parseFloat(((shortestPathShareLatest - shortestPathSharePrevious) * 100).toFixed(3));
   }
 
+  let localSuccessRateAbsoluteChange: number | undefined = undefined;
+  if (periodSummaryData.currentSuccessRate !== null && periodSummaryData.previousSuccessRate !== null) {
+    localSuccessRateAbsoluteChange = parseFloat((periodSummaryData.currentSuccessRate - periodSummaryData.previousSuccessRate).toFixed(1));
+  }
+
   const periodMetrics: KeyMetric[] = [
     {
       id: 'betweenness_rank',
@@ -170,11 +175,14 @@ export default async function OverviewPage({
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
     {
-      id: 'overall_success_rate_period',
-      title: `Overall Success Rate (last ${descriptiveLabel})`,
-      displayValue: periodSummaryData.successRate !== null ? `${periodSummaryData.successRate.toFixed(1)}%` : 'N/A',
-      iconName: 'PieChart', // Changed from Zap to PieChart
-      description: `Overall forwarding success rate in the last ${descriptiveLabel.toLowerCase()}.`,
+      id: 'local_success_rate_period',
+      title: `Local Success Rate (last ${descriptiveLabel})`,
+      displayValue: periodSummaryData.currentSuccessRate !== null ? `${periodSummaryData.currentSuccessRate.toFixed(1)}%` : 'N/A',
+      iconName: 'PieChart',
+      absoluteChange: localSuccessRateAbsoluteChange,
+      absoluteChangeDescription: `% vs prev. period`,
+      absoluteChangeDirection: 'higher_is_better',
+      description: `Local forwarding success rate in the last ${descriptiveLabel.toLowerCase()}. Considers only local fails.`,
     },
     {
       id: 'channel_changes_period',
@@ -292,3 +300,4 @@ export default async function OverviewPage({
     </div>
   );
 }
+

@@ -5,6 +5,7 @@ import type { KeyMetric, TimeSeriesData, BetweennessRankData, ShortestPathShareD
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
 import { specificNodeId } from '@/lib/constants';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   await ensureBigQueryClientInitialized();
@@ -139,7 +140,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
       const successfulForwards = Number(row.successful_forwards_count || 0);
       const localFails = Number(row.local_fails_count || 0);
       const relevantAttempts = successfulForwards + localFails;
-      const successRate = relevantAttempts > 0 ? (successfulForwards / relevantAttempts) * 100 : 0; // Default to 0 if no relevant attempts
+      const successRate = relevantAttempts > 0 ? (successfulForwards / relevantAttempts) * 100 : 0;
 
       return {
         date: formatDateFromBQ(row.date_group),
@@ -157,31 +158,72 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
   }
 }
 
-export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ maxPaymentForwardedSats: number; totalFeesEarnedSats: number; successRate: number | null; }> {
+export async function fetchPeriodForwardingSummary(aggregationPeriod: string): Promise<{ 
+  maxPaymentForwardedSats: number; 
+  totalFeesEarnedSats: number; 
+  currentSuccessRate: number | null;
+  previousSuccessRate: number | null; 
+}> {
   await ensureBigQueryClientInitialized();
   const bigquery = getBigQueryClient();
 
+  const defaultReturn = { 
+    maxPaymentForwardedSats: 0, 
+    totalFeesEarnedSats: 0, 
+    currentSuccessRate: null,
+    previousSuccessRate: null
+  };
+
   if (!bigquery) {
     logBigQueryError("fetchPeriodForwardingSummary", new Error("BigQuery client not available."));
-    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, successRate: null };
+    return defaultReturn;
   }
 
-  const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
+  const now = new Date();
+  let durationDays: number;
+
+  switch (aggregationPeriod.toLowerCase()) {
+    case 'day': durationDays = 1; break;
+    case 'week': durationDays = 7; break;
+    case 'month': durationDays = 30; break;
+    case 'quarter': durationDays = 90; break;
+    default: durationDays = 7; break; // Default to week
+  }
+
+  const currentPeriodEndDate = endOfDay(subDays(now, 1));
+  const currentPeriodStartDate = startOfDay(subDays(currentPeriodEndDate, durationDays - 1));
+
+  const previousPeriodEndDate = endOfDay(subDays(currentPeriodStartDate, 1));
+  const previousPeriodStartDate = startOfDay(subDays(previousPeriodEndDate, durationDays - 1));
+
+  const currentPeriodStartStr = format(currentPeriodStartDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
+  const currentPeriodEndStr = format(currentPeriodEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
+  const previousPeriodStartStr = format(previousPeriodStartDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
+  const previousPeriodEndStr = format(previousPeriodEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
 
   const query = `
     SELECT
-      MAX(IF(status = 'settled', out_msat, NULL)) as max_payment_msat,
-      SUM(IF(status = 'settled', fee_msat, 0)) as total_fees_msat,
-      COUNTIF(status = 'settled') as successful_forwards_count,
-      COUNTIF(status = 'local_failed') as local_fails_count
+      MAX(IF(status = 'settled' AND received_time >= TIMESTAMP(@currentPeriodStartStr) AND received_time <= TIMESTAMP(@currentPeriodEndStr), out_msat, NULL)) as max_payment_msat,
+      SUM(IF(status = 'settled' AND received_time >= TIMESTAMP(@currentPeriodStartStr) AND received_time <= TIMESTAMP(@currentPeriodEndStr), fee_msat, 0)) as total_fees_msat,
+      
+      COUNTIF(status = 'settled' AND received_time >= TIMESTAMP(@currentPeriodStartStr) AND received_time <= TIMESTAMP(@currentPeriodEndStr)) as current_successful_forwards,
+      COUNTIF(status = 'local_failed' AND received_time >= TIMESTAMP(@currentPeriodStartStr) AND received_time <= TIMESTAMP(@currentPeriodEndStr)) as current_local_fails,
+      
+      COUNTIF(status = 'settled' AND received_time >= TIMESTAMP(@previousPeriodStartStr) AND received_time <= TIMESTAMP(@previousPeriodEndStr)) as previous_successful_forwards,
+      COUNTIF(status = 'local_failed' AND received_time >= TIMESTAMP(@previousPeriodStartStr) AND received_time <= TIMESTAMP(@previousPeriodEndStr)) as previous_local_fails
+      
     FROM \`${projectId}.${datasetId}.forwardings\`
-    WHERE received_time >= TIMESTAMP(@startDate)
-      AND received_time <= TIMESTAMP(@endDate)
+    WHERE received_time >= TIMESTAMP(@previousPeriodStartStr) AND received_time <= TIMESTAMP(@currentPeriodEndStr)
   `;
 
   const options = {
     query: query,
-    params: { startDate: startDate, endDate: endDate }
+    params: { 
+      currentPeriodStartStr, 
+      currentPeriodEndStr,
+      previousPeriodStartStr,
+      previousPeriodEndStr
+    }
   };
 
   try {
@@ -189,21 +231,28 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
     const [rows] = await job.getQueryResults();
     const result = rows[0] || {};
 
-    const successfulForwards = Number(result.successful_forwards_count || 0);
-    const localFails = Number(result.local_fails_count || 0);
-    const relevantAttempts = successfulForwards + localFails;
-    const successRate = relevantAttempts > 0 ? (successfulForwards / relevantAttempts) * 100 : null;
+    const currentSuccessfulForwards = Number(result.current_successful_forwards || 0);
+    const currentLocalFails = Number(result.current_local_fails || 0);
+    const currentRelevantAttempts = currentSuccessfulForwards + currentLocalFails;
+    const currentSuccessRate = currentRelevantAttempts > 0 ? (currentSuccessfulForwards / currentRelevantAttempts) * 100 : null;
+
+    const previousSuccessfulForwards = Number(result.previous_successful_forwards || 0);
+    const previousLocalFails = Number(result.previous_local_fails || 0);
+    const previousRelevantAttempts = previousSuccessfulForwards + previousLocalFails;
+    const previousSuccessRate = previousRelevantAttempts > 0 ? (previousSuccessfulForwards / previousRelevantAttempts) * 100 : null;
 
     return {
       maxPaymentForwardedSats: Math.floor(Number(result.max_payment_msat || 0) / 1000),
       totalFeesEarnedSats: Math.floor(Number(result.total_fees_msat || 0) / 1000),
-      successRate: successRate !== null ? parseFloat(successRate.toFixed(1)) : null,
+      currentSuccessRate: currentSuccessRate !== null ? parseFloat(currentSuccessRate.toFixed(1)) : null,
+      previousSuccessRate: previousSuccessRate !== null ? parseFloat(previousSuccessRate.toFixed(1)) : null,
     };
   } catch (error) {
     logBigQueryError(`fetchPeriodForwardingSummary (aggregation: ${aggregationPeriod})`, error);
-    return { maxPaymentForwardedSats: 0, totalFeesEarnedSats: 0, successRate: null };
+    return defaultReturn;
   }
 }
+
 
 export async function fetchPeriodChannelActivity(aggregationPeriod: string): Promise<{ openedCount: number; closedCount: number; }> {
   await ensureBigQueryClientInitialized();
