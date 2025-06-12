@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, RoutingActivityData, DailyRoutingVolumeData, NetworkSubsumptionData, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, Channel, BetweennessRankData, ShortestPathShareData, ChannelDetails, ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell, NetworkSubsumptionData, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { formatDateFromBQ, formatTimestampFromBQValue, mapChannelStatus, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
 import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
@@ -847,92 +847,6 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
   }
 }
 
-export async function fetchMonthlyRoutingCount(): Promise<RoutingActivityData[]> {
-  await ensureBigQueryClientInitialized();
-  const bigquery = getBigQueryClient();
-
-  if (!bigquery) {
-    logBigQueryError("fetchMonthlyRoutingCount", new Error("BigQuery client not available."));
-    return [];
-  }
-  const query = `
-    SELECT
-      FORMAT_TIMESTAMP('%b', DATE_TRUNC(DATE(received_time), MONTH)) AS month,
-      COUNT(*) AS count
-    FROM \`${projectId}.${datasetId}.forwardings\`
-    WHERE status = 'settled'
-      AND received_time >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH))
-      AND received_time IS NOT NULL
-    GROUP BY month
-    ORDER BY MIN(DATE_TRUNC(DATE(received_time), MONTH)) 
-  `;
-  try {
-    const [job] = await bigquery.createQueryJob({ query });
-    const [rows] = await job.getQueryResults();
-
-    const monthMap = new Map<string, number>();
-    for (let i = 11; i >= 0; i--) {
-      const date = subMonths(new Date(), i);
-      const monthName = format(date, 'MMM');
-      monthMap.set(monthName, 0);
-    }
-    rows.forEach(row => {
-        if (row.month) { 
-            monthMap.set(String(row.month), Number(row.count));
-        }
-    });
-
-    return Array.from(monthMap.entries()).map(([month, count]) => ({ month, count }));
-
-  } catch (error) {
-    logBigQueryError("fetchMonthlyRoutingCount", error);
-    return [];
-  }
-}
-
-export async function fetchDailyRoutingVolume(): Promise<DailyRoutingVolumeData[]> {
-  await ensureBigQueryClientInitialized();
-  const bigquery = getBigQueryClient();
-
-  if (!bigquery) {
-    logBigQueryError("fetchDailyRoutingVolume", new Error("BigQuery client not available."));
-    return [];
-  }
-  const query = `
-    SELECT
-      DATE(received_time) AS date,
-      SUM(out_msat) AS volume_msat
-    FROM \`${projectId}.${datasetId}.forwardings\`
-    WHERE status = 'settled'
-      AND received_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 42 DAY) 
-      AND received_time IS NOT NULL
-    GROUP BY date
-    ORDER BY date
-  `;
-  try {
-    const [job] = await bigquery.createQueryJob({ query });
-    const [rows] = await job.getQueryResults();
-
-    if (!rows || rows.length === 0) {
-        return [];
-    }
-
-    return rows.map(row => {
-      if (!row || row.date === null || row.date === undefined) {
-        return null;
-      }
-      return {
-        date: formatDateFromBQ(row.date),
-        volume: Math.floor(Number(row.volume_msat || 0) / 1000), 
-      };
-    }).filter(item => item !== null) as DailyRoutingVolumeData[];
-
-  } catch (error) {
-    logBigQueryError("fetchDailyRoutingVolume", error);
-    return [];
-  }
-}
-
 async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'macro', limit: number = 3): Promise<SingleCategoryTopNode[]> {
   await ensureBigQueryClientInitialized();
   const bigquery = getBigQueryClient();
@@ -1320,3 +1234,4 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
     return null;
   }
 }
+
