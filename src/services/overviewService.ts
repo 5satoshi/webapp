@@ -167,12 +167,13 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
 
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
 
+  // Assumes a 'fail_type' column exists with 'LOCAL' for local failures.
   const query = `
     SELECT
       MAX(IF(status = 'settled', out_msat, NULL)) as max_payment_msat,
       SUM(IF(status = 'settled', fee_msat, 0)) as total_fees_msat,
       COUNTIF(status = 'settled') as successful_forwards_count,
-      COUNT(*) as total_forwards_attempts
+      COUNTIF(status != 'settled' AND fail_type = 'LOCAL') as local_fails_count
     FROM \`${projectId}.${datasetId}.forwardings\`
     WHERE received_time >= TIMESTAMP(@startDate)
       AND received_time <= TIMESTAMP(@endDate)
@@ -189,8 +190,9 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
     const result = rows[0] || {};
 
     const successfulForwards = Number(result.successful_forwards_count || 0);
-    const totalAttempts = Number(result.total_forwards_attempts || 0);
-    const successRate = totalAttempts > 0 ? (successfulForwards / totalAttempts) * 100 : null;
+    const localFails = Number(result.local_fails_count || 0);
+    const relevantAttempts = successfulForwards + localFails;
+    const successRate = relevantAttempts > 0 ? (successfulForwards / relevantAttempts) * 100 : null;
 
     return {
       maxPaymentForwardedSats: Math.floor(Number(result.max_payment_msat || 0) / 1000),
