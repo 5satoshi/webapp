@@ -13,7 +13,7 @@ import {
   fetchPeriodChannelActivity,
   fetchBetweennessRank,
   fetchShortestPathShare
-} from '@/services/overviewService'; // Updated import
+} from '@/services/overviewService'; 
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { BarChart3 } from 'lucide-react'; 
@@ -227,7 +227,7 @@ export default async function OverviewPage({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle className="font-headline">Historical Forwarding Volume & Period Activity</CardTitle>
             <Tabs value={currentAggregation} className="w-full sm:w-auto">
-              <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
+              <TabsList className="flex flex-wrap gap-1 sm:gap-2 justify-center sm:justify-end">
                 {aggregationPeriodOptions.map(option => (
                   <TabsTrigger key={option.value} value={option.value} asChild>
                     <Link href={`/?aggregation=${option.value}`}>{option.label}</Link>
@@ -292,5 +292,3 @@ export default async function OverviewPage({
     </div>
   );
 }
-
-    
