@@ -5,13 +5,12 @@ metadata:
   name: lightning-stats-dashboard
   description: A NextJS application providing a dashboard for Lightning Network node statistics, AI-powered insights, and channel management.
   annotations:
-    # If your project is on GitHub, uncomment and set this:
-    # github.com/project-slug: YOUR_ORG/YOUR_REPO
+    github.com/project-slug: https://github.com/5satoshi/webapp
     backstage.io/techdocs-ref: dir:.
 spec:
   type: website
   lifecycle: experimental
-  owner: user:default/guest # Replace with your team or user if known
+  owner: user:default/5satoshi # Replace with your team or user if known
   system: # Optional: specify a system if you have one defined in Backstage
   # dependsOn: [] # Optional: list resource or component dependencies
   # providesApis: [] # Optional: list APIs provided by this component
