@@ -16,7 +16,7 @@ export function MainHeader() {
         
         {/* Updated this div to use flexbox for centering its child (Logo) */}
         <div className="flex flex-1 justify-center items-center"> {/* Logo container */}
-          <Logo size="sm" />
+          <Logo size="md" /> {/* Changed size from "sm" to "md" */}
         </div>
         
         <div className="w-7 flex-shrink-0"> {/* Right Item: Spacer, ensures logo can center properly */}
@@ -36,3 +36,4 @@ export function MainHeader() {
     </header>
   );
 }
+
