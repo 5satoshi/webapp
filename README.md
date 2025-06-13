@@ -5,12 +5,25 @@ The Lightning Stats Dashboard is a comprehensive web application designed for Li
 
 ## Core Features
 
-- **Key Metrics Display**: Shows overall lightning node statistics such as total payments processed, forwarding fees earned, node uptime, and number of active channels.
-- **Historical Trend Visualizations**: Presents historical trends via interactive charts for node performance over time, with selectable aggregation periods (days, weeks, months, quarters).
-- **AI-Powered Insights**: The application infrastructure supports AI-powered analysis. *Currently, this includes providing node ID/alias suggestions with rank information.*
-- **Channel Network Monitoring**: Displays channel details, including peer node IDs, capacity, balance, and historical payment success rates.
-- **Routing Analysis (Shortest Path Share)**: Analyzes how often the node is part of the cheapest route for micro, common, and macro payments, showing trends over time and ranking against other nodes.
-- **Network Insights**: Provides analytics on payment amount distribution and transaction timing patterns using heatmaps.
+The dashboard offers a suite of features to monitor and analyze your Lightning Network node:
+
+- **Node Overview**: At-a-glance summary of key performance indicators, historical forwarding volume, period-specific activity, and information about the node.
+- **Channel Management**: Detailed listing of all channels with status, capacity, balance, and performance metrics, including a detail view for individual channels.
+- **Network Insights**: Analytics on routed payment amounts (distribution and value over time) and transaction timing patterns (heatmap).
+- **Routing Analysis**: Insights into the node's role in the network's cheapest paths for various payment sizes (shortest path share), including comparisons with top nodes and historical trends for any selected node.
+- **AI-Powered Assistance**: Includes features like Node ID/Alias autocomplete with rank information to aid in analysis.
+
+For more detailed information on each section, please refer to our [Documentation](#documentation).
+
+## Documentation
+
+For detailed information about installing, configuring, and using the Lightning Stats Dashboard, please refer to the following documents:
+
+- **[Installation Guide](./docs/installation.md)**: Instructions for setting up and running the application.
+- **[Overview Page Guide](./docs/overview.md)**: Detailed explanation of the Node Overview page.
+- **[Channels Page Guide](./docs/channels.md)**: Detailed explanation of the Channels page and features.
+- **[Network Insights Guide](./docs/network-insights.md)**: Detailed explanation of the Network Insights (Analytics) page.
+- **[Routing Analysis Guide](./docs/routing-analysis.md)**: Detailed explanation of the Routing Analysis (Subsumption) page.
 
 ## Technology Stack
 
@@ -29,66 +42,6 @@ The Lightning Stats Dashboard is a comprehensive web application designed for Li
     - [Google BigQuery](https://cloud.google.com/bigquery) (Stores and serves all node and network statistics)
 - **Deployment**:
     - Firebase App Hosting (Assumed target deployment platform)
-
-## Getting Started
-
-These instructions assume you have Node.js and npm/yarn installed.
-
-### Prerequisites
-
-- Access to a Google Cloud Project with BigQuery enabled.
-- The necessary data populated in your BigQuery tables (schema assumed by `src/services/nodeService.ts` and `src/ai/flows/getNodeSuggestionsFlow.ts`).
-- Service Account credentials configured for local development if running outside a Google Cloud environment that provides Application Default Credentials (ADC).
-
-### Environment Variables
-
-The application uses environment variables for configuration, primarily for connecting to BigQuery.
-Create a `.env` file in the root of the project. The BigQuery `projectId` and `datasetId` are currently hardcoded in `src/services/bigqueryClient.ts` but can be overridden by environment variables:
-
-```env
-# .env (example)
-BIGQUERY_PROJECT_ID=your-gcp-project-id
-BIGQUERY_DATASET_ID=your_bigquery_dataset_id
-
-# For local development, if not using gcloud ADC:
-# GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
-```
-
-Refer to `src/services/bigqueryClient.ts` for default values if environment variables are not set.
-
-### Installation
-
-1.  Clone the repository:
-    ```bash
-    git clone <repository-url>
-    cd <repository-directory>
-    ```
-
-2.  Install dependencies:
-    ```bash
-    npm install
-    # or
-    yarn install
-    ```
-
-### Running the Development Server
-
-To run the Next.js development server:
-
-```bash
-npm run dev
-```
-
-This will typically start the application on `http://localhost:9002`.
-
-To run the Genkit development server (for testing AI flows):
-
-```bash
-npm run genkit:dev
-# or for auto-reloading on changes
-npm run genkit:watch
-```
-The Genkit server usually starts on `http://localhost:3100`.
 
 ## Available Scripts
 
@@ -113,7 +66,7 @@ The Genkit server usually starts on `http://localhost:3100`.
     -   `ui/`: ShadCN UI components.
 -   `src/services/`: Contains services for data fetching and business logic.
     -   `bigqueryClient.ts`: Manages BigQuery client initialization and configuration.
-    -   `nodeService.ts`: Fetches data from BigQuery for the dashboard.
+    -   `overviewService.ts`, `channelsService.ts`, `analyticsService.ts`, `subsumptionService.ts`: Fetch data from BigQuery for different dashboard sections.
 -   `src/lib/`: Utility functions, type definitions, constants, and mock data.
     -   `bigqueryUtils.ts`: Utilities for BigQuery data formatting and date ranges.
     -   `types.ts`: TypeScript type definitions for data structures.
@@ -123,6 +76,7 @@ The Genkit server usually starts on `http://localhost:3100`.
     -   `flows/`: Genkit flows for AI-powered features (e.g., `getNodeSuggestionsFlow.ts`).
 -   `public/`: Static assets.
 -   `src/app/globals.css`: Global styles and Tailwind CSS theme configuration (ShadCN).
+-   `docs/`: Contains detailed documentation files.
 
 ## AI Features
 
@@ -142,3 +96,4 @@ All statistical data for the dashboard is sourced from Google BigQuery. The quer
 -   **ShadCN UI** provides the base components.
 -   The color scheme and theme variables (CSS HSL) are defined in `src/app/globals.css`, adhering to the project's style guidelines (Deep Purple primary, Burnt Orange secondary, Dark Gray background).
 -   Fonts: 'Inter' for body text, 'Space Grotesk' for headlines.
+
