@@ -1,9 +1,10 @@
+
 'use server';
 
 import type { NetworkSubsumptionData, AllTopNodes, SingleCategoryTopNode, OurNodeCategoryRank, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
-import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, subMonths, subWeeks, startOfDay, endOfDay } from 'date-fns'; // Added subWeeks
 
 async function fetchTopNodesForCategory(primaryCategory: 'micro' | 'common' | 'macro', limit: number = 3): Promise<SingleCategoryTopNode[]> {
   await ensureBigQueryClientInitialized();
@@ -187,27 +188,31 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
   }
 
   let datePeriodUnit: string;
-  let startDate: string;
+  let queryStartDate: string;
   const now = new Date();
-  const endDate = format(endOfDay(subDays(now, 1)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
+  const effectiveEndDate = endOfDay(subDays(now, 1));
+  const queryEndDate = format(effectiveEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX");
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'week':
+    case 'day': // Last 7 days
+      datePeriodUnit = 'DAY';
+      queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+      break;
+    case 'week': // Last 4 weeks
       datePeriodUnit = 'WEEK(MONDAY)';
-      startDate = format(startOfDay(subDays(now, 7 * 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // 12 weeks
+      queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'month':
+    case 'month': // Last 3 months
       datePeriodUnit = 'MONTH';
-      startDate = format(startOfDay(subMonths(now, 12)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
+      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 3 - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'quarter':
+    case 'quarter': // Last 12 months
       datePeriodUnit = 'QUARTER';
-      startDate = format(startOfDay(subMonths(now, 3 * 8)), "yyyy-MM-dd'T'HH:mm:ssXXX"); // 8 quarters
+      queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 12 - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
-    case 'day':
     default:
       datePeriodUnit = 'DAY';
-      startDate = format(startOfDay(subDays(now, 30)), "yyyy-MM-dd'T'HH:mm:ssXXX"); 
+      queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
       break;
   }
 
@@ -229,8 +234,8 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
     query: query,
     params: {
       nodeIdToQuery: nodeId,
-      startDate: startDate,
-      endDate: endDate,
+      startDate: queryStartDate,
+      endDate: queryEndDate,
     }
   };
 
@@ -392,5 +397,3 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
     return null;
   }
 }
-
-    

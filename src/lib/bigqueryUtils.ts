@@ -110,31 +110,30 @@ export function mapChannelStatus(state: string | null | undefined): Channel['sta
 
 export function getPeriodDateRange(aggregationPeriod: string): { startDate: string, endDate: string } {
   const now = new Date();
-  // For most queries, we look at data up to the end of *yesterday*
-  // to ensure data completeness, as some data might arrive with a delay.
-  const yesterday = endOfDay(subDays(now, 1)); 
+  const effectiveEndDate = endOfDay(subDays(now, 1)); // Data up to the end of yesterday
   let startOfPeriod: Date;
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': // Represents "Last 1 Day" or "Yesterday"
-      startOfPeriod = startOfDay(subDays(now, 1));
+    case 'day': // Last 7 days
+      startOfPeriod = startOfDay(subDays(effectiveEndDate, 6));
       break;
-    case 'week': // Represents "Last 7 Days"
-      startOfPeriod = startOfDay(subDays(now, 7)); // Inclusive of today, back 7 days
+    case 'week': // Last 4 weeks
+      startOfPeriod = startOfDay(subDays(effectiveEndDate, (4 * 7) - 1));
       break;
-    case 'month': // Represents "Last 30 Days"
-      startOfPeriod = startOfDay(subDays(now, 30));
+    case 'month': // Last 3 months
+      // subMonths(date, N-1) gives a period of N months ending 'date'
+      startOfPeriod = startOfDay(subMonths(effectiveEndDate, 3 - 1));
       break;
-    case 'quarter': // Represents "Last 90 Days"
-      startOfPeriod = startOfDay(subDays(now, 90));
+    case 'quarter': // Last 12 months
+      startOfPeriod = startOfDay(subMonths(effectiveEndDate, 12 - 1));
       break;
-    default: // Fallback to "Yesterday"
-      console.warn(`Unknown aggregation period "${aggregationPeriod}" in getPeriodDateRange. Defaulting to 'day'.`);
-      startOfPeriod = startOfDay(subDays(now, 1));
+    default: // Fallback to "Last 7 Days"
+      console.warn(`Unknown aggregation period "${aggregationPeriod}" in getPeriodDateRange. Defaulting to 'day' (last 7 days).`);
+      startOfPeriod = startOfDay(subDays(effectiveEndDate, 6));
       break;
   }
   return {
-    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"), // Using ISO format with timezone offset
-    endDate: format(yesterday, "yyyy-MM-dd'T'HH:mm:ssXXX")
+    startDate: format(startOfPeriod, "yyyy-MM-dd'T'HH:mm:ssXXX"),
+    endDate: format(effectiveEndDate, "yyyy-MM-dd'T'HH:mm:ssXXX")
   };
 }

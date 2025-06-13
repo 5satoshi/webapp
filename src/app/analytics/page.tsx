@@ -102,5 +102,3 @@ export default async function AnalyticsPage({
     </div>
   );
 }
-
-    

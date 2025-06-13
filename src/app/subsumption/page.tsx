@@ -61,21 +61,21 @@ export default async function SubsumptionPage({
 
   const rankingExplanation = `There are a couple of node ranking solutions available that try to introduce some arbitrary logic to define good quality of a node. Some of them are proprietary and closed, which opens the door for manipulation. Here we’re introducing another ranking mechanism that is leveraging standard graph analytics tools. Because every sender is aiming to find the cheapest route, it is most obvious to make use of shortest path finding algorithms for weighted directed graphs. The "Shortest Path Share" indicates how often a node is part of such an optimal, cheapest path for a given payment size.`;
 
-  let descriptiveLabel = '7 Days';
+  let descriptiveLabel = 'Last 4 Weeks';
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
     switch (currentAggregation) {
       case 'day':
-        descriptiveLabel = 'Day';
+        descriptiveLabel = 'Last 7 Days';
         break;
       case 'week':
-        descriptiveLabel = '7 Days';
+        descriptiveLabel = 'Last 4 Weeks';
         break;
       case 'month':
-        descriptiveLabel = '30 Days';
+        descriptiveLabel = 'Last 3 Months';
         break;
       case 'quarter':
-        descriptiveLabel = '90 Days';
+        descriptiveLabel = 'Last 12 Months';
         break;
       default:
         descriptiveLabel = selectedOption.label.replace(/s$/, '');
@@ -86,7 +86,7 @@ export default async function SubsumptionPage({
   const nodeRankMetrics: KeyMetric[] = [
     {
       id: 'node_micro_rank',
-      title: `Micro Rank (last ${descriptiveLabel})`,
+      title: `Micro Rank (${descriptiveLabel})`,
       displayValue: nodeRanks.micro.latestRank !== null ? `${nodeRanks.micro.latestRank}${getOrdinalSuffix(nodeRanks.micro.latestRank)}` : 'N/A',
       iconName: 'LineChart',
       absoluteChange: nodeRanks.micro.rankChange,
@@ -96,7 +96,7 @@ export default async function SubsumptionPage({
     },
     {
       id: 'node_common_rank',
-      title: `Common Rank (last ${descriptiveLabel})`,
+      title: `Common Rank (${descriptiveLabel})`,
       displayValue: nodeRanks.common.latestRank !== null ? `${nodeRanks.common.latestRank}${getOrdinalSuffix(nodeRanks.common.latestRank)}` : 'N/A',
       iconName: 'LineChart',
       absoluteChange: nodeRanks.common.rankChange,
@@ -106,7 +106,7 @@ export default async function SubsumptionPage({
     },
     {
       id: 'node_macro_rank',
-      title: `Macro Rank (last ${descriptiveLabel})`,
+      title: `Macro Rank (${descriptiveLabel})`,
       displayValue: nodeRanks.macro.latestRank !== null ? `${nodeRanks.macro.latestRank}${getOrdinalSuffix(nodeRanks.macro.latestRank)}` : 'N/A',
       iconName: 'LineChart',
       absoluteChange: nodeRanks.macro.rankChange,
@@ -186,7 +186,7 @@ export default async function SubsumptionPage({
                 </Tabs>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-                Historical trend of the selected node's shortest path share for micro (200 sats), common (50k sats), and macro (4M sats) payments.
+                Historical trend of the selected node's shortest path share for micro (200 sats), common (50k sats), and macro (4M sats) payments over the {descriptiveLabel.toLowerCase()}.
             </p>
             <NetworkSubsumptionChart data={nodeTimelineData} />
             <p className="text-xs text-muted-foreground pt-1">
@@ -195,7 +195,7 @@ export default async function SubsumptionPage({
           </div>
           
           <div className="pt-4">
-            <h3 className="text-xl font-semibold font-headline mb-2">{displayName}'s Rank (Last {descriptiveLabel})</h3>
+            <h3 className="text-xl font-semibold font-headline mb-2">{displayName}'s Rank ({descriptiveLabel})</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Current network rank of the selected node for different payment sizes compared to the start of the selected period. Lower rank is better.
             </p>
@@ -231,5 +231,3 @@ export default async function SubsumptionPage({
     </div>
   );
 }
-
-    

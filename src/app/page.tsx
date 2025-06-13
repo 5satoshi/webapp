@@ -113,21 +113,21 @@ export default async function OverviewPage({
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
   
-  let descriptiveLabel = '7 Days'; 
+  let descriptiveLabel = 'Last 4 Weeks';
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
     switch (currentAggregation) {
       case 'day':
-        descriptiveLabel = 'Day';
+        descriptiveLabel = 'Last 7 Days';
         break;
       case 'week':
-        descriptiveLabel = '7 Days';
+        descriptiveLabel = 'Last 4 Weeks';
         break;
       case 'month':
-        descriptiveLabel = '30 Days';
+        descriptiveLabel = 'Last 3 Months';
         break;
       case 'quarter':
-        descriptiveLabel = '90 Days';
+        descriptiveLabel = 'Last 12 Months';
         break;
       default:
         descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
@@ -166,7 +166,7 @@ export default async function OverviewPage({
     },
     {
       id: 'shortest_path_share',
-      title: `Shortest Path Share (last ${descriptiveLabel})`,
+      title: `Shortest Path Share (${descriptiveLabel})`,
       displayValue: shortestPathDisplayValue,
       iconName: 'PieChart',
       absoluteChange: shortestPathAbsoluteChange,
@@ -176,21 +176,21 @@ export default async function OverviewPage({
     },
     {
       id: 'local_success_rate_period',
-      title: `Local Success Rate (last ${descriptiveLabel})`,
+      title: `Local Success Rate (${descriptiveLabel})`,
       displayValue: periodSummaryData.currentSuccessRate !== null ? `${periodSummaryData.currentSuccessRate.toFixed(1)}%` : 'N/A',
-      iconName: 'PieChart',
+      iconName: 'PieChart', // Consider a different icon if PieChart is used too much e.g. 'Activity' or 'Zap'
       absoluteChange: localSuccessRateAbsoluteChange,
       absoluteChangeDescription: `% vs prev. period`,
       absoluteChangeDirection: 'higher_is_better',
-      description: `Local forwarding success rate in the last ${descriptiveLabel.toLowerCase()}. Considers only local fails.`,
+      description: `Local forwarding success rate in the ${descriptiveLabel.toLowerCase()}. Considers only local fails.`,
     },
     {
       id: 'channel_changes_period',
-      title: `Channel Changes (last ${descriptiveLabel})`,
+      title: `Channel Changes (${descriptiveLabel})`,
       displayValue: `${channelActivity.openedCount} / ${channelActivity.closedCount}`,
       unit: 'Opened / Closed',
       iconName: 'Network',
-      description: `Channels opened vs closed in the last ${descriptiveLabel.toLowerCase()}.`,
+      description: `Channels opened vs closed in the ${descriptiveLabel.toLowerCase()}.`,
     },
   ];
 
@@ -300,4 +300,3 @@ export default async function OverviewPage({
     </div>
   );
 }
-
