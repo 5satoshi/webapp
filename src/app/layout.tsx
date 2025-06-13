@@ -35,10 +35,16 @@ export const metadata: Metadata = {
     siteName: '5satoshi Lightning Stats Dashboard',
     images: [
       {
+        url: `${siteBaseUrl}/logo.svg`, // Updated to use the new logo.svg for social preview
+        width: 80, // SVG width
+        height: 80, // SVG height
+        alt: '5satoshi Lightning Dashboard Logo',
+      },
+      {
         url: 'https://placehold.co/1200x630.png', 
         width: 1200,
         height: 630,
-        alt: '5satoshi Lightning Dashboard Social Preview',
+        alt: '5satoshi Lightning Dashboard Social Preview Banner',
       },
     ],
     locale: 'en_US',

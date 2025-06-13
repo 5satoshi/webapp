@@ -1,21 +1,38 @@
-<svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-labelledby="faviconTitle" role="img">
-  <title id="faviconTitle">5satoshi Favicon</title>
-  <rect width="64" height="64" rx="8" fill="#673AB7"/> <!-- Deep Purple background -->
-  <defs>
-    <mask id="faviconDollarMask">
-      <rect width="64" height="64" fill="white"/>
-      <path d="M30 25 H38 C39.1046 25 40 25.8954 40 27 V29 C40 30.1046 39.1046 31 38 31 H30 C28.8954 31 28 30.1046 28 29 V27 C28 25.8954 27.1046 25 28 25 Z" fill="black" />
-      <path d="M30 37 H38 C39.1046 37 40 37.8954 40 39 V41 C40 42.1046 39.1046 43 38 43 H30 C28.8954 43 28 42.1046 28 41 V39 C28 37.8954 27.1046 37 28 37 Z" fill="black" />
-      <rect x="33" y="24" width="2.5" height="20" rx="1" fill="black"/>
-    </mask>
-  </defs>
-  <path 
-    d="M58,12 L30,12 L30,4 L62,4 L62,27 L42,27 C42,27 38,30.33 38,35 C38,39.67 42,43 42,43 L60,43 L60,56 L18,56 C18,56 18,40 18,30 C18,20 18,12 18,12 L30,12"
-    fill="#FF7043" 
-    stroke="#FFFFFF"
-    stroke-width="3" 
-    stroke-linecap="round" 
-    stroke-linejoin="round"
-    mask="url(#faviconDollarMask)" 
-  />
-</svg>
+<svg
+    width="64"
+    height="64"
+    viewBox="0 0 80 80" 
+    xmlns="http://www.w3.org/2000/svg"
+    aria-labelledby="faviconTitle"
+    role="img"
+  >
+    <title id="faviconTitle">5satoshi Favicon</title>
+    <defs>
+      <linearGradient id="fiveSDollarGradientFavicon" x1="50%" y1="0%" x2="50%" y2="100%">
+        <stop offset="0%" style="stop-color: #FFC107;" />
+        <stop offset="30%" style="stop-color: #FFA726;" />
+        <stop offset="70%" style="stop-color: #AB47BC;" />
+        <stop offset="100%" style="stop-color: #7B1FA2;" />
+      </linearGradient>
+      <mask id="dollarSignCutoutMaskFavicon">
+        <rect width="80" height="80" fill="white" />
+        <rect x="36" y="26" width="5" height="28" fill="black" rx="2" />
+        <rect x="45" y="26" width="5" height="28" fill="black" rx="2" />
+      </mask>
+    </defs>
+    <rect width="80" height="80" rx="14" ry="14" fill="#161616" />
+    <rect x="2.5" y="2.5" width="75" height="75" rx="11.5" ry="11.5" fill="none" stroke="url(#fiveSDollarGradientFavicon)" strokeWidth="3.5" />
+    <path
+      d="
+        M59,20 H30 V27 H56
+        C62,27 63,31 57,34
+        L37,40
+        C30,43 30,49 37,51
+        L57,56
+        C63,59 62,64 56,64
+        H30 V71 H59
+      "
+      fill="url(#fiveSDollarGradientFavicon)"
+      mask="url(#dollarSignCutoutMaskFavicon)"
+    />
+  </svg>
