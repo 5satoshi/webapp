@@ -1,9 +1,14 @@
+# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
+#
+# To ban all spiders from the entire site uncomment the following two lines:
+# User-agent: *
+# Disallow: /
+
 User-agent: *
 Allow: /
+Sitemap: https://www.five-satoshi.com/sitemap.xml
 
-# Disallow common WordPress paths if not using WordPress
 Disallow: /wp-admin/
 Disallow: /wp-includes/
 Disallow: /wp-content/
-
-Sitemap: https://www.five-satoshi.com/sitemap.xml
+Disallow: /.env
