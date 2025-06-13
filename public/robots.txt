@@ -1,6 +1,6 @@
 # See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
 #
-# To ban all spiders from the entire site uncomment the following two lines:
+# To ban all spiders from the entire site uncomment the next two lines:
 # User-agent: *
 # Disallow: /
 
@@ -12,3 +12,4 @@ Disallow: /wp-admin/
 Disallow: /wp-includes/
 Disallow: /wp-content/
 Disallow: /.env
+Disallow: /checkout
