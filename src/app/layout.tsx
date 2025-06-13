@@ -14,9 +14,50 @@ const spaceGrotesk = Space_Grotesk({
   variable: '--font-space-grotesk',
 });
 
+const siteBaseUrl = 'https://www.five-satoshi.com'; // IMPORTANT: Update if your production domain is different
+
 export const metadata: Metadata = {
-  title: '5satoshi - lightning node insights',
-  description: 'Monitor and optimize your Lightning Network node.',
+  metadataBase: new URL(siteBaseUrl),
+  title: {
+    default: '5satoshi Lightning Node Dashboard - Stats & Insights',
+    template: '%s | 5satoshi Dashboard',
+  },
+  description: 'Explore real-time statistics, channel management, network insights, and routing analysis for the 5satoshi Lightning Network node. AI-powered analytics for node operators.',
+  keywords: ['Lightning Network', 'Bitcoin', '5satoshi', 'node', 'dashboard', 'statistics', 'analytics', 'channel management', 'routing', 'crypto', 'cryptocurrency', 'LN', 'LNURL'],
+  openGraph: {
+    title: '5satoshi Lightning Node Dashboard - Stats & Insights',
+    description: 'Explore real-time statistics and analytics for the 5satoshi Lightning Network node.',
+    url: siteBaseUrl,
+    siteName: '5satoshi Lightning Stats Dashboard',
+    images: [
+      {
+        url: 'https://placehold.co/1200x630.png', // Placeholder OG image
+        width: 1200,
+        height: 630,
+        alt: '5satoshi Lightning Dashboard Social Preview',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  // You can also add Twitter specific card metadata if needed
+  // twitter: {
+  //   card: 'summary_large_image',
+  //   title: '5satoshi Lightning Node Dashboard - Stats & Insights',
+  //   description: 'Explore real-time statistics and analytics for the 5satoshi Lightning Network node.',
+  //   images: ['https://placehold.co/1200x630.png'], // Placeholder
+  // },
 };
 
 export default function RootLayout({

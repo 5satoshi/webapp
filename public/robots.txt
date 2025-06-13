@@ -1,6 +1,9 @@
 User-agent: *
 Allow: /
 
+# Disallow common WordPress paths if not using WordPress
 Disallow: /wp-admin/
 Disallow: /wp-includes/
 Disallow: /wp-content/
+
+Sitemap: https://www.five-satoshi.com/sitemap.xml

@@ -178,7 +178,7 @@ export default async function OverviewPage({
       id: 'local_success_rate_period',
       title: `Local Success Rate (${descriptiveLabel})`,
       displayValue: periodSummaryData.currentSuccessRate !== null ? `${periodSummaryData.currentSuccessRate.toFixed(1)}%` : 'N/A',
-      iconName: 'PieChart', // Consider a different icon if PieChart is used too much e.g. 'Activity' or 'Zap'
+      iconName: 'Activity', 
       absoluteChange: localSuccessRateAbsoluteChange,
       absoluteChangeDescription: `% vs prev. period`,
       absoluteChangeDirection: 'higher_is_better',
