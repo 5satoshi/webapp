@@ -1,0 +1,73 @@
+
+site_name: Lightning Stats Dashboard
+site_description: Documentation for the Lightning Stats Dashboard application.
+# Optional: Add your repository URL
+# repo_url: https://github.com/your-org/lightning-stats-dashboard
+# edit_uri: edit/main/docs/ # Allows users to suggest edits to docs
+
+docs_dir: docs
+
+theme:
+  name: material
+  logo: assets/logo-placeholder.png # Optional: Add a logo to public/assets and reference here
+  favicon: assets/favicon-placeholder.png # Optional: Add a favicon
+  palette:
+    # Palette toggle for light/dark mode
+    - scheme: default # Light mode
+      primary: deep_purple # Corresponds to --primary HSL value in globals.css
+      accent: orange # Corresponds to --secondary HSL value in globals.css
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to dark mode
+    - scheme: slate # Dark mode
+      primary: deep_purple
+      accent: orange
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: Roboto Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+    - toc.integrate # Integrates Table of Contents into the navigation sidebar
+
+nav:
+  - 'Home': 'index.md'
+  - 'Installation': 'installation.md'
+  - 'User Guides':
+    - 'Overview Page': 'overview.md'
+    - 'Channels Page': 'channels.md'
+    - 'Network Insights': 'network-insights.md'
+    - 'Routing Analysis': 'routing-analysis.md'
+
+# Optional: Add plugins for more features
+# plugins:
+#   - search
+#   - mermaid2
+#   -awesome-pages: # For more flexible navigation structure if needed
+
+# Optional: Add custom CSS
+# extra_css:
+#   - stylesheets/extra.css
+
+# Optional: Markdown extensions for more features
+# markdown_extensions:
+#   - pymdownx.highlight:
+#       anchor_linenums: true
+#   - pymdownx.inlinehilite
+#   - pymdownx.snippets
+#   - pymdownx.superfences
+#   - admonition
+#   - toc:
+#       permalink: true
+
+# Copyright
+# copyright: Copyright &copy; 2024 Your Name or Company
