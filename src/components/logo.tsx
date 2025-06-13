@@ -1,4 +1,5 @@
 import type React from 'react';
+import { cn } from '@/lib/utils';
 
 // New SVG for the provided image
 const NewFiveSDollarLogoSVG: React.FC<{ width: number; height: number; className?: string }> = ({ width, height, className }) => (
@@ -30,11 +31,25 @@ const NewFiveSDollarLogoSVG: React.FC<{ width: number; height: number; className
 
 
 export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const iconSize = size === 'lg' ? 40 : size === 'md' ? 32 : 28; // Adjusted sm size
+  const iconSize = size === 'lg' ? 40 : size === 'md' ? 32 : 28;
+  const showText = size === 'md' || size === 'lg';
 
   return (
-    <div className="flex items-center" title="5satoshi">
+    <div className="flex items-center gap-2" title="5satoshi">
       <NewFiveSDollarLogoSVG width={iconSize} height={iconSize} />
+      {showText && (
+        <span className={cn(
+          "font-headline text-sidebar-foreground",
+          size === 'lg' ? "text-xl" : "text-lg",
+          // This class will hide the text if the parent .group/sidebar-wrapper
+          // has data-collapsible="icon" (which happens when sidebar is icon-only)
+          // This relies on the Logo being a child of an element with .group/sidebar-wrapper
+          // which is the case through SidebarProvider -> Sidebar -> SidebarHeader -> Logo
+          "group-data-[collapsible=icon]/sidebar-wrapper:hidden" 
+        )}>
+          5satoshi
+        </span>
+      )}
     </div>
   );
 }
