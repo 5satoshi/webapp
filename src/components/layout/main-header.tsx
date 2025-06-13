@@ -9,16 +9,17 @@ export function MainHeader() {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
       {/* --- Mobile View --- */}
-      <div className="flex w-full items-center md:hidden"> {/* Removed justify-between */}
-        <div className="flex-shrink-0"> {/* Container for trigger */}
+      <div className="flex w-full items-center md:hidden"> {/* Parent Flex Container */}
+        <div className="flex-shrink-0"> {/* Left Item: Trigger */}
           <SidebarTrigger className="h-7 w-7" />
         </div>
         
-        <div className="flex-1 text-center"> {/* Logo container */}
+        {/* Updated this div to use flexbox for centering its child (Logo) */}
+        <div className="flex flex-1 justify-center items-center"> {/* Logo container */}
           <Logo size="sm" />
         </div>
         
-        <div className="w-7 flex-shrink-0"> {/* Spacer matching trigger's width (h-7 w-7) */}
+        <div className="w-7 flex-shrink-0"> {/* Right Item: Spacer, ensures logo can center properly */}
           {/* This div intentionally left empty */}
         </div>
       </div>
