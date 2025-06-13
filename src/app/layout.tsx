@@ -23,6 +23,10 @@ export const metadata: Metadata = {
     template: '%s | 5satoshi Dashboard',
   },
   description: 'Explore real-time statistics, channel management, network insights, and routing analysis for the 5satoshi Lightning Network node. AI-powered analytics for node operators.',
+  icons: {
+    icon: '/favicon.svg', // Updated to new SVG favicon
+    // apple: '/apple-icon.png', // Optional: if you have apple touch icons
+  },
   keywords: ['Lightning Network', 'Bitcoin', '5satoshi', 'node', 'dashboard', 'statistics', 'analytics', 'channel management', 'routing', 'crypto', 'cryptocurrency', 'LN', 'LNURL'],
   openGraph: {
     title: '5satoshi Lightning Node Dashboard - Stats & Insights',
@@ -31,7 +35,7 @@ export const metadata: Metadata = {
     siteName: '5satoshi Lightning Stats Dashboard',
     images: [
       {
-        url: 'https://placehold.co/1200x630.png', // Placeholder OG image
+        url: 'https://placehold.co/1200x630.png', 
         width: 1200,
         height: 630,
         alt: '5satoshi Lightning Dashboard Social Preview',
@@ -51,13 +55,6 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  // You can also add Twitter specific card metadata if needed
-  // twitter: {
-  //   card: 'summary_large_image',
-  //   title: '5satoshi Lightning Node Dashboard - Stats & Insights',
-  //   description: 'Explore real-time statistics and analytics for the 5satoshi Lightning Network node.',
-  //   images: ['https://placehold.co/1200x630.png'], // Placeholder
-  // },
 };
 
 export default function RootLayout({
@@ -68,12 +65,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Google Fonts links are kept for compatibility with guidelines if needed, but Next/Font is preferred */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Example: <link href="https://fonts.googleapis.com/css2?family=Inter&family=Space+Grotesk&display=swap" rel="stylesheet" /> */}
       </head>
-      {/* Ensure no 'dark' class is applied here for default light mode */}
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased`}>
         <AppShell>
           {children}

@@ -9,8 +9,8 @@ docs_dir: docs
 
 theme:
   name: material
-  logo: assets/logo-placeholder.png # Optional: Add a logo to public/assets and reference here
-  favicon: assets/favicon-placeholder.png # Optional: Add a favicon
+  logo: /logo.svg # Updated to new SVG logo in public directory
+  favicon: /favicon.svg # Updated to new SVG favicon in public directory
   palette:
     # Palette toggle for light/dark mode
     - scheme: default # Light mode
