@@ -17,7 +17,7 @@ const SwaggerUIInitializer = () => {
     import('swagger-ui-dist/swagger-ui-bundle.js').then(module => {
       const SwaggerUIBundle = module.default || module;
       if (SwaggerUIBundle && swaggerUIRoot.current) {
-        // Ensure the container is empty before initializing
+        // Ensure the container is empty before initializing to prevent duplicates
         if (swaggerUIRoot.current.innerHTML === '') {
           SwaggerUIBundle({
             url: "/api/openapi.yaml", // Path to your OpenAPI spec in the public directory
@@ -40,16 +40,15 @@ const SwaggerUIInitializer = () => {
       }
     });
 
-    // Cleanup function if needed, though SwaggerUIBundle might not require explicit cleanup
+    // Cleanup function
     return () => {
-      // If Swagger UI has a destroy method, call it here
-      // For example: if (window.ui) window.ui.destroy();
-      // Or simply clear the container if re-initialization is an issue on HMR
       if (swaggerUIRoot.current) {
-        // swaggerUIRoot.current.innerHTML = ''; // This might be too aggressive depending on HMR
+        // Clear the container's content when the component unmounts or effect re-runs
+        // This helps prevent errors if SwaggerUI modifies the DOM in ways React doesn't expect
+        swaggerUIRoot.current.innerHTML = '';
       }
     };
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount
 
   return <div id="swagger-ui-container" ref={swaggerUIRoot}></div>;
 };
