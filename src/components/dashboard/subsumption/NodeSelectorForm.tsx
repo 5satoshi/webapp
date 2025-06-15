@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // Removed useSearchParams as it's not directly needed for constructing the new URL
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Search, Loader2 } from 'lucide-react';
 import { getNodeSuggestions, type NodeSuggestion } from '@/ai/flows/getNodeSuggestionsFlow';
 import { cn } from '@/lib/utils';
 import { getOrdinalSuffix } from '@/lib/utils';
+import { specificNodeId } from '@/lib/constants';
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -19,7 +20,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
     }
     timeout = setTimeout(() => func(...args), waitFor);
   };
-  return debounced as (...args: Parameters<F>) => void; // Ensure void return for debounced function
+  return debounced as (...args: Parameters<F>) => void;
 }
 
 interface NodeSelectorFormProps {
@@ -29,7 +30,6 @@ interface NodeSelectorFormProps {
 
 export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSelectorFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [nodeInput, setNodeInput] = useState(initialNodeId);
 
   const [suggestions, setSuggestions] = useState<NodeSuggestion[]>([]);
@@ -61,6 +61,7 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
   const debouncedFetchSuggestions = useRef(debounce(fetchSuggestionsCallback, 300)).current;
 
   useEffect(() => {
+    // Update input if initialNodeId prop changes (e.g., from URL parameter)
     setNodeInput(initialNodeId);
   }, [initialNodeId]);
 
@@ -68,9 +69,9 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
     if (nodeInput.trim().length >= 2 && document.activeElement === inputRef.current) {
       debouncedFetchSuggestions(nodeInput);
     } else if (document.activeElement !== inputRef.current) {
-      // If input is not focused, don't show suggestions unless explicitly opened
+      // setShowSuggestions(false); // Optionally hide if input loses focus
     } else {
-       setSuggestions([]); // Clear suggestions if input is too short
+       setSuggestions([]);
        setShowSuggestions(false);
     }
   }, [nodeInput, debouncedFetchSuggestions]);
@@ -94,26 +95,20 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setShowSuggestions(false); // Hide suggestions on submit
-    const newParams = new URLSearchParams(searchParams.toString());
+    setShowSuggestions(false);
     const trimmedInput = nodeInput.trim();
+    const nodeIdToNavigate = trimmedInput || specificNodeId; // Fallback to default if input is empty
 
-    if (trimmedInput) {
-      newParams.set('nodeId', trimmedInput);
-    } else {
-      newParams.delete('nodeId');
-    }
-    newParams.set('aggregation', currentAggregation);
-    router.push(`/subsumption?${newParams.toString()}`);
+    router.push(`/subsumption/${encodeURIComponent(nodeIdToNavigate)}?aggregation=${currentAggregation}`);
   };
 
   const handleSuggestionClick = (suggestion: NodeSuggestion) => {
-    setNodeInput(suggestion.value);
+    setNodeInput(suggestion.value); // Use the actual value (Node ID or full alias)
     setSuggestions([]);
     setShowSuggestions(false);
-    inputRef.current?.focus();
-    // Consider auto-submitting or just letting user click the button
-    // handleSubmit(new Event('submit') as any); // To auto-submit
+    // Automatically submit the form upon suggestion selection
+    const nodeIdToNavigate = suggestion.value.trim() || specificNodeId;
+    router.push(`/subsumption/${encodeURIComponent(nodeIdToNavigate)}?aggregation=${currentAggregation}`);
   };
 
   return (
@@ -156,6 +151,7 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault(); // Prevent form submission if it's also listening
                       handleSuggestionClick(suggestion);
                     }
                   }}
