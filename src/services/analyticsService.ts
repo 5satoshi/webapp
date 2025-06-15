@@ -1,3 +1,4 @@
+
 'use server';
 
 import type { ForwardingAmountDistributionData, ForwardingValueOverTimeData, HeatmapCell } from '@/lib/types';
@@ -6,7 +7,12 @@ import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bi
 import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
 
 export async function fetchForwardingAmountDistribution(aggregationPeriod: string): Promise<ForwardingAmountDistributionData[]> {
-  await ensureBigQueryClientInitialized();
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchForwardingAmountDistribution (client initialization)", initError);
+    return [];
+  }
   const bigquery = getBigQueryClient();
   
   if (!bigquery) {
@@ -96,13 +102,18 @@ export async function fetchForwardingAmountDistribution(aggregationPeriod: strin
       frequency: Number(row.frequency),
     }));
   } catch (error) {
-    logBigQueryError(`fetchForwardingAmountDistribution (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchForwardingAmountDistribution (aggregation: ${aggregationPeriod}, query execution)`, error);
     return [];
   }
 }
 
 export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod: string): Promise<ForwardingValueOverTimeData[]> {
-  await ensureBigQueryClientInitialized();
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchMedianAndMaxForwardingValueOverTime (client initialization)", initError);
+    return [];
+  }
   const bigquery = getBigQueryClient();
 
   if (!bigquery) {
@@ -169,15 +180,21 @@ export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod
 
     return formattedAndSortedRows as ForwardingValueOverTimeData[];
   } catch (error) {
-    logBigQueryError(`fetchMedianAndMaxForwardingValueOverTime (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchMedianAndMaxForwardingValueOverTime (aggregation: ${aggregationPeriod}, query execution)`, error);
     return [];
   }
 }
 
 
 export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week'): Promise<HeatmapCell[]> {
-  await ensureBigQueryClientInitialized();
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchTimingHeatmapData (client initialization)", initError);
+    return [];
+  }
   const bigquery = getBigQueryClient();
+
 
   if (!bigquery) {
     logBigQueryError("fetchTimingHeatmapData", new Error("BigQuery client not available."));
@@ -243,7 +260,7 @@ export async function fetchTimingHeatmapData(aggregationPeriod: string = 'week')
     }));
 
   } catch (error) {
-    logBigQueryError(`fetchTimingHeatmapData (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchTimingHeatmapData (aggregation: ${aggregationPeriod}, query execution)`, error);
     return [];
   }
 }

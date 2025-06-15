@@ -1,3 +1,4 @@
+
 'use server';
 
 import type { Channel, ChannelDetails } from '@/lib/types';
@@ -5,7 +6,12 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { formatTimestampFromBQValue, mapChannelStatus, logBigQueryError } from '@/lib/bigqueryUtils';
 
 export async function fetchChannels(): Promise<Channel[]> {
-  await ensureBigQueryClientInitialized();
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchChannels (client initialization)", initError);
+    return [];
+  }
   const bigquery = getBigQueryClient();
 
   if (!bigquery) {
@@ -105,24 +111,31 @@ export async function fetchChannels(): Promise<Channel[]> {
         remoteBalance: remoteBalanceSats,
         status: channelStatus,
         historicalPaymentSuccessRate: successRate,
-        lastUpdate: new Date().toISOString(), // This is a placeholder; consider if actual last update is needed
-        uptime: 0, // Placeholder, as uptime is not directly available from this query
+        lastUpdate: new Date().toISOString(), 
+        uptime: 0, 
       };
     });
 
   } catch (error) {
-    logBigQueryError("fetchChannels", error);
+    logBigQueryError("fetchChannels (query execution)", error);
     return [];
   }
 }
 
 export async function fetchChannelDetails(shortChannelId: string): Promise<ChannelDetails | null> {
-  await ensureBigQueryClientInitialized();
+  const defaultReturn: ChannelDetails | null = null; // Or a default structure if preferred
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError(`fetchChannelDetails (client initialization, ID: ${shortChannelId})`, initError);
+    return defaultReturn;
+  }
   const bigquery = getBigQueryClient();
+
 
   if (!bigquery || !shortChannelId) {
     logBigQueryError("fetchChannelDetails", new Error(`BigQuery client not available or shortChannelId not provided (ID: ${shortChannelId}).`));
-    return null;
+    return defaultReturn;
   }
 
   const query = `
@@ -240,8 +253,8 @@ export async function fetchChannelDetails(shortChannelId: string): Promise<Chann
     };
 
   } catch (error) {
-    logBigQueryError(`fetchChannelDetails (shortChannelId: ${shortChannelId})`, error);
-    return null;
+    logBigQueryError(`fetchChannelDetails (query execution, shortChannelId: ${shortChannelId})`, error);
+    return defaultReturn;
   }
 }
 

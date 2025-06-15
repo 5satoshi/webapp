@@ -11,17 +11,25 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
 
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
-  await ensureBigQueryClientInitialized();
+  const defaultMetrics: KeyMetric[] = [
+      { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: 'N/A', unit: 'Forwards', iconName: 'Zap' },
+      { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'N/A', unit: 'sats', iconName: 'Activity' },
+      { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: 'N/A', unit: 'BTC', iconName: 'BarChart3' },
+      { id: 'connected_peers', title: 'Connected Peers', displayValue: 'N/A', unit: 'Peers', iconName: 'Users' },
+  ];
+  
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchKeyMetrics (client initialization)", initError);
+    return defaultMetrics.map(m => ({ ...m, displayValue: 'Error' }));
+  }
+  
   const bigquery = getBigQueryClient();
 
   if (!bigquery) {
     logBigQueryError("fetchKeyMetrics", new Error("BigQuery client not available after initialization attempt."));
-    return [
-        { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: 'N/A', unit: 'Forwards', iconName: 'Zap' },
-        { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'N/A', unit: 'sats', iconName: 'Activity' },
-        { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: 'N/A', unit: 'BTC', iconName: 'BarChart3' },
-        { id: 'connected_peers', title: 'Connected Peers', displayValue: 'N/A', unit: 'Peers', iconName: 'Users' },
-    ];
+    return defaultMetrics.map(m => ({ ...m, displayValue: 'Error' }));
   }
 
   const forwardsQuery = `
@@ -74,18 +82,18 @@ export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
     ];
 
   } catch (error) {
-    logBigQueryError("fetchKeyMetrics", error);
-    return [
-        { id: 'forwards_processed', title: 'Total Forwards Processed', displayValue: 'Error', unit: 'Forwards', iconName: 'Zap' },
-        { id: 'fees', title: 'Forwarding Fees Earned', displayValue: 'Error', unit: 'sats', iconName: 'Activity' },
-        { id: 'total_forwarding_volume', title: 'Total Forwarding Volume', displayValue: 'Error', unit: 'BTC', iconName: 'BarChart3' },
-        { id: 'connected_peers', title: 'Connected Peers', displayValue: 'Error', unit: 'Peers', iconName: 'Users' },
-    ];
+    logBigQueryError("fetchKeyMetrics (query execution)", error);
+    return defaultMetrics.map(m => ({ ...m, displayValue: 'Error' }));
   }
 }
 
 export async function fetchHistoricalForwardingVolume(aggregationPeriod: string = 'week'): Promise<TimeSeriesData[]> {
-  await ensureBigQueryClientInitialized();
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchHistoricalForwardingVolume (client initialization)", initError);
+    return [];
+  }
   const bigquery = getBigQueryClient();
 
   if (!bigquery) {
@@ -150,7 +158,7 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
     return formattedAndSortedRows as TimeSeriesData[];
 
   } catch (error) {
-    logBigQueryError(`fetchHistoricalForwardingVolume (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchHistoricalForwardingVolume (aggregation: ${aggregationPeriod}, query execution)`, error);
     return [];
   }
 }
@@ -161,15 +169,21 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
   currentSuccessRate: number | null;
   previousSuccessRate: number | null; 
 }> {
-  await ensureBigQueryClientInitialized();
-  const bigquery = getBigQueryClient();
-
   const defaultReturn = { 
     maxPaymentForwardedSats: 0, 
     totalFeesEarnedSats: 0, 
     currentSuccessRate: null,
     previousSuccessRate: null
   };
+
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchPeriodForwardingSummary (client initialization)", initError);
+    return defaultReturn;
+  }
+  const bigquery = getBigQueryClient();
+
 
   if (!bigquery) {
     logBigQueryError("fetchPeriodForwardingSummary", new Error("BigQuery client not available."));
@@ -180,11 +194,11 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
   let durationDays: number;
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': durationDays = 1; break; // This logic implies "today vs yesterday" for days, may need adjustment for "last 7 days" etc.
+    case 'day': durationDays = 1; break;
     case 'week': durationDays = 7; break;
     case 'month': durationDays = 30; break;
     case 'quarter': durationDays = 90; break;
-    default: durationDays = 7; break; // Default to week
+    default: durationDays = 7; break; 
   }
 
   const currentPeriodEndDate = endOfDay(subDays(now, 1));
@@ -245,19 +259,26 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
       previousSuccessRate: previousSuccessRate !== null ? parseFloat(previousSuccessRate.toFixed(1)) : null,
     };
   } catch (error) {
-    logBigQueryError(`fetchPeriodForwardingSummary (aggregation: ${aggregationPeriod})`, error);
+    logBigQueryError(`fetchPeriodForwardingSummary (aggregation: ${aggregationPeriod}, query execution)`, error);
     return defaultReturn;
   }
 }
 
 
 export async function fetchPeriodChannelActivity(aggregationPeriod: string): Promise<{ openedCount: number; closedCount: number; }> {
-  await ensureBigQueryClientInitialized();
+  const defaultReturn = { openedCount: 0, closedCount: 0 };
+  try {
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchPeriodChannelActivity (client initialization)", initError);
+    return defaultReturn;
+  }
   const bigquery = getBigQueryClient();
+
 
   if (!bigquery) {
     logBigQueryError("fetchPeriodChannelActivity", new Error("BigQuery client not available."));
-    return { openedCount: 0, closedCount: 0 };
+    return defaultReturn;
   }
 
   const { startDate, endDate } = getPeriodDateRange(aggregationPeriod);
@@ -309,8 +330,8 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
       closedCount: Number(result.closed_count || 0),
     };
   } catch (error) {
-    logBigQueryError(`fetchPeriodChannelActivity (aggregation: ${aggregationPeriod})`, error);
-    return { openedCount: 0, closedCount: 0 };
+    logBigQueryError(`fetchPeriodChannelActivity (aggregation: ${aggregationPeriod}, query execution)`, error);
+    return defaultReturn;
   }
 }
 
@@ -319,6 +340,7 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
   const defaultReturn: BetweennessRankData = { latestRank: null, previousRank: null };
 
   try {
+    // No direct BigQuery client check here, API call will handle its own errors
     const response = await fetch(`${API_BASE_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       const errorBody = await response.text();
@@ -349,6 +371,7 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
   const defaultReturn: ShortestPathShareData = { latestShare: null, previousShare: null };
 
   try {
+    // No direct BigQuery client check here, API call will handle its own errors
     const response = await fetch(`${API_BASE_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       const errorBody = await response.text();

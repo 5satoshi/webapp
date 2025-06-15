@@ -13,10 +13,9 @@ async function initializeBigQuery(): Promise<void> {
     // console.log("BigQuery client already initialized.");
     return;
   }
-  if (bigqueryInitializationError) {
-    // console.warn("BigQuery client initialization previously failed. Not re-attempting.");
-    return;
-  }
+  // If there was a previous error, and we are re-attempting, clear it.
+  // However, ensureBigQueryClientInitialized should prevent re-attempts if an error is sticky.
+  // bigqueryInitializationError = null; 
 
   // console.log("Attempting to initialize BigQuery client...");
   try {
@@ -24,35 +23,13 @@ async function initializeBigQuery(): Promise<void> {
     const client = new BigQuery({ projectId });
     
     // console.log("BigQuery client instantiated. Attempting to get and log authentication details...");
-    try {
-      const credentials = await client.authClient.getCredentials(); 
-      // console.log("Successfully called getCredentials() on authClient.");
+    // Optional: Perform a lightweight operation to confirm connectivity/auth, e.g., client.getServiceAccount()
+    // For now, we assume constructor success means basic setup is okay, errors usually surface on first query.
+    // await client.getProjects(); // Example check, but adds overhead.
 
-      if (credentials && typeof credentials === 'object') {
-        if ('client_email' in credentials && typeof credentials.client_email === 'string' && credentials.client_email) {
-          // console.log(`BigQuery client is authenticated as service account: ${credentials.client_email}`);
-        } else if ('refresh_token' in credentials && credentials.refresh_token) {
-           // console.log("BigQuery client is authenticated using user refresh token (likely OAuth flow).");
-        } else if (Object.keys(credentials).length === 0) {
-           // console.log("BigQuery client credentials object is empty. This might indicate it's using gcloud CLI default credentials or environment-provided ADC without explicit email (e.g., on App Hosting or GCE).");
-        } else {
-          // console.log("BigQuery client authenticated, but credentials object is not in a recognized service account or user refresh token format. Keys:", Object.keys(credentials).join(', '));
-        }
-      } else if (credentials === null || credentials === undefined) {
-         // console.log("BigQuery client getCredentials() returned null or undefined. Client might be using environment credentials transparently (e.g., on App Hosting or GCE).");
-      } else {
-        // console.log("BigQuery client authenticated, but credentials object is not in a recognized format:", credentials);
-      }
-    } catch (authError: any) {
-      // console.error("Error calling bigquery.authClient.getCredentials():", authError.message);
-      if (authError.message && authError.message.includes("Could not load the default credentials")) {
-        // console.error("Hint for 'Could not load the default credentials': Ensure GOOGLE_APPLICATION_CREDENTIALS env var is set correctly for local dev, or that the runtime service account for App Hosting has permissions and BigQuery API is enabled.");
-      }
-    }
-    
     bigqueryInstance = client;
     // console.log("BigQuery client assigned to bigqueryInstance successfully.");
-    bigqueryInitializationError = null; 
+    bigqueryInitializationError = null; // Clear any previous error on successful init
 
   } catch (error: any) {
     console.error(`BigQuery client main initialization error:`, error.message);
@@ -64,42 +41,71 @@ async function initializeBigQuery(): Promise<void> {
     }
     bigqueryInitializationError = error; 
     bigqueryInstance = undefined; 
+    // Re-throw the error so the promise awaiting this initialization fails
+    throw error;
   }
 }
 
+// Initialize on module load for server environments
 if (typeof window === 'undefined') { 
-  bigqueryPromise = initializeBigQuery();
+  bigqueryPromise = initializeBigQuery().catch(err => {
+    // The promise itself will be rejected, but we've already set bigqueryInitializationError.
+    // This catch is to prevent unhandled promise rejection at the module level if not awaited elsewhere.
+    // console.error("BigQuery initialization promise rejected at module level:", err.message);
+  });
 }
 
 
 export function getBigQueryClient(): BigQuery | undefined {
   if (bigqueryInitializationError) {
+    // console.warn("getBigQueryClient: Returning undefined due to prior initialization error.");
     return undefined;
   }
   return bigqueryInstance;
 }
 
 export async function ensureBigQueryClientInitialized(): Promise<void> {
+    if (bigqueryInitializationError) {
+      // console.error("ensureBigQueryClientInitialized: Short-circuiting due to existing initialization error.", bigqueryInitializationError.message);
+      throw bigqueryInitializationError;
+    }
+    
     if (!bigqueryPromise) {
         if (typeof window === 'undefined') {
-          bigqueryPromise = initializeBigQuery();
+          // This case should ideally not be hit if module-level init is working,
+          // but as a fallback:
+          // console.warn("ensureBigQueryClientInitialized: bigqueryPromise was null, attempting re-initialization.");
+          bigqueryPromise = initializeBigQuery().catch(err => {
+            // console.error("BigQuery re-initialization promise rejected:", err.message);
+          });
         } else {
-          console.error("ensureBigQueryClientInitialized called in a client-side context. BigQuery operations should be server-side.");
-          throw new Error("BigQuery client cannot be initialized client-side.");
+          const clientSideError = new Error("BigQuery client cannot be initialized client-side.");
+          console.error("ensureBigQueryClientInitialized called in a client-side context.", clientSideError.message);
+          bigqueryInitializationError = clientSideError;
+          throw clientSideError;
         }
     }
+
     try {
         await bigqueryPromise;
+        // After promise resolves, check again for an error set during initialization
         if (bigqueryInitializationError) {
-            console.error("ensureBigQueryClientInitialized: Initialization failed.", bigqueryInitializationError.message);
+            // console.error("ensureBigQueryClientInitialized: Initialization failed during promise execution.", bigqueryInitializationError.message);
             throw bigqueryInitializationError; 
         }
          if (!bigqueryInstance) {
-            console.error("ensureBigQueryClientInitialized: BigQuery instance is still not available after awaiting promise, and no explicit error was set. This is unexpected.");
-            throw new Error("BigQuery client not available after initialization.");
+            const noInstanceError = new Error("BigQuery client not available after initialization and no specific error was thrown.");
+            // console.error("ensureBigQueryClientInitialized: BigQuery instance is still not available after awaiting promise.", noInstanceError.message);
+            bigqueryInitializationError = noInstanceError; // Set error for future calls
+            throw noInstanceError;
         }
-    } catch (error) {
-        console.error("ensureBigQueryClientInitialized: Error during await of bigqueryPromise.", error);
-        throw error;
+        // console.log("ensureBigQueryClientInitialized: BigQuery client is ready.");
+    } catch (error: any) {
+        // console.error("ensureBigQueryClientInitialized: Error during await of bigqueryPromise or subsequent checks.", error.message);
+        if (!bigqueryInitializationError) { // Ensure error is stored if not already
+            bigqueryInitializationError = error;
+        }
+        throw error; // Re-throw to be caught by service functions
     }
 }
+
