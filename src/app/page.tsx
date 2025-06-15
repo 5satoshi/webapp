@@ -5,29 +5,29 @@ import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card
 import { SampleOverviewChart } from '@/components/dashboard/overview/sample-overview-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { aggregationPeriodOptions } from '@/lib/mock-data'; 
-import { 
-  fetchKeyMetrics, 
+import { aggregationPeriodOptions } from '@/lib/mock-data';
+import {
+  fetchKeyMetrics,
   fetchHistoricalForwardingVolume,
   fetchPeriodForwardingSummary,
   fetchPeriodChannelActivity,
   fetchBetweennessRank,
   fetchShortestPathShare
-} from '@/services/overviewService'; 
+} from '@/services/overviewService';
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
-import { BarChart3 } from 'lucide-react'; 
+import { BarChart3 } from 'lucide-react';
 
-export const dynamic = 'force-dynamic'; 
+export const dynamic = 'force-dynamic';
 
 const LnRouterLogoIcon = ({ className }: { className?: string }) => (
   <svg
-    width="24" 
+    width="24"
     height="24"
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
-    className={className} 
-    fill="#00C4B3" 
+    className={className}
+    fill="#00C4B3"
   >
     <path
       d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z"
@@ -36,22 +36,22 @@ const LnRouterLogoIcon = ({ className }: { className?: string }) => (
 );
 
 const AmbossLogoIcon = ({ className }: { className?: string }) => (
-  <svg 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24" 
-    xmlns="http://www.w3.org/2000/svg" 
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
     <defs>
       <linearGradient id="ambossGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style={{stopColor: 'rgb(236, 72, 153)', stopOpacity: 1}} /> 
+        <stop offset="0%" style={{stopColor: 'rgb(236, 72, 153)', stopOpacity: 1}} />
         <stop offset="100%" style={{stopColor: 'rgb(139, 92, 246)', stopOpacity: 1}} />
       </linearGradient>
     </defs>
-    <path 
+    <path
       d="M6 19 L12 7 L18 19 H15 L12 13 L9 19 H6Z"
-      fill="url(#ambossGradient)" 
+      fill="url(#ambossGradient)"
     />
   </svg>
 );
@@ -67,7 +67,7 @@ const LnPlusLogoIcon = ({ className }: { className?: string }) => (
     <circle cx="12" cy="12" r="11" fill="hsl(var(--card))" stroke="hsl(var(--primary))" strokeWidth="1.5" />
     <path
       d="M11.9162 5.33301L8.41618 12.4997H12.7495L11.0828 18.6663L14.5828 11.4997H10.2495L11.9162 5.33301Z"
-      fill="hsl(var(--primary))" 
+      fill="hsl(var(--primary))"
     />
   </svg>
 );
@@ -78,7 +78,7 @@ const OneMlLogoIcon = ({ className }: { className?: string }) => (
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <rect width="80" height="80" rx="8" ry="8" fill="#1E88E5" /> 
+    <rect width="80" height="80" rx="8" ry="8" fill="#1E88E5" />
     <text
       x="50%"
       y="52%"
@@ -95,12 +95,14 @@ const OneMlLogoIcon = ({ className }: { className?: string }) => (
 );
 
 
-export default async function OverviewPage({ 
-  searchParams 
-}: { 
+export default async function OverviewPage({
+  params,
+  searchParams
+}: {
+  params: {}; // For root page, params is an empty object
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  
+
   const aggregationParam = searchParams.aggregation;
   let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week' (index 1)
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
@@ -113,7 +115,7 @@ export default async function OverviewPage({
   const channelActivity = await fetchPeriodChannelActivity(currentAggregation);
   const betweennessRankData = await fetchBetweennessRank(currentAggregation);
   const shortestPathShareData = await fetchShortestPathShare(currentAggregation);
-  
+
   let descriptiveLabel = 'Last 4 Weeks';
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
   if (selectedOption) {
@@ -131,7 +133,7 @@ export default async function OverviewPage({
         descriptiveLabel = 'Last 12 Months';
         break;
       default:
-        descriptiveLabel = selectedOption.label.replace(/s$/, ''); 
+        descriptiveLabel = selectedOption.label.replace(/s$/, '');
         break;
     }
   }
@@ -139,8 +141,8 @@ export default async function OverviewPage({
 
   const shortestPathShareLatest = shortestPathShareData.latestShare;
   const shortestPathSharePrevious = shortestPathShareData.previousShare;
-  const shortestPathDisplayValue = shortestPathShareLatest !== null 
-    ? `${(shortestPathShareLatest * 100).toFixed(3)}%` 
+  const shortestPathDisplayValue = shortestPathShareLatest !== null
+    ? `${(shortestPathShareLatest * 100).toFixed(3)}%`
     : 'N/A';
   let shortestPathAbsoluteChange: number | undefined = undefined;
   if (shortestPathShareLatest !== null && shortestPathSharePrevious !== null) {
@@ -158,10 +160,10 @@ export default async function OverviewPage({
       title: `Betweenness Rank`,
       displayValue: betweennessRankData.latestRank !== null ? `${betweennessRankData.latestRank}${getOrdinalSuffix(betweennessRankData.latestRank)}` : 'N/A',
       iconName: 'LineChart',
-      absoluteChange: (betweennessRankData.latestRank !== null && betweennessRankData.previousRank !== null) 
-                      ? betweennessRankData.latestRank - betweennessRankData.previousRank 
+      absoluteChange: (betweennessRankData.latestRank !== null && betweennessRankData.previousRank !== null)
+                      ? betweennessRankData.latestRank - betweennessRankData.previousRank
                       : undefined,
-      absoluteChangeDescription: ``, 
+      absoluteChangeDescription: ``,
       absoluteChangeDirection: 'lower_is_better',
       description: `Node's current betweenness centrality rank for common payments. Lower is better.`,
     },
@@ -171,7 +173,7 @@ export default async function OverviewPage({
       displayValue: shortestPathDisplayValue,
       iconName: 'PieChart',
       absoluteChange: shortestPathAbsoluteChange,
-      absoluteChangeDescription: `%`, 
+      absoluteChangeDescription: `%`,
       absoluteChangeDirection: 'higher_is_better',
       description: `Expected fraction of routing attempts using this node for common payments.`,
     },
@@ -179,7 +181,7 @@ export default async function OverviewPage({
       id: 'local_success_rate_period',
       title: `Local Success Rate (${descriptiveLabel})`,
       displayValue: periodSummaryData.currentSuccessRate !== null ? `${periodSummaryData.currentSuccessRate.toFixed(1)}%` : 'N/A',
-      iconName: 'Activity', 
+      iconName: 'Activity',
       absoluteChange: localSuccessRateAbsoluteChange,
       absoluteChangeDescription: `% vs prev. period`,
       absoluteChangeDirection: 'higher_is_better',
@@ -196,33 +198,33 @@ export default async function OverviewPage({
   ];
 
   const externalPlatforms = [
-    { 
-      name: "lightningnetwork.plus", 
-      url: "https://lightningnetwork.plus/nodes/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: LnPlusLogoIcon 
+    {
+      name: "lightningnetwork.plus",
+      url: "https://lightningnetwork.plus/nodes/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69",
+      icon: LnPlusLogoIcon
     },
-    { 
-      name: "Amboss.space", 
-      url: "https://amboss.space/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
+    {
+      name: "Amboss.space",
+      url: "https://amboss.space/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69",
       icon: AmbossLogoIcon
     },
-    { 
-      name: "1ml.com", 
-      url: "https://1ml.com/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
+    {
+      name: "1ml.com",
+      url: "https://1ml.com/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69",
       icon: OneMlLogoIcon
     },
-    { 
-      name: "LN Router", 
-      url: "https://lnrouter.app/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69", 
-      icon: LnRouterLogoIcon 
+    {
+      name: "LN Router",
+      url: "https://lnrouter.app/node/03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69",
+      icon: LnRouterLogoIcon
     },
   ];
 
   return (
     <div className="space-y-6">
-      <PageTitle 
-        title="Node Overview" 
-        description="Welcome to the 5satoshi Lightning Node dashboard. This platform offers a transparent view into our node's performance, operational strategy, and ongoing journey within the Lightning Network." 
+      <PageTitle
+        title="Node Overview"
+        description="Welcome to the 5satoshi Lightning Node dashboard. This platform offers a transparent view into our node's performance, operational strategy, and ongoing journey within the Lightning Network."
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -248,7 +250,7 @@ export default async function OverviewPage({
         </CardHeader>
         <CardContent className="space-y-6">
           <SampleOverviewChart data={historicalForwardingVolume} aggregationPeriod={currentAggregation} />
-          
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {periodMetrics.map((metric) => (
               <KeyMetricsCard key={metric.id} metric={metric} />
@@ -277,11 +279,11 @@ export default async function OverviewPage({
               {externalPlatforms.map((platform) => {
                 const IconComponent = platform.icon;
                 return (
-                  <a 
+                  <a
                     key={platform.name}
-                    href={platform.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
+                    href={platform.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 group"
                   >
                     <Card className="aspect-square bg-card group-hover:shadow-lg group-hover:border-primary/50 group-focus-visible:shadow-lg group-focus-visible:border-primary/50 transition-all duration-200">
@@ -297,7 +299,7 @@ export default async function OverviewPage({
           </div>
         </CardContent>
       </Card>
-      
+
     </div>
   );
 }

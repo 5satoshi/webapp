@@ -9,19 +9,21 @@ import { Separator } from '@/components/ui/separator';
 import { PaymentAmountChart } from '@/components/dashboard/analytics/payment-amount-chart';
 import { TimingHeatmap } from '@/components/dashboard/analytics/timing-heatmap';
 
-import { 
+import {
   fetchForwardingAmountDistribution,
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
 } from '@/services/analyticsService';
 
 
-export default async function AnalyticsPage({ 
-  searchParams 
-}: { 
+export default async function AnalyticsPage({
+  params,
+  searchParams
+}: {
+  params: {}; // For /analytics, params is an empty object
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  
+
   const aggregationParam = searchParams.aggregation;
   let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week'
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
@@ -32,7 +34,7 @@ export default async function AnalyticsPage({
   const forwardingValueData = await fetchMedianAndMaxForwardingValueOverTime(currentAggregation);
   const timingHeatmapData = await fetchTimingHeatmapData(currentAggregation);
 
-  let chartTitlePeriodLabel = 'Last 4 Weeks'; 
+  let chartTitlePeriodLabel = 'Last 4 Weeks';
   const selectedOption = aggregationPeriodOptions.find(opt => opt.value === currentAggregation);
 
   if (selectedOption) {
@@ -50,16 +52,16 @@ export default async function AnalyticsPage({
         chartTitlePeriodLabel = 'Last 12 Months';
         break;
       default:
-        chartTitlePeriodLabel = `Last ${selectedOption.label}`; 
+        chartTitlePeriodLabel = `Last ${selectedOption.label}`;
         break;
     }
   }
 
   return (
     <div className="space-y-6">
-      <PageTitle 
-        title="Network Insights" 
-        description="We can learn something from our node about the usage of the overall network, how much and when the network is used." 
+      <PageTitle
+        title="Network Insights"
+        description="We can learn something from our node about the usage of the overall network, how much and when the network is used."
       />
 
       <Card>
@@ -82,11 +84,11 @@ export default async function AnalyticsPage({
             Understanding the routed payment amounts for the {chartTitlePeriodLabel.toLowerCase()} is crucial. We present two insights: first, the distribution of payment amounts, and second, the evolution of median and maximum payment values over this period.
           </p>
           <PaymentAmountChart
-            distributionData={forwardingDistributionData} 
+            distributionData={forwardingDistributionData}
             forwardingValueData={forwardingValueData}
             frequencyChartTitleLabel={chartTitlePeriodLabel}
           />
-        
+
           <Separator />
 
           <div>
