@@ -1,0 +1,366 @@
+openapi: 3.0.0
+info:
+  title: Lightning Stats Dashboard API
+  version: v1
+  description: API for accessing Lightning Network node statistics and betweenness data.
+servers:
+  - url: /api # Relative to the application's base URL
+
+components:
+  schemas:
+    NodeSuggestion:
+      type: object
+      properties:
+        value:
+          type: string
+          description: The actual value (Node ID or full alias).
+        display:
+          type: string
+          description: The string to display in the UI (e.g., truncated Node ID or alias).
+        type:
+          type: string
+          enum: [alias, nodeId]
+        rank:
+          type: integer
+          nullable: true
+          description: The common rank of the node/alias.
+    NodeSuggestionArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/NodeSuggestion'
+
+    NodeDisplayInfo:
+      type: object
+      properties:
+        nodeId:
+          type: string
+        alias:
+          type: string
+          nullable: true
+
+    NodeIdResponse:
+      type: object
+      properties:
+        nodeId:
+          type: string
+          nullable: true
+
+    OurNodeCategoryRank:
+      type: object
+      properties:
+        latestRank:
+          type: integer
+          nullable: true
+        rankChange:
+          type: integer
+          nullable: true
+        latestShare:
+          type: number
+          format: double
+          nullable: true
+        previousShare:
+          type: number
+          format: double
+          nullable: true
+
+    OurNodeRanksForAllCategories:
+      type: object
+      properties:
+        micro:
+          $ref: '#/components/schemas/OurNodeCategoryRank'
+        common:
+          $ref: '#/components/schemas/OurNodeCategoryRank'
+        macro:
+          $ref: '#/components/schemas/OurNodeCategoryRank'
+
+    NetworkSubsumptionDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2023-10-26"
+        micro:
+          type: number
+          format: double
+          description: Percentage share for micro transactions.
+        common:
+          type: number
+          format: double
+          description: Percentage share for common transactions.
+        macro:
+          type: number
+          format: double
+          description: Percentage share for macro transactions.
+    NetworkSubsumptionDataArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/NetworkSubsumptionDataPoint'
+
+    SingleCategoryTopNode:
+      type: object
+      properties:
+        nodeid:
+          type: string
+        alias:
+          type: string
+          nullable: true
+        categoryShare:
+          type: number
+          format: double
+          nullable: true
+        categoryRank:
+          type: integer
+          nullable: true
+        microShare:
+          type: number
+          format: double
+          nullable: true
+        microRank:
+          type: integer
+          nullable: true
+        commonShare:
+          type: number
+          format: double
+          nullable: true
+        commonRank:
+          type: integer
+          nullable: true
+        macroShare:
+          type: number
+          format: double
+          nullable: true
+        macroRank:
+          type: integer
+          nullable: true
+    SingleCategoryTopNodeArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/SingleCategoryTopNode'
+
+    AllTopNodes:
+      type: object
+      properties:
+        micro:
+          $ref: '#/components/schemas/SingleCategoryTopNodeArray'
+        common:
+          $ref: '#/components/schemas/SingleCategoryTopNodeArray'
+        macro:
+          $ref: '#/components/schemas/SingleCategoryTopNodeArray'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details: # Optional
+          type: string
+          nullable: true
+
+
+  parameters:
+    NodeIdParam:
+      name: nodeId
+      in: query
+      required: true
+      description: The public key of the Lightning Network node.
+      schema:
+        type: string
+        example: "03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69"
+    AggregationParam:
+      name: aggregation
+      in: query
+      required: false
+      description: Aggregation period for data (day, week, month, quarter). Defaults to 'week'.
+      schema:
+        type: string
+        enum: [day, week, month, quarter]
+        default: week
+    SearchTermParam:
+      name: searchTerm
+      in: query
+      required: true
+      description: Search term for node suggestions (min 2 characters).
+      schema:
+        type: string
+        minLength: 2
+    AliasParam:
+      name: alias
+      in: query
+      required: true
+      description: Node alias to resolve.
+      schema:
+        type: string
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Number of results to return for top nodes. Defaults to 3.
+      schema:
+        type: integer
+        default: 3
+
+paths:
+  /betweenness/suggestions:
+    get:
+      summary: Get Node ID/Alias Suggestions
+      description: Provides autocomplete suggestions for node IDs and aliases, including their latest common rank.
+      operationId: getNodeSuggestionsApi
+      parameters:
+        - $ref: '#/components/parameters/SearchTermParam'
+      responses:
+        '200':
+          description: A list of node suggestions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeSuggestionArray'
+        '400':
+          description: Bad Request (e.g., searchTerm too short).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /betweenness/node-info:
+    get:
+      summary: Get Node Display Info
+      description: Fetches the latest alias for a given Node ID.
+      operationId: getNodeInfoApi
+      parameters:
+        - $ref: '#/components/parameters/NodeIdParam'
+      responses:
+        '200':
+          description: Node display information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeDisplayInfo'
+        '400':
+          description: Bad Request (e.g., nodeId parameter missing).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /betweenness/resolve-alias:
+    get:
+      summary: Resolve Alias to Node ID
+      description: Fetches the Node ID for a given alias.
+      operationId: resolveAliasApi
+      parameters:
+        - $ref: '#/components/parameters/AliasParam'
+      responses:
+        '200':
+          description: Node ID corresponding to the alias, or null if not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeIdResponse'
+        '400':
+          description: Bad Request (e.g., alias parameter missing).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /betweenness/node-ranks:
+    get:
+      summary: Get Node Ranks and Shares
+      description: Fetches rank and shortest path share data for a specific node across micro, common, and macro payment categories for a given aggregation period.
+      operationId: getNodeRanksApi
+      parameters:
+        - $ref: '#/components/parameters/NodeIdParam'
+        - $ref: '#/components/parameters/AggregationParam'
+      responses:
+        '200':
+          description: Node rank and share data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OurNodeRanksForAllCategories'
+        '400':
+          description: Bad Request (e.g., nodeId parameter missing).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /betweenness/node-timeline:
+    get:
+      summary: Get Node Shortest Path Share Timeline
+      description: Fetches the historical shortest path share for a specific node across micro, common, and macro payment categories for a given aggregation period.
+      operationId: getNodeTimelineApi
+      parameters:
+        - $ref: '#/components/parameters/NodeIdParam'
+        - $ref: '#/components/parameters/AggregationParam'
+      responses:
+        '200':
+          description: Time series data of shortest path shares.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkSubsumptionDataArray'
+        '400':
+          description: Bad Request (e.g., nodeId parameter missing).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /betweenness/top-nodes:
+    get:
+      summary: Get Top Nodes by Shortest Path Share
+      description: Fetches the top nodes ranked by their latest shortest path share for micro, common, and macro payment categories.
+      operationId: getTopNodesApi
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Top nodes data for all categories.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllTopNodes'
+        '400':
+          description: Bad Request (e.g., invalid limit parameter).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

@@ -47,6 +47,7 @@ nav:
     - 'Channels Page': 'channels.md'
     - 'Network Insights': 'network-insights.md'
     - 'Routing Analysis': 'routing-analysis.md'
+  - 'API Reference': 'api-reference.md'
 
 # Optional: Add plugins for more features
 # plugins:
