@@ -1,12 +1,10 @@
 
 'use client';
 
-import Head from 'next/head';
 import { useEffect, useRef } from 'react';
 import { PageTitle } from '@/components/ui/page-title';
 
-// It's important to load Swagger UI scripts and CSS.
-
+// SwaggerUIInitializer component remains the same internally
 const SwaggerUIInitializer = () => {
   const swaggerUIRoot = useRef<HTMLDivElement>(null);
 
@@ -22,12 +20,8 @@ const SwaggerUIInitializer = () => {
             dom_id: '#swagger-ui-container', // Matches the div id
             presets: [
               SwaggerUIBundle.presets.apis,
-              // SwaggerUIBundle.SwaggerUIStandalonePreset // Removed problematic preset
             ],
-            // layout: "StandaloneLayout", // Removed explicit layout
             deepLinking: true,
-            // You can add more Swagger UI options here
-            // e.g., defaultModelsExpandDepth: -1 to hide models by default
           });
         }
       }
@@ -47,29 +41,30 @@ const SwaggerUIInitializer = () => {
     };
   }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount
 
-  return <div id="swagger-ui-container" ref={swaggerUIRoot}></div>;
+  // Added minHeight to ensure the container is not collapsed
+  return <div id="swagger-ui-container" ref={swaggerUIRoot} style={{ minHeight: '600px' }}></div>;
 };
 
 
 export default function ApiDocsPage() {
   return (
-    <div className="space-y-6">
-      <Head>
-        <link
-          rel="stylesheet"
-          type="text/css"
-          href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"
-          key="swagger-css"
-        />
-        <title>API Reference | 5satoshi Dashboard</title>
-      </Head>
-      <PageTitle
-        title="API Reference"
-        description="Explore the available API endpoints for the Lightning Stats Dashboard."
+    <>
+      <link
+        key="swagger-css" // React key for the link element
+        rel="stylesheet"
+        type="text/css"
+        // Using a specific version from unpkg consistent with potential installed version
+        href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css"
       />
-      <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
-        <SwaggerUIInitializer />
+      <div className="space-y-6">
+        <PageTitle
+          title="API Reference"
+          description="Explore the available API endpoints for the Lightning Stats Dashboard."
+        />
+        <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
+          <SwaggerUIInitializer />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
