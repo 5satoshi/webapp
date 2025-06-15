@@ -2,9 +2,8 @@
 'use server';
 
 import type { NetworkSubsumptionData, AllTopNodes, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
-// Direct BigQuery imports are removed as logic is now in API routes.
-// Helper imports might still be needed if any utility functions were used for data transformation AFTER fetching,
-// but for now, we assume API returns data in the shape the UI expects or close to it.
+import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
+import { logBigQueryError } from '@/lib/bigqueryUtils';
 
 const HOST_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
 const API_BASE_PATH = '/api/betweenness'; 
@@ -64,33 +63,79 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
 
 export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayInfo | null> {
   try {
-    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/node-info?nodeId=${encodeURIComponent(nodeId)}`);
-    if (!response.ok) {
-      console.error(`API Error fetchNodeDisplayInfo: ${response.status} ${response.statusText}`);
-      const errorBody = await response.text();
-      console.error("Error body:", errorBody);
-      return { nodeId, alias: null }; // Return a default structure
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchNodeDisplayInfo (client init)", initError);
+    return { nodeId, alias: null };
+  }
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchNodeDisplayInfo", new Error("BigQuery client not available."));
+    return { nodeId, alias: null };
+  }
+
+  const query = `
+    SELECT alias
+    FROM \`${projectId}.${datasetId}.peers\`
+    WHERE id = @nodeIdToQuery 
+      AND alias IS NOT NULL AND TRIM(alias) != ''
+    LIMIT 1 
+  `;
+  const options = {
+    query: query,
+    params: { nodeIdToQuery: nodeId }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    if (rows && rows.length > 0 && rows[0] && rows[0].alias) {
+      return { nodeId, alias: String(rows[0].alias) };
     }
-    return await response.json() as NodeDisplayInfo;
+    return { nodeId, alias: null };
   } catch (error) {
-    console.error('Network Error fetchNodeDisplayInfo:', error);
+    logBigQueryError('fetchNodeDisplayInfo (query execution)', error);
     return { nodeId, alias: null };
   }
 }
 
 export async function fetchNodeIdByAlias(alias: string): Promise<string | null> {
   try {
-    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/resolve-alias?alias=${encodeURIComponent(alias)}`);
-    if (!response.ok) {
-      console.error(`API Error fetchNodeIdByAlias: ${response.status} ${response.statusText}`);
-      const errorBody = await response.text();
-      console.error("Error body:", errorBody);
-      return null;
+    await ensureBigQueryClientInitialized();
+  } catch (initError: any) {
+    logBigQueryError("fetchNodeIdByAlias (client init)", initError);
+    return null;
+  }
+  const bigquery = getBigQueryClient();
+
+  if (!bigquery) {
+    logBigQueryError("fetchNodeIdByAlias", new Error("BigQuery client not available."));
+    return null;
+  }
+
+  const query = `
+    SELECT id
+    FROM \`${projectId}.${datasetId}.peers\`
+    WHERE alias = @aliasToQuery
+    LIMIT 1
+  `;
+  const options = {
+    query: query,
+    params: { aliasToQuery: alias.trim() }
+  };
+
+  try {
+    const [job] = await bigquery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+    
+    if (rows && rows.length > 0 && rows[0] && rows[0].id) {
+      return String(rows[0].id);
     }
-    const data = await response.json();
-    return data.nodeId || null;
+    return null;
   } catch (error) {
-    console.error('Network Error fetchNodeIdByAlias:', error);
+    logBigQueryError('fetchNodeIdByAlias (query execution)', error);
     return null;
   }
 }
