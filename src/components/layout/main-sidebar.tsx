@@ -14,8 +14,11 @@ import {
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { LayoutDashboard, Users, BarChart3, GitCompareArrows, Github, BookText } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { specificNodeId } from '@/lib/constants';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -26,8 +29,7 @@ const navItems = [
 
 export function MainSidebar() {
   const pathname = usePathname();
-
-  const apiDocsPath = '/api-docs'; // Internal Next.js page
+  const apiDocsPath = '/api-docs';
 
   return (
     <Sidebar collapsible="icon" className="border-r">
@@ -52,33 +54,50 @@ export function MainSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <Separator className="my-2" />
-      <SidebarFooter className="p-2">
-        <SidebarMenuItem>
-          <Link href={apiDocsPath}>
-            <SidebarMenuButton
-              tooltip="API Documentation"
-              className="w-full justify-start"
-              variant="ghost"
-              isActive={pathname === apiDocsPath}
-            >
-              <BookText className="h-5 w-5" />
-              <span className="group-data-[collapsible=icon]/sidebar-wrapper:hidden">API Docs</span>
-            </SidebarMenuButton>
-          </Link>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <a href="https://github.com/5satoshi/webapp" target="_blank" rel="noopener noreferrer" className="w-full">
-            <SidebarMenuButton
-              tooltip="Fork on GitHub"
-              className="w-full justify-start"
-              variant="ghost"
-            >
-              <Github className="h-5 w-5" />
-              <span className="group-data-[collapsible=icon]/sidebar-wrapper:hidden">Fork on GitHub</span>
-            </SidebarMenuButton>
-          </a>
-        </SidebarMenuItem>
+      
+      <SidebarFooter className="p-4 mt-auto">
+        <TooltipProvider delayDuration={0}>
+          <div className="flex justify-center items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href={apiDocsPath}
+                  aria-label="API Documentation"
+                  className={cn(
+                    buttonVariants({ variant: 'ghost', size: 'icon' }),
+                    'h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    pathname === apiDocsPath && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  )}
+                >
+                  <BookText className="h-5 w-5" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="center">
+                <p>API Documentation</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href="https://github.com/5satoshi/webapp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Fork on GitHub"
+                  className={cn(
+                    buttonVariants({ variant: 'ghost', size: 'icon' }),
+                    'h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )}
+                >
+                  <Github className="h-5 w-5" />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="center">
+                <p>Fork on GitHub</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       </SidebarFooter>
     </Sidebar>
   );
