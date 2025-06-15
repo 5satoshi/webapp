@@ -6,11 +6,12 @@ import type { NetworkSubsumptionData, AllTopNodes, OurNodeRanksForAllCategories,
 // Helper imports might still be needed if any utility functions were used for data transformation AFTER fetching,
 // but for now, we assume API returns data in the shape the UI expects or close to it.
 
-const API_BASE_URL = '/api/betweenness'; // Assuming Next.js serves API routes from here
+const HOST_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
+const API_BASE_PATH = '/api/betweenness'; 
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   try {
-    const response = await fetch(`${API_BASE_URL}/top-nodes?limit=${limit}`);
+    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/top-nodes?limit=${limit}`);
     if (!response.ok) {
       console.error(`API Error fetchTopNodesBySubsumption: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -26,7 +27,7 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
 
 export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/node-timeline?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/node-timeline?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       console.error(`API Error fetchNetworkSubsumptionDataForNode: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -42,12 +43,12 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
 
 export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregationPeriod: string): Promise<OurNodeRanksForAllCategories> {
   const defaultRanks: OurNodeRanksForAllCategories = {
-    micro: { latestRank: null, rankChange: null },
-    common: { latestRank: null, rankChange: null },
-    macro: { latestRank: null, rankChange: null },
+    micro: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
+    common: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
+    macro: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
   };
   try {
-    const response = await fetch(`${API_BASE_URL}/node-ranks?nodeId=${encodeURIComponent(nodeIdToFetch)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/node-ranks?nodeId=${encodeURIComponent(nodeIdToFetch)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       console.error(`API Error fetchNodeRankForCategories: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -63,7 +64,7 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
 
 export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayInfo | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/node-info?nodeId=${encodeURIComponent(nodeId)}`);
+    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/node-info?nodeId=${encodeURIComponent(nodeId)}`);
     if (!response.ok) {
       console.error(`API Error fetchNodeDisplayInfo: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -79,7 +80,7 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
 
 export async function fetchNodeIdByAlias(alias: string): Promise<string | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/resolve-alias?alias=${encodeURIComponent(alias)}`);
+    const response = await fetch(`${HOST_URL}${API_BASE_PATH}/resolve-alias?alias=${encodeURIComponent(alias)}`);
     if (!response.ok) {
       console.error(`API Error fetchNodeIdByAlias: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
