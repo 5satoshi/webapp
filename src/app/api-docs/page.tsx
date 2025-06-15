@@ -6,8 +6,6 @@ import { useEffect, useRef } from 'react';
 import { PageTitle } from '@/components/ui/page-title';
 
 // It's important to load Swagger UI scripts and CSS.
-// We're using unpkg CDN links here.
-// Ensure these versions are suitable or manage them locally if preferred.
 
 const SwaggerUIInitializer = () => {
   const swaggerUIRoot = useRef<HTMLDivElement>(null);
@@ -24,9 +22,9 @@ const SwaggerUIInitializer = () => {
             dom_id: '#swagger-ui-container', // Matches the div id
             presets: [
               SwaggerUIBundle.presets.apis,
-              SwaggerUIBundle.SwaggerUIStandalonePreset
+              // SwaggerUIBundle.SwaggerUIStandalonePreset // Removed problematic preset
             ],
-            layout: "StandaloneLayout",
+            // layout: "StandaloneLayout", // Removed explicit layout
             deepLinking: true,
             // You can add more Swagger UI options here
             // e.g., defaultModelsExpandDepth: -1 to hide models by default
@@ -44,7 +42,6 @@ const SwaggerUIInitializer = () => {
     return () => {
       if (swaggerUIRoot.current) {
         // Clear the container's content when the component unmounts or effect re-runs
-        // This helps prevent errors if SwaggerUI modifies the DOM in ways React doesn't expect
         swaggerUIRoot.current.innerHTML = '';
       }
     };
