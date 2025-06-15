@@ -28,13 +28,14 @@ export default async function SubsumptionPage({
   searchParams
 }: {
   params: { nodeId: string };
-  searchParams?: { aggregation?: string; }
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
 
   const { nodeId: rawNodeIdFromPath } = params;
-  let currentAggregation = searchParams?.aggregation || 'week';
+  const aggregationParam = searchParams.aggregation;
+  let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week'
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'week';
+    currentAggregation = aggregationPeriodOptions[1].value; // Ensure it's a valid option, default to 'week'
   }
 
   let nodeIdentifierForFormDisplay = rawNodeIdFromPath;
@@ -51,11 +52,9 @@ export default async function SubsumptionPage({
       if (resolvedNodeIdFromAlias) {
         nodeIdForDataFetching = resolvedNodeIdFromAlias;
       } else {
-        // Alias from path not found, will use `specificNodeId` for data.
         if (rawNodeIdFromPath.toLowerCase() !== specificNodeId.toLowerCase() && rawNodeIdFromPath.toLowerCase() !== (await fetchNodeDisplayInfo(specificNodeId))?.alias?.toLowerCase()) {
            aliasNotFoundMessage = `Node alias "${rawNodeIdFromPath}" could not be found. Displaying data for the default node.`;
         }
-        // nodeIdForDataFetching remains specificNodeId
       }
     }
   }

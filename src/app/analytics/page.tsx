@@ -13,18 +13,19 @@ import {
   fetchForwardingAmountDistribution,
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
-} from '@/services/analyticsService'; // Updated import
+} from '@/services/analyticsService';
 
 
 export default async function AnalyticsPage({ 
   searchParams 
 }: { 
-  searchParams?: { aggregation?: string } 
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
   
-  let currentAggregation = searchParams?.aggregation || 'week'; 
+  const aggregationParam = searchParams.aggregation;
+  let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week'
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'week'; 
+    currentAggregation = aggregationPeriodOptions[1].value; // Ensure it's a valid option, default to 'week'
   }
 
   const forwardingDistributionData = await fetchForwardingAmountDistribution(currentAggregation);

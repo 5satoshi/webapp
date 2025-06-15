@@ -4,7 +4,7 @@ import { PageTitle } from '@/components/ui/page-title';
 import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card';
 import { SampleOverviewChart } from '@/components/dashboard/overview/sample-overview-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aggregationPeriodOptions } from '@/lib/mock-data'; 
 import { 
   fetchKeyMetrics, 
@@ -98,12 +98,13 @@ const OneMlLogoIcon = ({ className }: { className?: string }) => (
 export default async function OverviewPage({ 
   searchParams 
 }: { 
-  searchParams?: { aggregation?: string } 
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
   
-  let currentAggregation = searchParams?.aggregation || 'week'; 
+  const aggregationParam = searchParams.aggregation;
+  let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week' (index 1)
   if (!aggregationPeriodOptions.some(opt => opt.value === currentAggregation)) {
-    currentAggregation = 'week'; 
+    currentAggregation = aggregationPeriodOptions[1].value; // Ensure it's a valid option, default to 'week'
   }
 
   const keyMetrics = await fetchKeyMetrics();
