@@ -18,11 +18,14 @@ export async function GET(request: NextRequest) {
     await ensureBigQueryClientInitialized();
     const bigquery = getBigQueryClient();
 
-    const defaultCategoryRank: OurNodeCategoryRank = { latestRank: null, rankChange: null };
+    const defaultCategoryData: OurNodeCategoryRank = { 
+      latestRank: null, rankChange: null, 
+      latestShare: null, previousShare: null 
+    };
     const result: OurNodeRanksForAllCategories = {
-      micro: { ...defaultCategoryRank },
-      common: { ...defaultCategoryRank },
-      macro: { ...defaultCategoryRank },
+      micro: { ...defaultCategoryData },
+      common: { ...defaultCategoryData },
+      macro: { ...defaultCategoryData },
     };
 
     if (!bigquery) {
@@ -34,15 +37,15 @@ export async function GET(request: NextRequest) {
     const categories: Array<'micro' | 'common' | 'macro'> = ['micro', 'common', 'macro'];
 
     for (const category of categories) {
-      const latestRankQuery = `
-        SELECT rank
+      const latestDataQuery = `
+        SELECT rank, shortest_path_share
         FROM \`${projectId}.${datasetId}.betweenness\`
         WHERE nodeid = @nodeIdToQuery AND type = @categoryType
         ORDER BY timestamp DESC
         LIMIT 1
       `;
-      const previousRankQuery = `
-        SELECT rank
+      const previousDataQuery = `
+        SELECT rank, shortest_path_share
         FROM \`${projectId}.${datasetId}.betweenness\`
         WHERE nodeid = @nodeIdToQuery AND type = @categoryType AND timestamp < TIMESTAMP(@periodStartDate)
         ORDER BY timestamp DESC
@@ -50,20 +53,28 @@ export async function GET(request: NextRequest) {
       `;
 
       try {
-        const [latestRankJob] = await bigquery.createQueryJob({
-          query: latestRankQuery,
+        const [latestDataJob] = await bigquery.createQueryJob({
+          query: latestDataQuery,
           params: { nodeIdToQuery: nodeId, categoryType: category }
         });
-        const [[latestRankResult]] = await latestRankJob.getQueryResults();
-        const latestRank = latestRankResult?.rank !== undefined && latestRankResult?.rank !== null ? Number(latestRankResult.rank) : null;
+        const [[latestDataResult]] = await latestDataJob.getQueryResults();
+        
+        const latestRank = latestDataResult?.rank !== undefined && latestDataResult?.rank !== null ? Number(latestDataResult.rank) : null;
+        const latestShare = latestDataResult?.shortest_path_share !== undefined && latestDataResult?.shortest_path_share !== null ? Number(latestDataResult.shortest_path_share) : null;
+        
         result[category].latestRank = latestRank;
+        result[category].latestShare = latestShare;
 
-        const [previousRankJob] = await bigquery.createQueryJob({
-          query: previousRankQuery,
+        const [previousDataJob] = await bigquery.createQueryJob({
+          query: previousDataQuery,
           params: { nodeIdToQuery: nodeId, categoryType: category, periodStartDate: periodStartDateString }
         });
-        const [[previousRankResult]] = await previousRankJob.getQueryResults();
-        const previousRank = previousRankResult?.rank !== undefined && previousRankResult?.rank !== null ? Number(previousRankResult.rank) : null;
+        const [[previousDataResult]] = await previousDataJob.getQueryResults();
+
+        const previousRank = previousDataResult?.rank !== undefined && previousDataResult?.rank !== null ? Number(previousDataResult.rank) : null;
+        const previousShare = previousDataResult?.shortest_path_share !== undefined && previousDataResult?.shortest_path_share !== null ? Number(previousDataResult.shortest_path_share) : null;
+
+        result[category].previousShare = previousShare;
 
         if (latestRank !== null && previousRank !== null) {
           result[category].rankChange = latestRank - previousRank;
@@ -77,6 +88,12 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     logBigQueryError('API /api/betweenness/node-ranks', error);
-    return NextResponse.json({ error: 'Failed to fetch node rank data', details: error.message }, { status: 500 });
+    // Construct default result structure on error
+    const defaultErrorResult: OurNodeRanksForAllCategories = {
+      micro: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
+      common: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
+      macro: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
+    };
+    return NextResponse.json(defaultErrorResult, { status: 500 });
   }
 }

@@ -1,11 +1,14 @@
 
 'use server';
 
-import type { KeyMetric, TimeSeriesData, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
+import type { KeyMetric, TimeSeriesData, BetweennessRankData, ShortestPathShareData, OurNodeRanksForAllCategories } from '@/lib/types';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
 import { specificNodeId } from '@/lib/constants';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
+
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   await ensureBigQueryClientInitialized();
@@ -177,7 +180,7 @@ export async function fetchPeriodForwardingSummary(aggregationPeriod: string): P
   let durationDays: number;
 
   switch (aggregationPeriod.toLowerCase()) {
-    case 'day': durationDays = 1; break;
+    case 'day': durationDays = 1; break; // This logic implies "today vs yesterday" for days, may need adjustment for "last 7 days" etc.
     case 'week': durationDays = 7; break;
     case 'month': durationDays = 30; break;
     case 'quarter': durationDays = 90; break;
@@ -312,105 +315,60 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
 }
 
 export async function fetchBetweennessRank(aggregationPeriod: string): Promise<BetweennessRankData> {
-  await ensureBigQueryClientInitialized();
-  const bigquery = getBigQueryClient();
-
-  if (!bigquery) {
-    logBigQueryError("fetchBetweennessRank", new Error("BigQuery client not available."));
-    return { latestRank: null, previousRank: null };
-  }
-
   const nodeId = specificNodeId; 
-  const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
-
-  const latestRankQuery = `
-    SELECT rank
-    FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @nodeId AND type = 'common'
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `;
-
-  const previousRankQuery = `
-    SELECT rank
-    FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @nodeId AND type = 'common' AND timestamp < TIMESTAMP(@periodStartDate)
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `;
+  const defaultReturn: BetweennessRankData = { latestRank: null, previousRank: null };
 
   try {
-    const [latestRankJob] = await bigquery.createQueryJob({
-      query: latestRankQuery,
-      params: { nodeId: nodeId }
-    });
-    const [[latestRankResult]] = await latestRankJob.getQueryResults();
-    const latestRank = latestRankResult?.rank !== undefined && latestRankResult?.rank !== null ? Number(latestRankResult.rank) : null;
+    const response = await fetch(`${API_BASE_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`API Error fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
+      return defaultReturn;
+    }
+    const data: OurNodeRanksForAllCategories = await response.json();
+    
+    const commonData = data.common;
+    if (commonData) {
+      const latestRank = commonData.latestRank;
+      let previousRank: number | null = null;
+      if (latestRank !== null && commonData.rankChange !== null) {
+        previousRank = latestRank - commonData.rankChange;
+      }
+      return { latestRank, previousRank };
+    }
+    return defaultReturn;
 
-    const [previousRankJob] = await bigquery.createQueryJob({
-      query: previousRankQuery,
-      params: { nodeId: nodeId, periodStartDate: periodStartDateString }
-    });
-    const [[previousRankResult]] = await previousRankJob.getQueryResults();
-    const previousRank = previousRankResult?.rank !== undefined && previousRankResult?.rank !== null ? Number(previousRankResult.rank) : null;
-
-    return { latestRank, previousRank };
-
-  } catch (error) {
-    logBigQueryError(`fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod})`, error);
-    return { latestRank: null, previousRank: null };
+  } catch (error: any) {
+    console.error(`Network/JSON Error fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}):`, error.message);
+    return defaultReturn;
   }
 }
 
 export async function fetchShortestPathShare(aggregationPeriod: string): Promise<ShortestPathShareData> {
-  await ensureBigQueryClientInitialized();
-  const bigquery = getBigQueryClient();
-  
-  if (!bigquery) {
-    logBigQueryError("fetchShortestPathShare", new Error("BigQuery client not available."));
-    return { latestShare: null, previousShare: null };
-  }
-
-  const nodeId = specificNodeId; 
-  const { startDate: periodStartDateString } = getPeriodDateRange(aggregationPeriod);
-
-  const latestShareQuery = `
-    SELECT shortest_path_share
-    FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @nodeId AND type = 'common'
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `;
-
-  const previousShareQuery = `
-    SELECT shortest_path_share
-    FROM \`${projectId}.${datasetId}.betweenness\`
-    WHERE nodeid = @nodeId AND type = 'common' AND timestamp < TIMESTAMP(@periodStartDate)
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `;
+  const nodeId = specificNodeId;
+  const defaultReturn: ShortestPathShareData = { latestShare: null, previousShare: null };
 
   try {
-    const [latestShareJob] = await bigquery.createQueryJob({
-      query: latestShareQuery,
-      params: { nodeId: nodeId }
-    });
-    const [[latestShareResult]] = await latestShareJob.getQueryResults();
-    const latestShare = latestShareResult?.shortest_path_share !== undefined && latestShareResult?.shortest_path_share !== null ? Number(latestShareResult.shortest_path_share) : null;
+    const response = await fetch(`${API_BASE_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`API Error fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
+      return defaultReturn;
+    }
+    const data: OurNodeRanksForAllCategories = await response.json();
 
-    const [previousShareJob] = await bigquery.createQueryJob({
-      query: previousShareQuery,
-      params: { nodeId: nodeId, periodStartDate: periodStartDateString }
-    });
-    const [[previousShareResult]] = await previousShareJob.getQueryResults();
-    const previousShare = previousShareResult?.shortest_path_share !== undefined && previousShareResult?.shortest_path_share !== null ? Number(previousShareResult.shortest_path_share) : null;
+    const commonData = data.common;
+    if (commonData) {
+      return { 
+        latestShare: commonData.latestShare, 
+        previousShare: commonData.previousShare 
+      };
+    }
+    return defaultReturn;
 
-    return { latestShare, previousShare };
-
-  } catch (error) {
-    logBigQueryError(`fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod})`, error);
-    return { latestShare: null, previousShare: null };
+  } catch (error: any) {
+    console.error(`Network/JSON Error fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}):`, error.message);
+    return defaultReturn;
   }
 }
-
     

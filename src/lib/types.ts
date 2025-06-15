@@ -149,6 +149,8 @@ export interface ChannelDetails {
 export interface OurNodeCategoryRank {
   latestRank: number | null;
   rankChange: number | null; // Positive means rank got worse (higher number), negative means better
+  latestShare: number | null;
+  previousShare: number | null;
 }
 
 export interface OurNodeRanksForAllCategories {
@@ -161,3 +163,4 @@ export interface NodeDisplayInfo {
   nodeId: string;
   alias?: string | null;
 }
+
