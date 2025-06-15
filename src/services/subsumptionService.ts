@@ -6,7 +6,7 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 
 const HOST_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
-const API_BASE_PATH = '/api/betweenness'; 
+const API_BASE_PATH = '/api/betweenness';
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   try {
@@ -76,11 +76,11 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
   }
 
   const query = `
-    SELECT alias
+    SELECT alias.local as node_alias
     FROM \`${projectId}.${datasetId}.peers\`
-    WHERE id = @nodeIdToQuery 
-      AND alias IS NOT NULL AND TRIM(alias) != ''
-    LIMIT 1 
+    WHERE id = @nodeIdToQuery
+      AND alias.local IS NOT NULL AND TRIM(alias.local) != ''
+    LIMIT 1
   `;
   const options = {
     query: query,
@@ -91,8 +91,8 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
     const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
-    if (rows && rows.length > 0 && rows[0] && rows[0].alias) {
-      return { nodeId, alias: String(rows[0].alias) };
+    if (rows && rows.length > 0 && rows[0] && rows[0].node_alias) {
+      return { nodeId, alias: String(rows[0].node_alias) };
     }
     return { nodeId, alias: null };
   } catch (error) {
@@ -118,7 +118,7 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
   const query = `
     SELECT id
     FROM \`${projectId}.${datasetId}.peers\`
-    WHERE alias = @aliasToQuery
+    WHERE alias.local = @aliasToQuery
     LIMIT 1
   `;
   const options = {
@@ -129,7 +129,7 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
   try {
     const [job] = await bigquery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
-    
+
     if (rows && rows.length > 0 && rows[0] && rows[0].id) {
       return String(rows[0].id);
     }

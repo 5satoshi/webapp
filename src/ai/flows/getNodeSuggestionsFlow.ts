@@ -23,7 +23,7 @@ const NodeSuggestionSchema = z.object({
   value: z.string(), // This will be the Node ID
   display: z.string(), // This can be the alias or a formatted Node ID
   type: z.enum(['alias', 'nodeId']),
-  // Rank is removed as peers table doesn't have this info
+  // Rank is removed as peers table doesn't have this info and alias is assumed to be alias.local
 });
 export type NodeSuggestion = z.infer<typeof NodeSuggestionSchema>;
 
@@ -50,23 +50,23 @@ async function fetchSuggestionsFromPeersTable(searchTerm: string): Promise<GetNo
   const suggestions: NodeSuggestion[] = [];
 
   try {
-    // Query for aliases
+    // Query for aliases, assuming alias is a struct and we use alias.local
     const aliasQuery = `
       SELECT
-        id as value,  -- Node ID is the value
-        alias as display,
+        id as value,
+        alias.local as display_string,
         'alias' as type
       FROM \`${projectId}.${datasetId}.peers\`
-      WHERE LOWER(alias) LIKE LOWER(@searchTermWildcard)
-        AND alias IS NOT NULL AND TRIM(alias) != ''
+      WHERE LOWER(alias.local) LIKE LOWER(@searchTermWildcard)
+        AND alias.local IS NOT NULL AND TRIM(alias.local) != ''
       ORDER BY
         CASE
-          WHEN LOWER(alias) = LOWER(@searchTermExact) THEN 1
-          WHEN LOWER(alias) LIKE LOWER(@searchTermPrefix) THEN 2
+          WHEN LOWER(alias.local) = LOWER(@searchTermExact) THEN 1
+          WHEN LOWER(alias.local) LIKE LOWER(@searchTermPrefix) THEN 2
           ELSE 3
         END,
-        LENGTH(alias) ASC,
-        alias ASC
+        LENGTH(alias.local) ASC,
+        alias.local ASC
       LIMIT 5
     `;
     const [aliasJob] = await bigquery.createQueryJob({
@@ -79,10 +79,10 @@ async function fetchSuggestionsFromPeersTable(searchTerm: string): Promise<GetNo
     });
     const aliasRows = (await aliasJob.getQueryResults())[0];
     aliasRows.forEach((r: any) => {
-      if (r.value && r.display) {
+      if (r.value && r.display_string) {
         suggestions.push({
           value: String(r.value),
-          display: String(r.display),
+          display: String(r.display_string),
           type: 'alias',
         });
       }
@@ -97,7 +97,7 @@ async function fetchSuggestionsFromPeersTable(searchTerm: string): Promise<GetNo
           CONCAT(SUBSTR(id, 1, 8), '...', SUBSTR(id, LENGTH(id) - 7)) as display,
           'nodeId' as type
         FROM \`${projectId}.${datasetId}.peers\`
-        WHERE LOWER(id) LIKE LOWER(@searchTermPrefix) 
+        WHERE LOWER(id) LIKE LOWER(@searchTermPrefix)
           AND id NOT IN (SELECT value FROM UNNEST(@existingValues)) -- Avoid duplicates if an ID matched an alias
         LIMIT @limit
       `;
