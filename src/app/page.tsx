@@ -17,6 +17,7 @@ import {
 import type { KeyMetric, BetweennessRankData, ShortestPathShareData } from '@/lib/types';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { BarChart3 } from 'lucide-react';
+import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,9 +100,10 @@ export default async function OverviewPage({
   params,
   searchParams
 }: {
-  params: {}; // For root page, params is an empty object
+  params: {};
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
+  headers(); // Opt into dynamic rendering
 
   const aggregationParam = searchParams.aggregation;
   let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week' (index 1)

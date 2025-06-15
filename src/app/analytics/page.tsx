@@ -14,15 +14,17 @@ import {
   fetchMedianAndMaxForwardingValueOverTime,
   fetchTimingHeatmapData,
 } from '@/services/analyticsService';
+import { headers } from 'next/headers';
 
 
 export default async function AnalyticsPage({
   params,
   searchParams
 }: {
-  params: {}; // For /analytics, params is an empty object
+  params: {}; 
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
+  headers(); // Opt into dynamic rendering
 
   const aggregationParam = searchParams.aggregation;
   let currentAggregation = (typeof aggregationParam === 'string' ? aggregationParam : undefined) || aggregationPeriodOptions[1].value; // Default to 'week'

@@ -22,6 +22,7 @@ import { Info } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { TruncatedText } from '@/components/ui/truncated-text';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { headers } from 'next/headers';
 
 export default async function SubsumptionPage({
   params,
@@ -30,6 +31,7 @@ export default async function SubsumptionPage({
   params: { nodeId: string };
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
+  headers(); // Opt into dynamic rendering
 
   const { nodeId: rawNodeIdFromPath } = params;
   const aggregationParam = searchParams.aggregation;
