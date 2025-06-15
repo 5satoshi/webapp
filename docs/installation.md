@@ -6,7 +6,13 @@ These instructions assume you have Node.js and npm/yarn installed.
 ## Prerequisites
 
 - Access to a Google Cloud Project with BigQuery enabled.
-- The necessary data populated in your BigQuery tables (schema assumed by the application's service files).
+- **BigQuery Data Requirements**: The application relies on specific tables in your BigQuery dataset, typically populated with data from your Core Lightning (CLN) node. Ensure the following tables are present and contain the relevant data structures:
+    -   **`peers`**: Contains information about your node's peers and channel states, corresponding to data from the `listpeers` CLN command. This table is crucial for the "Channels" page and parts of the "Overview".
+        -   Expected fields include: `id` (peer_node_id), `funding_txid`, `funding_outnum`, `short_channel_id`, `msatoshi_total` (channel capacity), `msatoshi_to_us` (local balance), `state` (e.g., `CHANNELD_NORMAL`), and optionally `state_changes` (an array of state transition objects with `timestamp` and `new_state`) for historical channel activity.
+    -   **`forwardings`**: Stores details of forwarding events, corresponding to data from the `listforwards` CLN command. This table is essential for most dashboard analytics, including forwarding volume, fees earned, success rates, and timing patterns.
+        -   Expected fields include: `received_time`, `resolved_time`, `status` (e.g., 'settled', 'local_failed'), `in_msat`, `out_msat`, `fee_msat`, `in_channel` (short_channel_id), `out_channel` (short_channel_id).
+    -   **`betweenness`**: This table is expected to contain pre-calculated network metrics such as betweenness centrality ranks and shortest path shares for nodes, along with their aliases. This data is typically derived from analyzing the Lightning Network graph and is used for features like node suggestions (autocomplete), top node rankings in "Routing Analysis", and historical trend comparisons.
+        -   Expected fields include: `nodeid`, `alias`, `timestamp`, `type` (e.g., 'micro', 'common', 'macro' for different payment sizes), `rank`, and `shortest_path_share`.
 - Service Account credentials configured for local development if running outside a Google Cloud environment that provides Application Default Credentials (ADC).
 
 ## Environment Variables
