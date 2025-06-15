@@ -36,17 +36,14 @@ export function MainSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.label}>
-              <Link href={item.href} passHref legacyBehavior>
+              <Link href={item.href}>
                 <SidebarMenuButton
-                  asChild
                   isActive={item.href === `/subsumption/${specificNodeId}` ? pathname.startsWith('/subsumption') : (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)))}
                   tooltip={item.label}
                   className="w-full justify-start"
                 >
-                  <a>
-                    <item.icon className="h-5 w-5" />
-                    <span className="group-data-[collapsible=icon]/sidebar-wrapper:hidden">{item.label}</span>
-                  </a>
+                  <item.icon className="h-5 w-5" />
+                  <span className="group-data-[collapsible=icon]/sidebar-wrapper:hidden">{item.label}</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
