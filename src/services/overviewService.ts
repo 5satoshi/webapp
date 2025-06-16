@@ -7,8 +7,7 @@ import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bi
 import { specificNodeId } from '@/lib/constants';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
-
+// Removed API_BASE_URL, using relative paths for fetch
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   const defaultMetrics: KeyMetric[] = [
@@ -340,8 +339,7 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
   const defaultReturn: BetweennessRankData = { latestRank: null, previousRank: null };
 
   try {
-    // No direct BigQuery client check here, API call will handle its own errors
-    const response = await fetch(`${API_BASE_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`API Error fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
@@ -371,8 +369,7 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
   const defaultReturn: ShortestPathShareData = { latestShare: null, previousShare: null };
 
   try {
-    // No direct BigQuery client check here, API call will handle its own errors
-    const response = await fetch(`${API_BASE_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`API Error fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
