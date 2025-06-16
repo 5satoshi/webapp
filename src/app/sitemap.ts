@@ -1,9 +1,9 @@
 
 import { MetadataRoute } from 'next';
 import { specificNodeId } from '@/lib/constants';
+import { siteConfig } from '@/config/site';
 
-// IMPORTANT: Update this if your production domain is different
-const baseUrl = 'https://www.five-satoshi.com';
+const baseUrl = siteConfig.publicUrl;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages = [
@@ -32,12 +32,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.8,
     },
+     {
+      url: `${baseUrl}/api-docs`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
   ];
-
-  // If you had dynamic pages (e.g., /blog/[slug]), you would fetch their paths
-  // and add them here. For the /subsumption/[nodeId] route, we generally don't list
-  // all possible nodeIds in a sitemap. Search engines will discover them through links
-  // or if explicitly submitted. The entry above ensures the main/default view is listed.
 
   return staticPages;
 }

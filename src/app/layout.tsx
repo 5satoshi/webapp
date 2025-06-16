@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AppShell } from '@/components/layout/app-shell';
+import { siteConfig } from '@/config/site';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -14,37 +15,34 @@ const spaceGrotesk = Space_Grotesk({
   variable: '--font-space-grotesk',
 });
 
-const siteBaseUrl = 'https://www.five-satoshi.com'; // IMPORTANT: Update if your production domain is different
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteBaseUrl),
+  metadataBase: new URL(siteConfig.publicUrl),
   title: {
-    default: '5satoshi Lightning Node Dashboard - Stats & Insights',
-    template: '%s | 5satoshi Dashboard',
+    default: `${siteConfig.name} - Stats & Insights`,
+    template: `%s | ${siteConfig.name}`,
   },
-  description: 'Explore real-time statistics, channel management, network insights, and routing analysis for the 5satoshi Lightning Network node. AI-powered analytics for node operators.',
+  description: `Explore real-time statistics, channel management, network insights, and routing analysis for the ${siteConfig.name}. AI-powered analytics for node operators.`,
   icons: {
-    icon: '/favicon.svg', // Updated to new SVG favicon
-    // apple: '/apple-icon.png', // Optional: if you have apple touch icons
+    icon: '/favicon.svg',
   },
   keywords: ['Lightning Network', 'Bitcoin', '5satoshi', 'node', 'dashboard', 'statistics', 'analytics', 'channel management', 'routing', 'crypto', 'cryptocurrency', 'LN', 'LNURL'],
   openGraph: {
-    title: '5satoshi Lightning Node Dashboard - Stats & Insights',
-    description: 'Explore real-time statistics and analytics for the 5satoshi Lightning Network node.',
-    url: siteBaseUrl,
-    siteName: '5satoshi Lightning Stats Dashboard',
+    title: `${siteConfig.name} - Stats & Insights`,
+    description: `Explore real-time statistics and analytics for the ${siteConfig.name}.`,
+    url: siteConfig.publicUrl,
+    siteName: siteConfig.name,
     images: [
       {
-        url: `${siteBaseUrl}/logo.svg`, // Updated to use the new logo.svg for social preview
-        width: 80, // SVG width
-        height: 80, // SVG height
-        alt: '5satoshi Lightning Dashboard Logo',
+        url: `${siteConfig.publicUrl}/logo.svg`,
+        width: 80,
+        height: 80,
+        alt: `${siteConfig.name} Logo`,
       },
       {
-        url: 'https://placehold.co/1200x630.png', 
+        url: siteConfig.ogImageDefault,
         width: 1200,
         height: 630,
-        alt: '5satoshi Lightning Dashboard Social Preview Banner',
+        alt: `${siteConfig.name} Social Preview Banner`,
       },
     ],
     locale: 'en_US',
