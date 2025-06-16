@@ -6,8 +6,9 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
 import { specificNodeId } from '@/lib/constants';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { siteConfig } from '@/config/site';
 
-const INTERNAL_API_HOST = process.env.INTERNAL_API_HOST || 'http://localhost:9002';
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.publicUrl || 'http://localhost:9002';
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   const defaultMetrics: KeyMetric[] = [
@@ -339,7 +340,7 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
   const defaultReturn: BetweennessRankData = { latestRank: null, previousRank: null };
 
   try {
-    const response = await fetch(`${INTERNAL_API_HOST}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`API Error fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
@@ -369,7 +370,7 @@ export async function fetchShortestPathShare(aggregationPeriod: string): Promise
   const defaultReturn: ShortestPathShareData = { latestShare: null, previousShare: null };
 
   try {
-    const response = await fetch(`${INTERNAL_API_HOST}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`API Error fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
