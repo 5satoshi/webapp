@@ -6,7 +6,7 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 import { siteConfig } from '@/config/site';
 
-const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.publicUrl || 'http://localhost:9002';
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.publicUrl || `http://localhost:${process.env.PORT || '9002'}`;
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   try {
