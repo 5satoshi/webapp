@@ -5,11 +5,11 @@ import type { NetworkSubsumptionData, AllTopNodes, OurNodeRanksForAllCategories,
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 
-// Removed HOST_URL and API_BASE_PATH, using relative paths for fetch
+const INTERNAL_API_HOST = process.env.INTERNAL_API_HOST || 'http://localhost:9002';
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   try {
-    const response = await fetch(`/api/betweenness/top-nodes?limit=${limit}`);
+    const response = await fetch(`${INTERNAL_API_HOST}/api/betweenness/top-nodes?limit=${limit}`);
     if (!response.ok) {
       console.error(`API Error fetchTopNodesBySubsumption: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -25,7 +25,7 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
 
 export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggregationPeriod: string): Promise<NetworkSubsumptionData[]> {
   try {
-    const response = await fetch(`/api/betweenness/node-timeline?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`${INTERNAL_API_HOST}/api/betweenness/node-timeline?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       console.error(`API Error fetchNetworkSubsumptionDataForNode: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -46,7 +46,7 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
     macro: { latestRank: null, rankChange: null, latestShare: null, previousShare: null },
   };
   try {
-    const response = await fetch(`/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeIdToFetch)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(`${INTERNAL_API_HOST}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeIdToFetch)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
     if (!response.ok) {
       console.error(`API Error fetchNodeRankForCategories: ${response.status} ${response.statusText}`);
       const errorBody = await response.text();
@@ -139,3 +139,5 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
   }
 }
 
+
+    
