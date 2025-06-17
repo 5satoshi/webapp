@@ -1,7 +1,8 @@
-
 # Routing Analysis (Subsumption) Page Documentation
 
 The **Routing Analysis Page** (labeled "Subsumption" in some contexts) focuses on understanding your node's position and performance within the broader Lightning Network by analyzing its "shortest path share." This metric indicates how often your node is part of the cheapest (shortest) route for payments of different sizes.
+
+All data related to shortest path shares, node rankings, and top node comparisons on this page is fetched from the application's internal API endpoints (e.g., `/api/betweenness/...`). These APIs, in turn, query pre-calculated network analysis data (typically from a `betweenness` table) in BigQuery.
 
 ## Key Sections
 
@@ -10,7 +11,7 @@ The **Routing Analysis Page** (labeled "Subsumption" in some contexts) focuses o
 - **Description**: Introduces the concept of analyzing the node's role in network routing, particularly through shortest path shares.
 
 ### 2. Top Nodes by Shortest Path Share Card
-This section provides a competitive overview by ranking the top nodes in the network based on their latest shortest path share for different payment categories.
+This section provides a competitive overview by ranking the top nodes in the network based on their latest shortest path share for different payment categories, fetched via an API call.
 
 - **Description & Truncated Text**: Explains the "Shortest Path Share" concept as a ranking mechanism based on standard graph analytics (cheapest routes). The text can be expanded to read more.
 - **Category Cards**: Three cards are typically displayed, one for each payment size category:
@@ -29,15 +30,15 @@ This section provides a competitive overview by ranking the top nodes in the net
             - Shortest path shares and ranks for *all three* categories (Micro, Common, Macro) for that specific node, allowing for a quick comparison of its performance across different payment sizes.
 
 ### 3. Node-Specific Routing Analysis Card
-This section allows for a detailed analysis of a specific node's routing performance, defaulting to your own node but allowing analysis of any node.
+This section allows for a detailed analysis of a specific node's routing performance, defaulting to your own node but allowing analysis of any node. Data is fetched via API calls based on the selected Node ID.
 
 - **Node Selector Form**:
-    - **Input Field**: Allows users to enter a Node ID or an Alias to fetch data for. Autocomplete suggestions (node ID or alias with rank) appear as the user types.
+    - **Input Field**: Allows users to enter a Node ID or an Alias. Autocomplete suggestions (node ID or alias with last announcement timestamp from the `nodes` table) appear as the user types, fetched via a Genkit flow.
     - **Button**: "Load Node Data" triggers the data fetch for the entered/selected node.
 - **Selected Node's Shortest Path Share Over Time**:
     - **Title**: "[Selected Node's Display Name]'s Shortest Path Share Over Time"
     - **Aggregation Period Tabs**: Allows users to select the time frame for the historical data (Days, Weeks, Months, Quarters). This selection is persistent with the Node ID in the URL.
-    - **Description**: Explains that the chart shows the historical trend of the selected node's shortest path share for micro, common, and macro payments.
+    - **Description**: Explains that the chart shows the historical trend of the selected node's shortest path share for micro, common, and macro payments, fetched via API.
     - **Network Subsumption Chart (Line Chart)**:
         - **X-axis**: Date, formatted according to the selected aggregation period.
         - **Y-axis**: Shortest Path Share (%).
@@ -49,7 +50,7 @@ This section allows for a detailed analysis of a specific node's routing perform
     - **Explanatory Text**: Provides further context on interpreting the chart (higher percentage is better, fluctuations indicate network/fee changes).
 - **Selected Node's Rank (Last [Period])**:
     - **Title**: "[Selected Node's Display Name]'s Rank (Last [Selected Period Label])"
-    - **Description**: Explains that these cards show the selected node's current network rank for different payment sizes compared to the start of the selected period. Lower rank is better.
+    - **Description**: Explains that these cards show the selected node's current network rank for different payment sizes compared to the start of the selected period, fetched via API. Lower rank is better.
     - **Rank Cards (KeyMetricCard style)**: Three cards are displayed:
         - **Micro Rank**: Current rank for micro payments, with change from the start of the period.
         - **Common Rank**: Current rank for common payments, with change.

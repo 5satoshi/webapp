@@ -8,7 +8,7 @@ import { specificNodeId } from '@/lib/constants';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { siteConfig } from '@/config/site';
 
-const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.publicUrl || `http://localhost:${process.env.PORT || '9002'}`;
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.apiBaseUrl || `http://localhost:${process.env.PORT || '9002'}`;
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   const defaultMetrics: KeyMetric[] = [

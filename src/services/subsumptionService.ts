@@ -6,7 +6,7 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 import { siteConfig } from '@/config/site';
 
-const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.publicUrl || `http://localhost:${process.env.PORT || '9002'}`;
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.apiBaseUrl || `http://localhost:${process.env.PORT || '9002'}`;
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   try {
@@ -75,30 +75,55 @@ export async function fetchNodeDisplayInfo(nodeId: string): Promise<NodeDisplayI
     return { nodeId, alias: null };
   }
 
-  const query = `
+  // Attempt to get alias from the 'nodes' table first
+  const nodesTableQuery = `
+    SELECT alias as node_alias
+    FROM \`${projectId}.${datasetId}.nodes\`
+    WHERE nodeid = @nodeIdToQuery
+      AND alias IS NOT NULL AND TRIM(alias) != ''
+    LIMIT 1
+  `;
+  const nodesTableOptions = {
+    query: nodesTableQuery,
+    params: { nodeIdToQuery: nodeId }
+  };
+
+  try {
+    const [nodesJob] = await bigquery.createQueryJob(nodesTableOptions);
+    const [nodesRows] = await nodesJob.getQueryResults();
+
+    if (nodesRows && nodesRows.length > 0 && nodesRows[0] && nodesRows[0].node_alias) {
+      return { nodeId, alias: String(nodesRows[0].node_alias) };
+    }
+  } catch (error) {
+    logBigQueryError('fetchNodeDisplayInfo (query execution on nodes table)', error);
+    // Fall through to try peers table if nodes table query fails or returns no alias
+  }
+  
+  // Fallback to 'peers' table if not found or error in 'nodes' table
+  const peersTableQuery = `
     SELECT alias.local as node_alias
     FROM \`${projectId}.${datasetId}.peers\`
     WHERE id = @nodeIdToQuery
       AND alias.local IS NOT NULL AND TRIM(alias.local) != ''
     LIMIT 1
   `;
-  const options = {
-    query: query,
+   const peersTableOptions = {
+    query: peersTableQuery,
     params: { nodeIdToQuery: nodeId }
   };
 
   try {
-    const [job] = await bigquery.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
-    if (rows && rows.length > 0 && rows[0] && rows[0].node_alias) {
-      return { nodeId, alias: String(rows[0].node_alias) };
+    const [peersJob] = await bigquery.createQueryJob(peersTableOptions);
+    const [peersRows] = await peersJob.getQueryResults();
+    if (peersRows && peersRows.length > 0 && peersRows[0] && peersRows[0].node_alias) {
+      return { nodeId, alias: String(peersRows[0].node_alias) };
     }
-    return { nodeId, alias: null };
   } catch (error) {
-    logBigQueryError('fetchNodeDisplayInfo (query execution)', error);
-    return { nodeId, alias: null };
+     logBigQueryError('fetchNodeDisplayInfo (query execution on peers table)', error);
   }
+
+  return { nodeId, alias: null }; // Default if not found in either table
 }
 
 export async function fetchNodeIdByAlias(alias: string): Promise<string | null> {
@@ -115,29 +140,53 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
     return null;
   }
 
-  const query = `
+  // Query 'nodes' table first
+  const nodesTableQuery = `
+    SELECT nodeid
+    FROM \`${projectId}.${datasetId}.nodes\`
+    WHERE alias = @aliasToQuery
+    LIMIT 1
+  `;
+  const nodesTableOptions = {
+    query: nodesTableQuery,
+    params: { aliasToQuery: alias.trim() }
+  };
+
+  try {
+    const [nodesJob] = await bigquery.createQueryJob(nodesTableOptions);
+    const [nodesRows] = await nodesJob.getQueryResults();
+
+    if (nodesRows && nodesRows.length > 0 && nodesRows[0] && nodesRows[0].nodeid) {
+      return String(nodesRows[0].nodeid);
+    }
+  } catch (error) {
+    logBigQueryError('fetchNodeIdByAlias (query execution on nodes table)', error);
+    // Fall through to try peers table
+  }
+
+  // Fallback to 'peers' table
+  const peersTableQuery = `
     SELECT id
     FROM \`${projectId}.${datasetId}.peers\`
     WHERE alias.local = @aliasToQuery
     LIMIT 1
   `;
-  const options = {
-    query: query,
+  const peersTableOptions = {
+    query: peersTableQuery,
     params: { aliasToQuery: alias.trim() }
   };
-
+  
   try {
-    const [job] = await bigquery.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
-    if (rows && rows.length > 0 && rows[0] && rows[0].id) {
-      return String(rows[0].id);
+    const [peersJob] = await bigquery.createQueryJob(peersTableOptions);
+    const [peersRows] = await peersJob.getQueryResults();
+     if (peersRows && peersRows.length > 0 && peersRows[0] && peersRows[0].id) {
+      return String(peersRows[0].id);
     }
-    return null;
   } catch (error) {
-    logBigQueryError('fetchNodeIdByAlias (query execution)', error);
-    return null;
+     logBigQueryError('fetchNodeIdByAlias (query execution on peers table)', error);
   }
+  
+  return null; // Not found in either table
 }
 
 
