@@ -5,12 +5,12 @@ These instructions assume you have Node.js and npm/yarn installed.
 ## Prerequisites
 
 - Access to a Google Cloud Project with BigQuery enabled.
-- **Core Lightning (CLN) Node Data**: The application is designed to visualize and analyze data from your Core Lightning (CLN) node. You will need to export data from your CLN node and ingest it into specific tables within your BigQuery dataset.
+- **Core Lightning (CLN) Node Data**: The application is designed to visualize and analyze data from your Core Lightning (CLN) node. You will need to export data from your CLN and ingest it into specific tables within your BigQuery dataset.
 - Service Account credentials configured for local development if running outside a Google Cloud environment that provides Application Default Credentials (ADC).
 
 ### BigQuery Data Requirements
 
-The dashboard relies on specific tables in your BigQuery dataset, populated with data from your CLN node. You must set up a process to regularly export data from your CLN and load it into these BigQuery tables. The expected tables and their corresponding CLN data sources are:
+The dashboard relies on specific tables in your BigQuery dataset, populated with data from your CLN. You must set up a process to regularly export data from your CLN and load it into these BigQuery tables. The expected tables and their corresponding CLN data sources are:
 
 1.  **`peers` Table**
     *   **CLN Data Source**: Primarily from `lightning-cli listpeers`. Channel-specific details like capacity and balance also align with `lightning-cli listchannels`.
@@ -49,11 +49,16 @@ The dashboard relies on specific tables in your BigQuery dataset, populated with
         *   `in_channel` (string, nullable): Short channel ID of the incoming channel.
         *   `out_channel` (string, nullable): Short channel ID of the outgoing channel.
 
-4.  **`betweenness` Table (Accessed via Internal API)**
+4.  **`betweenness` Table (Data for Routing Analysis)**
     *   **Data Source**: This data is typically pre-calculated by analyzing the Lightning Network graph, often involving graph algorithms to determine betweenness centrality and shortest path shares. It's not directly from a single CLN command.
     *   **Purpose**: Powers network analysis features on the "Routing Analysis" page, such as node rankings, shortest path shares for different payment sizes, and historical trends for these metrics.
-    *   **Access Method**: The dashboard application does **not** directly query this table. Instead, it accesses data derived from this table through its own internal API endpoints (e.g., `/api/betweenness/...`). These API routes are responsible for querying the `betweenness` table in your BigQuery dataset.
-    *   **Key Expected Fields (queried by the API)**:
+    *   **Access Method**:
+        *   The dashboard application includes its own API endpoints (e.g., `/api/betweenness/...`) located in `src/app/api/betweenness/`. These server-side routes are responsible for querying a `betweenness` table in BigQuery.
+        *   When a user runs their own instance of the dashboard, the client-side code (on pages like Routing Analysis) makes API calls to these endpoints.
+        *   The target host for these API calls is determined by the `INTERNAL_API_HOST` environment variable.
+        *   **If `INTERNAL_API_HOST` is set to the URL of the user's own deployed dashboard instance** (e.g., `https://their-dashboard.com`), then their dashboard's client-side calls its own backend API routes. These routes will then query the `betweenness` table configured in *their* BigQuery project (using `BIGQUERY_PROJECT_ID` and `BIGQUERY_DATASET_ID`). This is the recommended approach if the user has their own `betweenness` data.
+        *   **If `INTERNAL_API_HOST` is NOT set**, it defaults to `siteConfig.apiBaseUrl` (from `src/config/site.ts`), which is `https://5sats.com`. In this scenario, the user's dashboard instance will make API calls to `https://5sats.com/api/...` for `betweenness` data. This means they will be using the **external 5satoshi API** for these specific statistics. This can be useful if they don't have their own `betweenness` data calculation process.
+    *   **Key Expected Fields (in the BigQuery `betweenness` table queried by the API)**:
         *   `nodeid` (string): The Node ID.
         *   `alias` (string, nullable): The node's alias.
         *   `timestamp` (timestamp): Timestamp of the data record.
@@ -71,7 +76,9 @@ The application uses environment variables for configuration:
     *   `BIGQUERY_PROJECT_ID`: Your Google Cloud Project ID (defaults to `lightning-fee-optimizer` if not set).
     *   `BIGQUERY_DATASET_ID`: Your BigQuery dataset ID (defaults to `version_1` if not set).
 -   **API Endpoint Configuration**:
-    *   `INTERNAL_API_HOST`: (Optional but Recommended for Production) The base URL for the application's internal API endpoints (e.g., `https://your-app-service-url.com`). If your deployment environment has a specific internal address for the service to call itself, set this variable. If not set, the application defaults to `siteConfig.apiBaseUrl` from `src/config/site.ts`.
+    *   `INTERNAL_API_HOST`: (Optional but Recommended for Production/Custom Setups) The base URL for the application's internal API endpoints (e.g., `https://your-app-service-url.com`).
+        *   If you set this to your own application's URL, your dashboard will use its own backend API routes to query your BigQuery tables (including your `betweenness` table if populated).
+        *   If this is not set, the application defaults to `siteConfig.apiBaseUrl` from `src/config/site.ts` (which is `https://5sats.com`). In this default case, or if you explicitly set `INTERNAL_API_HOST` to `https://5sats.com`, API calls for `betweenness` data will target the 5sats.com production API. Other API calls (if any were to exist that are not betweenness related) would still attempt to target the host defined by this logic.
 -   **Local Development Credentials**:
     *   `GOOGLE_APPLICATION_CREDENTIALS`: Path to your service account key JSON file (e.g., `/path/to/your/service-account-key.json`). Required for local development if not using `gcloud auth application-default login`.
 
@@ -81,8 +88,9 @@ Create a `.env` file in the root of the project with these variables as needed:
 BIGQUERY_PROJECT_ID=your-gcp-project-id
 BIGQUERY_DATASET_ID=your_bigquery_dataset_id
 
-# Optional: Override the API base URL for internal calls
-# INTERNAL_API_HOST=https://your-app-internal-service-url.com
+# Optional: Set this to your application's own URL if you have your own betweenness data and want to use your instance's API.
+# If not set, or set to https://5sats.com, betweenness data will be fetched from the 5sats.com API.
+# INTERNAL_API_HOST=https://your-dashboard-deployment-url.com
 
 # For local development, if not using gcloud ADC:
 # GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
@@ -110,7 +118,7 @@ To run the Next.js development server:
 ```bash
 npm run dev
 ```
-This will typically start the application on `http://localhost:9002`.
+This will typically start the application on `http://localhost:9002`. Your local instance will, by default, attempt to call `https://5sats.com/api/...` for betweenness data unless `INTERNAL_API_HOST` is set to `http://localhost:9002` (or your local dev URL) and you have a local `betweenness` table.
 
 To run the Genkit development server (for testing AI flows):
 ```bash

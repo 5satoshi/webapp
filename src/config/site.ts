@@ -19,11 +19,16 @@ const tertiaryColorL = 55;
 export const siteConfig = {
   name: "5satoshi Lightning Node Dashboard",
   publicUrl: 'https://5sats.com', // User-facing public URL of the dashboard
-  apiBaseUrl: 'https://5sats.com', // Base URL for internal API calls, can be overridden by INTERNAL_API_HOST
+  // Base URL for API calls.
+  // If INTERNAL_API_HOST environment variable is not set, API calls from a self-hosted dashboard
+  // will default to this URL. For betweenness data specifically, this means
+  // it would call the 5sats.com production API.
+  // Set INTERNAL_API_HOST to your own application's URL if you want to use your own backend APIs.
+  apiBaseUrl: 'https://5sats.com', 
   ogImageDefault: 'https://placehold.co/1200x630.png', 
   themeColors: {
-    primaryHSLString: `${primaryColorH} ${primaryColorS}% ${primaryColorL}%`,
-    secondaryHSLString: `${secondaryColorH} ${secondaryColorS}% ${secondaryColorL}%`,
-    tertiaryHSLString: `${tertiaryColorH} ${tertiaryColorS}% ${tertiaryColorL}%`,
+    primary: `${primaryColorH} ${primaryColorS}% ${primaryColorL}%`,
+    secondary: `${secondaryColorH} ${secondaryColorS}% ${secondaryColorL}%`,
+    tertiary: `${tertiaryColorH} ${tertiaryColorS}% ${tertiaryColorL}%`,
   },
 };

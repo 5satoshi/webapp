@@ -10,14 +10,14 @@ The dashboard offers a suite of features to monitor and analyze your Lightning N
 - **Node Overview**: At-a-glance summary of key performance indicators, historical forwarding volume, period-specific activity, and information about the node. Metrics like "Betweenness Rank" and "Shortest Path Share" are fetched via the application's internal API.
 - **Channel Management**: Detailed listing of all channels with status, capacity, balance, and performance metrics, including a detail view for individual channels. Data is sourced from `peers` and `forwardings` tables.
 - **Network Insights**: Analytics on routed payment amounts (distribution and value over time) and transaction timing patterns (heatmap). Data is sourced from the `forwardings` table.
-- **Routing Analysis**: Insights into the node's role in the network's cheapest paths for various payment sizes (shortest path share), including comparisons with top nodes and historical trends for any selected node. Data for these analyses (originally from `betweenness` table) is fetched via the application's internal API.
+- **Routing Analysis**: Insights into the node's role in the network's cheapest paths for various payment sizes (shortest path share), including comparisons with top nodes and historical trends for any selected node. Data for these analyses is fetched via the application's internal API.
 - **AI-Powered Assistance**: Includes features like Node ID/Alias autocomplete with rank information to aid in analysis. Autocomplete suggestions are sourced from the `nodes` table.
 
 For more detailed information on each section, please refer to our [Documentation](#documentation).
 
 ## Documentation
 
-For detailed information about installing, configuring, and using the Lightning Stats Dashboard, please refer to the following documents:
+For detailed information about installing, configuring,and using the Lightning Stats Dashboard, please refer to the following documents:
 
 - **[Installation Guide](./docs/installation.md)**: Instructions for setting up and running the application.
 - **[Overview Page Guide](./docs/overview.md)**: Detailed explanation of the Node Overview page.
@@ -60,6 +60,7 @@ For detailed information about installing, configuring, and using the Lightning 
     -   `channels/`: Channel list and details.
     -   `analytics/`: Network insights (payment volume, timing).
     -   `subsumption/`: Routing analysis (shortest path share).
+    -   `api/`: Internal API routes, including those for `betweenness` data.
 -   `src/components/`: Reusable UI components.
     -   `dashboard/`: Components specific to dashboard sections.
     -   `layout/`: Core layout components (AppShell, Sidebar, Header).
@@ -90,18 +91,20 @@ These features are implemented as Genkit flows, which can be found in `src/ai/fl
 
 ## Data Source
 
-All statistical data for the dashboard is sourced from Google BigQuery. The application directly queries the following tables:
+The dashboard application directly queries Google BigQuery for the following tables, which users must populate from their Core Lightning (CLN) node data:
 -   **`peers`**: For channel list information, peer details, and some node alias lookups.
--   **`nodes`**: For Node ID/Alias autocomplete suggestions.
+-   **`nodes`**: For Node ID/Alias autocomplete suggestions (nodeid, alias, last_timestamp).
 -   **`forwardings`**: For detailed forwarding event data, used in most analytics and overview metrics.
 
-Data related to network graph analysis (such as betweenness centrality and shortest path shares, typically from a `betweenness` table) is accessed via the application's internal API endpoints (e.g., `/api/betweenness/...`). These API endpoints, in turn, query the `betweenness` table in BigQuery.
+Data related to network graph analysis (such as betweenness centrality and shortest path shares, typically from a **`betweenness`** table) is accessed via the application's internal API endpoints (e.g., `/api/betweenness/...`).
+-   For a self-hosted deployment, if the `INTERNAL_API_HOST` environment variable is set to the instance's own URL, these API routes query the `betweenness` table in the user's configured BigQuery project.
+-   If `INTERNAL_API_HOST` is **not set**, it defaults to `siteConfig.apiBaseUrl` (from `src/config/site.ts`), which is `https://5sats.com`. In this case, the self-hosted dashboard will fetch `betweenness` data from the **5sats.com production API**.
 
-The `ensureBigQueryClientInitialized` function in `src/services/bigqueryClient.ts` manages the BigQuery connection. The base URL for internal API calls is configured in `src/config/site.ts` (`apiBaseUrl`) and can be overridden by the `INTERNAL_API_HOST` environment variable.
+The `ensureBigQueryClientInitialized` function in `src/services/bigqueryClient.ts` manages the BigQuery connection. The `apiBaseUrl` for API calls is configured in `src/config/site.ts` and can be overridden by the `INTERNAL_API_HOST` environment variable.
 
 ## Styling
 
 -   The application uses **Tailwind CSS** for utility-first styling.
 -   **ShadCN UI** provides the base components.
--   The color scheme and theme variables (CSS HSL) are defined in `src/app/globals.css`, adhering to the project's style guidelines (Deep Purple primary, Orange secondary, Dark Gray background).
+-   The color scheme and theme variables (CSS HSL) are defined in `src/app/globals.css`, adhering to the project's style guidelines (Deep Purple primary, Orange secondary, Lighter Purple tertiary).
 -   Fonts: 'Inter' for body text, 'Space Grotesk' for headlines.
