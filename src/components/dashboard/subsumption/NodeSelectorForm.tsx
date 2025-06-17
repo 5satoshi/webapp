@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Clock } from 'lucide-react';
 import { getNodeSuggestions, type NodeSuggestion } from '@/ai/flows/getNodeSuggestionsFlow';
 import { cn } from '@/lib/utils';
-import { getOrdinalSuffix } from '@/lib/utils';
 import { specificNodeId } from '@/lib/constants';
+import { format, parseISO } from 'date-fns';
 
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -26,6 +26,18 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 interface NodeSelectorFormProps {
   currentAggregation: string;
   initialNodeId: string;
+}
+
+function formatSuggestionTimestamp(isoTimestamp: string | null | undefined): string | null {
+  if (!isoTimestamp) return null;
+  try {
+    const date = parseISO(isoTimestamp);
+    // Format to something like: "Oct 27, 2023, 3:30 PM UTC"
+    return format(date, "MMM d, yyyy, h:mm a") + " UTC";
+  } catch (e) {
+    console.warn("Failed to parse suggestion timestamp:", e);
+    return "Invalid date";
+  }
 }
 
 export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSelectorFormProps) {
@@ -122,8 +134,9 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
           onFocus={() => {
             if (nodeInput.trim().length >= 2) {
               if (suggestions.length > 0) {
-                setShowSuggestions(true);
+                 setShowSuggestions(true);
               } else {
+                // If input has valid text but no suggestions loaded, fetch them on focus
                 debouncedFetchSuggestions(nodeInput);
               }
             } else {
@@ -144,35 +157,40 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
             className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-lg max-h-60 overflow-y-auto"
           >
             <ul className="py-1">
-              {suggestions.map((suggestion, index) => (
-                <li
-                  key={`${suggestion.value}-${index}`}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="px-3 py-2 text-sm hover:bg-accent focus:bg-accent cursor-pointer flex justify-between items-center group"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault(); 
-                      handleSuggestionClick(suggestion);
-                    }
-                  }}
-                >
-                  <span className="truncate group-hover:text-accent-foreground">
-                    {suggestion.display}
-                    {suggestion.rank !== null && suggestion.rank !== undefined && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        (Rank: {suggestion.rank}{getOrdinalSuffix(suggestion.rank)})
+              {suggestions.map((suggestion, index) => {
+                const formattedTimestamp = formatSuggestionTimestamp(suggestion.lastTimestamp);
+                return (
+                  <li
+                    key={`${suggestion.value}-${index}`}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    className="px-3 py-2 text-sm hover:bg-accent focus:bg-accent cursor-pointer group"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault(); 
+                        handleSuggestionClick(suggestion);
+                      }
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="truncate group-hover:text-accent-foreground font-medium">
+                        {suggestion.display}
                       </span>
+                      <span className={cn(
+                        "text-xs px-1.5 py-0.5 rounded-full ml-2 shrink-0",
+                        suggestion.type === 'alias' ? 'bg-primary/10 text-primary group-hover:bg-primary/20' : 'bg-secondary/10 text-secondary group-hover:bg-secondary/20'
+                      )}>
+                        {suggestion.type}
+                      </span>
+                    </div>
+                    {formattedTimestamp && (
+                      <div className="text-xs text-muted-foreground group-hover:text-accent-foreground/80 mt-0.5 flex items-center">
+                        <Clock className="mr-1 h-3 w-3" /> Last Announce: {formattedTimestamp}
+                      </div>
                     )}
-                  </span>
-                  <span className={cn(
-                    "text-xs px-1.5 py-0.5 rounded-full ml-2 shrink-0",
-                    suggestion.type === 'alias' ? 'bg-primary/10 text-primary group-hover:bg-primary/20' : 'bg-secondary/10 text-secondary group-hover:bg-secondary/20'
-                  )}>
-                    {suggestion.type}
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
@@ -184,4 +202,3 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
     </form>
   );
 }
-
