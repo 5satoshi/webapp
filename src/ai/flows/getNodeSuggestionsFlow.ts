@@ -13,6 +13,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from '@/services/bigqueryClient';
 import { logBigQueryError } from '@/lib/bigqueryUtils';
+import type { QueryJobOptions } from '@google-cloud/bigquery';
 
 const GetNodeSuggestionsInputSchema = z.object({
   searchTerm: z.string().min(2, "Search term must be at least 2 characters long."),
@@ -101,14 +102,20 @@ async function fetchSuggestionsFromPeersTable(searchTerm: string): Promise<GetNo
           AND id NOT IN (SELECT value FROM UNNEST(@existingValues)) -- Avoid duplicates if an ID matched an alias
         LIMIT @limit
       `;
-      const [nodeIdJob] = await bigquery.createQueryJob({
+      
+      const nodeIdJobOptions: QueryJobOptions = {
         query: nodeIdQuery,
         params: {
           searchTermPrefix: `${cleanedSearchTerm}%`,
           existingValues: suggestions.map(s => s.value),
           limit: nodeIdLimit
+        },
+        types: { // Explicitly define type for array parameter
+          existingValues: 'STRING[]'
         }
-      });
+      };
+      const [nodeIdJob] = await bigquery.createQueryJob(nodeIdJobOptions);
+      
       const nodeIdRows = (await nodeIdJob.getQueryResults())[0];
       nodeIdRows.forEach((r: any) => {
          if (r.value && r.display && !suggestions.some(s => s.value === r.value)) {
@@ -145,3 +152,4 @@ export async function getNodeSuggestions(input: GetNodeSuggestionsInput): Promis
   }
   return getNodeSuggestionsFlowRunner(input);
 }
+
