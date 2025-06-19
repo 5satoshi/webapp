@@ -12,7 +12,7 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
   const fetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/top-nodes?limit=${limit}`;
   console.log(`[subsumptionService] Fetching top nodes from: ${fetchUrl}`);
   try {
-    const response = await fetch(fetchUrl);
+    const response = await fetch(fetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`[subsumptionService] API Error fetchTopNodesBySubsumption (URL: ${fetchUrl}): ${response.status} ${response.statusText}`, errorBody);
@@ -29,7 +29,7 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
   const fetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-timeline?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
   console.log(`[subsumptionService] Fetching network subsumption data for node ${nodeId} from: ${fetchUrl}`);
   try {
-    const response = await fetch(fetchUrl);
+    const response = await fetch(fetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`[subsumptionService] API Error fetchNetworkSubsumptionDataForNode (URL: ${fetchUrl}): ${response.status} ${response.statusText}`, errorBody);
@@ -51,7 +51,7 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
   const fetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeIdToFetch)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
   console.log(`[subsumptionService] Fetching node ranks for ${nodeIdToFetch} from: ${fetchUrl}`);
   try {
-    const response = await fetch(fetchUrl);
+    const response = await fetch(fetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`[subsumptionService] API Error fetchNodeRankForCategories (URL: ${fetchUrl}): ${response.status} ${response.statusText}`, errorBody);
@@ -205,13 +205,13 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
   console.log(`[subsumptionService] INTERNAL_API_HOST_URL: ${INTERNAL_API_HOST_URL}`);
   console.log(`[subsumptionService] Fetching node graph data for ${nodeId} from: ${fetchUrl}`);
   try {
-    const response = await fetch(fetchUrl);
+    const response = await fetch(fetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const errorBody = await response.text();
       // Log only the status and statusText, not the full HTML body for a 404
       console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${response.status} ${response.statusText}`);
       if (response.status !== 404) { // Log body for non-404 errors
-          console.error("Error body:", errorBody);
+          console.error("Error body snippet:", errorBody.substring(0, 500)); // Log a snippet for other errors
       }
       return null;
     }
