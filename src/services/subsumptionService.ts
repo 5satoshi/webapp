@@ -6,7 +6,9 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 import { siteConfig } from '@/config/site';
 
-const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.apiBaseUrl || `http://localhost:${process.env.PORT || '9002'}`;
+// Updated order: process.env.INTERNAL_API_HOST -> localhost:PORT -> siteConfig.apiBaseUrl
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || (typeof window === 'undefined' ? `http://localhost:${process.env.PORT || '9002'}` : siteConfig.apiBaseUrl) || siteConfig.apiBaseUrl;
+
 
 export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<AllTopNodes> {
   const fetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/top-nodes?limit=${limit}`;
@@ -21,6 +23,22 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
     return await response.json() as AllTopNodes;
   } catch (error: any) {
     console.error(`[subsumptionService] Network Error fetchTopNodesBySubsumption (URL: ${fetchUrl}):`, error.message, error);
+    // Fallback if localhost fails and siteConfig.apiBaseUrl is different and might work
+    if (INTERNAL_API_HOST_URL.startsWith('http://localhost') && siteConfig.apiBaseUrl && !siteConfig.apiBaseUrl.startsWith('http://localhost')) {
+      console.log(`[subsumptionService] Retrying fetchTopNodesBySubsumption with ${siteConfig.apiBaseUrl}`);
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/top-nodes?limit=${limit}`;
+      try {
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+          console.error(`[subsumptionService] Fallback API Error fetchTopNodesBySubsumption (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return { micro: [], common: [], macro: [] };
+        }
+        return await fallbackResponse.json() as AllTopNodes;
+      } catch (fallbackError: any) {
+        console.error(`[subsumptionService] Fallback Network Error fetchTopNodesBySubsumption (URL: ${fallbackFetchUrl}):`, fallbackError.message, fallbackError);
+      }
+    }
     return { micro: [], common: [], macro: [] };
   }
 }
@@ -38,6 +56,21 @@ export async function fetchNetworkSubsumptionDataForNode(nodeId: string, aggrega
     return await response.json() as NetworkSubsumptionData[];
   } catch (error: any) {
     console.error(`[subsumptionService] Network Error fetchNetworkSubsumptionDataForNode (URL: ${fetchUrl}):`, error.message, error);
+    if (INTERNAL_API_HOST_URL.startsWith('http://localhost') && siteConfig.apiBaseUrl && !siteConfig.apiBaseUrl.startsWith('http://localhost')) {
+      console.log(`[subsumptionService] Retrying fetchNetworkSubsumptionDataForNode with ${siteConfig.apiBaseUrl}`);
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-timeline?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
+      try {
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+          console.error(`[subsumptionService] Fallback API Error fetchNetworkSubsumptionDataForNode (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return [];
+        }
+        return await fallbackResponse.json() as NetworkSubsumptionData[];
+      } catch (fallbackError: any) {
+        console.error(`[subsumptionService] Fallback Network Error fetchNetworkSubsumptionDataForNode (URL: ${fallbackFetchUrl}):`, fallbackError.message, fallbackError);
+      }
+    }
     return [];
   }
 }
@@ -60,6 +93,21 @@ export async function fetchNodeRankForCategories(nodeIdToFetch: string, aggregat
     return await response.json() as OurNodeRanksForAllCategories;
   } catch (error: any) {
     console.error(`[subsumptionService] Network Error fetchNodeRankForCategories (URL: ${fetchUrl}):`, error.message, error);
+     if (INTERNAL_API_HOST_URL.startsWith('http://localhost') && siteConfig.apiBaseUrl && !siteConfig.apiBaseUrl.startsWith('http://localhost')) {
+      console.log(`[subsumptionService] Retrying fetchNodeRankForCategories with ${siteConfig.apiBaseUrl}`);
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeIdToFetch)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
+      try {
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+          console.error(`[subsumptionService] Fallback API Error fetchNodeRankForCategories (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return defaultRanks;
+        }
+        return await fallbackResponse.json() as OurNodeRanksForAllCategories;
+      } catch (fallbackError: any) {
+        console.error(`[subsumptionService] Fallback Network Error fetchNodeRankForCategories (URL: ${fallbackFetchUrl}):`, fallbackError.message, fallbackError);
+      }
+    }
     return defaultRanks;
   }
 }
@@ -201,35 +249,88 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
     console.log("[subsumptionService] fetchNodeGraphData called with no nodeId.");
     return null;
   }
-  const fetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
+  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
   console.log(`[subsumptionService] INTERNAL_API_HOST_URL: ${INTERNAL_API_HOST_URL}`);
-  console.log(`[subsumptionService] Fetching node graph data for ${nodeId} from: ${fetchUrl}`);
+  console.log(`[subsumptionService] Attempting to fetch node graph data for ${nodeId} from primary URL: ${primaryFetchUrl}`);
+  
+  let response;
   try {
-    const response = await fetch(fetchUrl, { cache: 'no-store' }); // Added cache: 'no-store'
+    response = await fetch(primaryFetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const statusAndText = `${response.status} ${response.statusText}`;
-      console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${statusAndText}`);
-      
-      // Log a snippet of the body for non-404s, or if it's a 404 but not the huge HTML page.
+      console.error(`[subsumptionService] API Error (Primary) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${primaryFetchUrl}): ${statusAndText}`);
       if (response.status !== 404) {
         try {
-            const errorBody = await response.text();
-            console.error("Error body snippet:", errorBody.substring(0, 500)); 
+          const errorBody = await response.text();
+          console.error("Error body (Primary):", errorBody.substring(0, 500));
         } catch (textError: any) {
-            console.error("Could not retrieve error body text:", textError.message);
+          console.error("Could not retrieve error body text (Primary):", textError.message);
         }
-      } else {
-        // For 404, we already know it's likely the HTML page, so no need to log body.
       }
-      return null;
+      // If primary URL (localhost or INTERNAL_API_HOST) fails, and it wasn't already siteConfig.apiBaseUrl, try siteConfig.apiBaseUrl as fallback
+      if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
+         console.log(`[subsumptionService] Primary fetch failed. Retrying with fallback URL using siteConfig.apiBaseUrl for nodeId: ${nodeId}`);
+         const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
+         console.log(`[subsumptionService] Attempting fallback fetch from: ${fallbackFetchUrl}`);
+         response = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+
+         if (!response.ok) {
+            const fallbackStatusAndText = `${response.status} ${response.statusText}`;
+            console.error(`[subsumptionService] API Error (Fallback) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fallbackFetchUrl}): ${fallbackStatusAndText}`);
+            if (response.status !== 404) {
+              try {
+                const errorBody = await response.text();
+                console.error("Error body (Fallback):", errorBody.substring(0, 500));
+              } catch (textError: any) {
+                console.error("Could not retrieve error body text (Fallback):", textError.message);
+              }
+            }
+            return null; // Fallback also failed
+         }
+         console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId} using fallback URL.`);
+      } else {
+        return null; // Primary failed, and no different fallback to try or fallback is same as primary
+      }
+    } else {
+      console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId} using primary URL.`);
     }
+    
     const data = await response.json() as NodeGraphData;
-    console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId}. Nodes: ${data.nodes?.length}, Links: ${data.links?.length}`);
+    console.log(`[subsumptionService] Parsed graph data. Nodes: ${data.nodes?.length}, Links: ${data.links?.length}`);
     return data;
-  } catch (error: any) {
-    console.error(`[subsumptionService] Network Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}):`, error.message, error);
-    return null;
+
+  } catch (error: any) { // Catches network errors for the primary fetch
+    console.error(`[subsumptionService] Network Error (Primary) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${primaryFetchUrl}):`, error.message, error);
+    // If primary URL (localhost or INTERNAL_API_HOST) fails due to network error, and it wasn't already siteConfig.apiBaseUrl, try siteConfig.apiBaseUrl as fallback
+    if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
+      console.log(`[subsumptionService] Primary fetch network error. Retrying with fallback URL using siteConfig.apiBaseUrl for nodeId: ${nodeId}`);
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
+      console.log(`[subsumptionService] Attempting fallback fetch from: ${fallbackFetchUrl}`);
+      try {
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackStatusAndText = `${fallbackResponse.status} ${fallbackResponse.statusText}`;
+          console.error(`[subsumptionService] API Error (Fallback) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fallbackFetchUrl}): ${fallbackStatusAndText}`);
+           if (fallbackResponse.status !== 404) {
+              try {
+                const errorBody = await fallbackResponse.text();
+                console.error("Error body (Fallback):", errorBody.substring(0, 500));
+              } catch (textError: any) {
+                console.error("Could not retrieve error body text (Fallback):", textError.message);
+              }
+            }
+          return null; // Fallback also failed (API error)
+        }
+        console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId} using fallback URL after primary network error.`);
+        return await fallbackResponse.json() as NodeGraphData;
+      } catch (fallbackError: any) { // Catches network errors for the fallback fetch
+        console.error(`[subsumptionService] Network Error (Fallback) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fallbackFetchUrl}):`, fallbackError.message, fallbackError);
+        return null; // Fallback also failed (network error)
+      }
+    }
+    return null; // Primary failed (network error), and no different fallback to try or fallback is same as primary
   }
 }
     
 
+    

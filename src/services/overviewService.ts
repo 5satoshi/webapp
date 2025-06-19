@@ -8,7 +8,9 @@ import { specificNodeId } from '@/lib/constants';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { siteConfig } from '@/config/site';
 
-const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || siteConfig.apiBaseUrl || `http://localhost:${process.env.PORT || '9002'}`;
+// Updated order: process.env.INTERNAL_API_HOST -> localhost:PORT -> siteConfig.apiBaseUrl
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || (typeof window === 'undefined' ? `http://localhost:${process.env.PORT || '9002'}` : siteConfig.apiBaseUrl) || siteConfig.apiBaseUrl;
+
 
 export async function fetchKeyMetrics(): Promise<KeyMetric[]> {
   const defaultMetrics: KeyMetric[] = [
@@ -338,29 +340,51 @@ export async function fetchPeriodChannelActivity(aggregationPeriod: string): Pro
 export async function fetchBetweennessRank(aggregationPeriod: string): Promise<BetweennessRankData> {
   const nodeId = specificNodeId; 
   const defaultReturn: BetweennessRankData = { latestRank: null, previousRank: null };
+  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
 
   try {
-    const response = await fetch(`${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(primaryFetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`API Error fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
+      console.error(`API Error (Primary) fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}, URL: ${primaryFetchUrl}): ${response.status} ${response.statusText}`, errorBody);
+      if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
+        const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
+        console.log(`Retrying fetchBetweennessRank with ${fallbackFetchUrl}`);
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+          console.error(`API Error (Fallback) fetchBetweennessRank (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return defaultReturn;
+        }
+        const data: OurNodeRanksForAllCategories = await fallbackResponse.json();
+        const commonData = data.common;
+        return commonData ? { latestRank: commonData.latestRank, previousRank: (commonData.latestRank !== null && commonData.rankChange !== null ? commonData.latestRank - commonData.rankChange : null) } : defaultReturn;
+      }
       return defaultReturn;
     }
     const data: OurNodeRanksForAllCategories = await response.json();
-    
     const commonData = data.common;
-    if (commonData) {
-      const latestRank = commonData.latestRank;
-      let previousRank: number | null = null;
-      if (latestRank !== null && commonData.rankChange !== null) {
-        previousRank = latestRank - commonData.rankChange;
-      }
-      return { latestRank, previousRank };
-    }
-    return defaultReturn;
+    return commonData ? { latestRank: commonData.latestRank, previousRank: (commonData.latestRank !== null && commonData.rankChange !== null ? commonData.latestRank - commonData.rankChange : null) } : defaultReturn;
 
   } catch (error: any) {
-    console.error(`Network/JSON Error fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}):`, error.message);
+    console.error(`Network/JSON Error (Primary) fetchBetweennessRank (nodeId: ${nodeId}, period: ${aggregationPeriod}, URL: ${primaryFetchUrl}):`, error.message);
+    if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
+      console.log(`Retrying fetchBetweennessRank with ${fallbackFetchUrl} after primary network error.`);
+      try {
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+           console.error(`API Error (Fallback) fetchBetweennessRank (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return defaultReturn;
+        }
+        const data: OurNodeRanksForAllCategories = await fallbackResponse.json();
+        const commonData = data.common;
+        return commonData ? { latestRank: commonData.latestRank, previousRank: (commonData.latestRank !== null && commonData.rankChange !== null ? commonData.latestRank - commonData.rankChange : null) } : defaultReturn;
+      } catch (fallbackError: any) {
+        console.error(`Network/JSON Error (Fallback) fetchBetweennessRank (URL: ${fallbackFetchUrl}):`, fallbackError.message);
+      }
+    }
     return defaultReturn;
   }
 }
@@ -368,27 +392,48 @@ export async function fetchBetweennessRank(aggregationPeriod: string): Promise<B
 export async function fetchShortestPathShare(aggregationPeriod: string): Promise<ShortestPathShareData> {
   const nodeId = specificNodeId;
   const defaultReturn: ShortestPathShareData = { latestShare: null, previousShare: null };
+  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
 
   try {
-    const response = await fetch(`${INTERNAL_API_HOST_URL}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`);
+    const response = await fetch(primaryFetchUrl, { cache: 'no-store' });
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`API Error fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}): ${response.status} ${response.statusText}`, errorBody);
+      console.error(`API Error (Primary) fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}, URL: ${primaryFetchUrl}): ${response.status} ${response.statusText}`, errorBody);
+      if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
+        const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
+        console.log(`Retrying fetchShortestPathShare with ${fallbackFetchUrl}`);
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+          console.error(`API Error (Fallback) fetchShortestPathShare (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return defaultReturn;
+        }
+        const data: OurNodeRanksForAllCategories = await fallbackResponse.json();
+        return data.common ? { latestShare: data.common.latestShare, previousShare: data.common.previousShare } : defaultReturn;
+      }
       return defaultReturn;
     }
     const data: OurNodeRanksForAllCategories = await response.json();
-
-    const commonData = data.common;
-    if (commonData) {
-      return { 
-        latestShare: commonData.latestShare, 
-        previousShare: commonData.previousShare 
-      };
-    }
-    return defaultReturn;
+    return data.common ? { latestShare: data.common.latestShare, previousShare: data.common.previousShare } : defaultReturn;
 
   } catch (error: any) {
-    console.error(`Network/JSON Error fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}):`, error.message);
+    console.error(`Network/JSON Error (Primary) fetchShortestPathShare (nodeId: ${nodeId}, period: ${aggregationPeriod}, URL: ${primaryFetchUrl}):`, error.message);
+     if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-ranks?nodeId=${encodeURIComponent(nodeId)}&aggregation=${encodeURIComponent(aggregationPeriod)}`;
+      console.log(`Retrying fetchShortestPathShare with ${fallbackFetchUrl} after primary network error.`);
+      try {
+        const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
+        if (!fallbackResponse.ok) {
+          const fallbackErrorBody = await fallbackResponse.text();
+          console.error(`API Error (Fallback) fetchShortestPathShare (URL: ${fallbackFetchUrl}): ${fallbackResponse.status} ${fallbackResponse.statusText}`, fallbackErrorBody);
+          return defaultReturn;
+        }
+        const data: OurNodeRanksForAllCategories = await fallbackResponse.json();
+        return data.common ? { latestShare: data.common.latestShare, previousShare: data.common.previousShare } : defaultReturn;
+      } catch (fallbackError: any) {
+        console.error(`Network/JSON Error (Fallback) fetchShortestPathShare (URL: ${fallbackFetchUrl}):`, fallbackError.message);
+      }
+    }
     return defaultReturn;
   }
 }
