@@ -24,7 +24,6 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 }); 
   const [hasMounted, setHasMounted] = useState(false);
 
-  // Colors are now expected to be set on the node object by the API
   const linkColor = 'hsla(var(--muted-foreground), 0.3)';
 
   useEffect(() => {
@@ -48,7 +47,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   }, [hasMounted, graphData]); 
 
   const getNodeColor = useCallback((node: GraphNode) => {
-    return node.color || 'hsl(var(--accent))'; // Fallback to accent if color not set from API
+    return node.color || 'hsl(var(--accent))'; 
   }, []);
 
   const handleNodeHover = useCallback((node: GraphNode | null) => {
@@ -93,10 +92,10 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           nodeId="id"
           nodeVal="val" 
           nodeLabel="name"
-          nodeColor={getNodeColor} // Uses the color from the node object
+          nodeColor={getNodeColor}
           nodeRelSize={4} 
           linkColor={() => linkColor}
-          linkWidth={link => Math.max(0.5, (link as any).value * 30)} 
+          linkWidth={link => Math.max(0.2, (link as any).value * 50)} 
           linkDirectionalParticles={1}
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleSpeed={0.006}
@@ -104,7 +103,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           cooldownTicks={150} 
           onEngineStop={() => {
              if (fgRef.current) {
-                fgRef.current.zoomToFit(400, 150); // Zoom to fit, 150px padding
+                fgRef.current.zoomToFit(400, 100); 
              }
           }}
           backgroundColor="hsl(var(--card))"
