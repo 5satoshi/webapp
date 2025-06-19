@@ -208,7 +208,11 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
     const response = await fetch(fetchUrl);
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${response.status} ${response.statusText}`, errorBody);
+      // Log only the status and statusText, not the full HTML body for a 404
+      console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${response.status} ${response.statusText}`);
+      if (response.status !== 404) { // Log body for non-404 errors
+          console.error("Error body:", errorBody);
+      }
       return null;
     }
     const data = await response.json() as NodeGraphData;
