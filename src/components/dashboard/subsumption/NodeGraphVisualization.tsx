@@ -131,7 +131,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           nodeColor={getNodeColor}
           nodeRelSize={4}
           linkColor={() => linkColor}
-          linkWidth={link => Math.max(0.2, (link as any).value * 50)}
+          linkWidth={link => Math.max(0.2, (link as any).value * 5000)}
           linkDirectionalParticles={1}
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleSpeed={0.006}
@@ -175,3 +175,4 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
 };
 
 export default NodeGraphVisualization;
+
