@@ -205,11 +205,12 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
   console.log(`[subsumptionService] INTERNAL_API_HOST_URL: ${INTERNAL_API_HOST_URL}`);
   console.log(`[subsumptionService] Fetching node graph data for ${nodeId} from: ${fetchUrl}`);
   try {
-    const response = await fetch(fetchUrl, { cache: 'no-store' });
+    const response = await fetch(fetchUrl, { cache: 'no-store' }); // Added cache: 'no-store'
     if (!response.ok) {
       const statusAndText = `${response.status} ${response.statusText}`;
       console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${statusAndText}`);
       
+      // Log a snippet of the body for non-404s, or if it's a 404 but not the huge HTML page.
       if (response.status !== 404) {
         try {
             const errorBody = await response.text();
@@ -217,6 +218,8 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
         } catch (textError: any) {
             console.error("Could not retrieve error body text:", textError.message);
         }
+      } else {
+        // For 404, we already know it's likely the HTML page, so no need to log body.
       }
       return null;
     }
@@ -229,3 +232,4 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
   }
 }
     
+

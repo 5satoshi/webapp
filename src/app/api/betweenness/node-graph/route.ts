@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
     }
     console.log('[API /api/betweenness/node-graph] BigQuery client obtained.');
 
+    // Query for edges involving the central node from edge_betweenness table
+    // Filters by type = 'common' and shortest_path_share >= 0.001
     const edgeQuery = `
       SELECT
         source,
@@ -51,12 +53,13 @@ export async function GET(request: NextRequest) {
     const nodes = new Map<string, GraphNode>();
     const links: GraphLink[] = [];
 
+    // Add the central node first
     nodes.set(centralNodeId, {
       id: centralNodeId,
-      name: `Central: ${centralNodeId.substring(0, 8)}...`,
-      val: 10, 
+      name: `Central: ${centralNodeId.substring(0, 8)}...`, // Placeholder name
+      val: 10, // Central node can be larger
       isCentralNode: true,
-      color: 'hsl(var(--primary))'
+      color: 'hsl(var(--primary))' // Or any distinct color
     });
 
     edgeRows.forEach((row: any) => {
@@ -64,6 +67,7 @@ export async function GET(request: NextRequest) {
       const targetId = String(row.destination);
       const share = parseFloat(row.shortest_path_share);
 
+      // Add source and target nodes if they don't exist, only if they are not the central node (already added)
       if (!nodes.has(sourceId)) {
         nodes.set(sourceId, { id: sourceId, name: `${sourceId.substring(0, 8)}...`, val: 5, isCentralNode: false, color: 'hsl(var(--secondary))' });
       }
@@ -73,6 +77,7 @@ export async function GET(request: NextRequest) {
       links.push({ source: sourceId, target: targetId, value: share });
     });
 
+    // Fetch aliases for all collected node IDs from the 'nodes' table
     const nodeIdsForAliasLookup = Array.from(nodes.keys());
     if (nodeIdsForAliasLookup.length > 0) {
       const aliasQuery = `
@@ -95,18 +100,20 @@ export async function GET(request: NextRequest) {
         if (nodes.has(nodeId) && alias) {
           const node = nodes.get(nodeId)!;
           node.name = alias;
-           if (node.isCentralNode) {
+           if (node.isCentralNode) { // If it's the central node, append (Central)
             node.name = `${alias} (Central)`;
           }
-        } else if (nodes.has(nodeId) && node.isCentralNode && !alias) {
+        } else if (nodes.has(nodeId) && node.isCentralNode && !alias) { // Central node without alias from 'nodes'
            const node = nodes.get(nodeId)!;
            node.name = `${nodeId.substring(0,8)}... (Central)`;
         }
       });
     }
     
+    // Fallback: If central node alias was not in 'nodes' table, try 'betweenness' table
     const centralGraphNode = nodes.get(centralNodeId);
     if (centralGraphNode && centralGraphNode.name === `Central: ${centralNodeId.substring(0, 8)}...`) {
+      // This implies its alias wasn't found in the 'nodes' table query above
       const centralAliasQueryBetweenness = `
         SELECT alias FROM \`${projectId}.${datasetId}.betweenness\`
         WHERE nodeid = @centralNodeId AND alias IS NOT NULL AND TRIM(alias) != ''
@@ -121,15 +128,17 @@ export async function GET(request: NextRequest) {
         console.log(`[API /api/betweenness/node-graph] Found central node alias in 'betweenness': ${centralGraphNode.name}`);
       } else {
          console.log(`[API /api/betweenness/node-graph] Central node alias not found in 'betweenness' table either.`);
+         // Keep the placeholder like `03fe84... (Central)`
          centralGraphNode.name = `${centralNodeId.substring(0,8)}... (Central)`;
       }
     }
+
 
     const responseData: NodeGraphData = {
       nodes: Array.from(nodes.values()),
       links: links
     };
-    console.log(`[API /api/betweenness/node-graph] Successfully prepared graph data. Nodes: ${responseData.nodes.length}, Links: ${responseData.links.length}.`);
+    console.log(`[API /api/betweenness/node-graph] Successfully prepared graph data. Nodes: ${responseData.nodes.length}, Links: ${responseData.links.length}. Responding with data.`);
     return NextResponse.json(responseData);
 
   } catch (error: any) {
