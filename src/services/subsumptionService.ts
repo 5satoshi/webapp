@@ -207,11 +207,16 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
   try {
     const response = await fetch(fetchUrl, { cache: 'no-store' });
     if (!response.ok) {
-      const errorBody = await response.text();
-      // Log only the status and statusText, not the full HTML body for a 404
-      console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${response.status} ${response.statusText}`);
-      if (response.status !== 404) { // Log body for non-404 errors
-          console.error("Error body snippet:", errorBody.substring(0, 500)); // Log a snippet for other errors
+      const statusAndText = `${response.status} ${response.statusText}`;
+      console.error(`[subsumptionService] API Error fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fetchUrl}): ${statusAndText}`);
+      
+      if (response.status !== 404) {
+        try {
+            const errorBody = await response.text();
+            console.error("Error body snippet:", errorBody.substring(0, 500)); 
+        } catch (textError: any) {
+            console.error("Could not retrieve error body text:", textError.message);
+        }
       }
       return null;
     }

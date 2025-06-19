@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
     const bigquery = getBigQueryClient();
 
     if (!bigquery) {
-      logBigQueryError("API /api/betweenness/node-graph", new Error("BigQuery client not available after initialization."));
+      const errorMessage = "BigQuery client not available after ensuring initialization.";
+      logBigQueryError("API /api/betweenness/node-graph", new Error(errorMessage));
+      console.error(`[API /api/betweenness/node-graph] ${errorMessage}`);
       return NextResponse.json({ error: 'Database client not available' }, { status: 500 });
     }
     console.log('[API /api/betweenness/node-graph] BigQuery client obtained.');
@@ -49,13 +51,12 @@ export async function GET(request: NextRequest) {
     const nodes = new Map<string, GraphNode>();
     const links: GraphLink[] = [];
 
-    // Add central node first
     nodes.set(centralNodeId, {
       id: centralNodeId,
-      name: `Central: ${centralNodeId.substring(0, 8)}...`, // Placeholder, will be updated with alias
-      val: 10, // Larger value for central node
+      name: `Central: ${centralNodeId.substring(0, 8)}...`,
+      val: 10, 
       isCentralNode: true,
-      color: 'hsl(var(--primary))' // Primary color for central node
+      color: 'hsl(var(--primary))'
     });
 
     edgeRows.forEach((row: any) => {
@@ -97,32 +98,32 @@ export async function GET(request: NextRequest) {
            if (node.isCentralNode) {
             node.name = `${alias} (Central)`;
           }
-        } else if (nodes.has(nodeId) && node.isCentralNode) {
+        } else if (nodes.has(nodeId) && node.isCentralNode && !alias) {
            const node = nodes.get(nodeId)!;
            node.name = `${nodeId.substring(0,8)}... (Central)`;
         }
       });
     }
     
-    // Update name for central node if alias was not found from nodes table
     const centralGraphNode = nodes.get(centralNodeId);
-    if (centralGraphNode && centralGraphNode.name === `Central: ${centralNodeId.substring(0, 8)}...`) { // Check if placeholder is still there
-      // Attempt to get alias from betweenness table as a fallback for central node, if not already found in nodes
-      const centralAliasQuery = `
+    if (centralGraphNode && centralGraphNode.name === `Central: ${centralNodeId.substring(0, 8)}...`) {
+      const centralAliasQueryBetweenness = `
         SELECT alias FROM \`${projectId}.${datasetId}.betweenness\`
-        WHERE nodeid = @centralNodeId AND alias IS NOT NULL
+        WHERE nodeid = @centralNodeId AND alias IS NOT NULL AND TRIM(alias) != ''
         ORDER BY timestamp DESC
         LIMIT 1
       `;
-      const [centralAliasJob] = await bigquery.createQueryJob({query: centralAliasQuery, params: {centralNodeId}});
-      const [centralAliasRows] = await centralAliasJob.getQueryResults();
-      if (centralAliasRows.length > 0 && centralAliasRows[0].alias) {
-        centralGraphNode.name = `${String(centralAliasRows[0].alias)} (Central)`;
+      console.log(`[API /api/betweenness/node-graph] Central node alias not found in 'nodes' table. Querying 'betweenness' table for alias.`);
+      const [centralAliasJobB] = await bigquery.createQueryJob({query: centralAliasQueryBetweenness, params: {centralNodeId}});
+      const [centralAliasRowsB] = await centralAliasJobB.getQueryResults();
+      if (centralAliasRowsB.length > 0 && centralAliasRowsB[0].alias) {
+        centralGraphNode.name = `${String(centralAliasRowsB[0].alias)} (Central)`;
+        console.log(`[API /api/betweenness/node-graph] Found central node alias in 'betweenness': ${centralGraphNode.name}`);
       } else {
+         console.log(`[API /api/betweenness/node-graph] Central node alias not found in 'betweenness' table either.`);
          centralGraphNode.name = `${centralNodeId.substring(0,8)}... (Central)`;
       }
     }
-
 
     const responseData: NodeGraphData = {
       nodes: Array.from(nodes.values()),
@@ -137,6 +138,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch node graph data', details: error.message }, { status: 500 });
   }
 }
-
-// Ensure we opt into dynamic rendering
-export const dynamic = 'force-dynamic';
