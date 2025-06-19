@@ -103,7 +103,7 @@ async function fetchAliasesForNodeIds(nodeIds: string[], bigquery: any): Promise
   const aliasOptions = {
     query: aliasQuery,
     params: { nodeIds: nodeIds },
-    types: { nodeIds: ['STRING'] }
+    types: { nodeIds: ['STRING'] } // Specify type for array parameter
   };
   
   try {
