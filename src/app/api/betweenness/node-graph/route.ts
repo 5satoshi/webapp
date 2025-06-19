@@ -5,6 +5,12 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 import type { NodeGraphData, GraphNode, GraphLink } from '@/lib/types';
 
+// Colors based on globals.css for direct use in canvas
+const PRIMARY_COLOR_HSL = 'hsl(277, 70%, 36%)';   // --primary (Purple)
+const SECONDARY_COLOR_HSL = 'hsl(34, 100%, 50%)'; // --secondary (Orange)
+const ACCENT_COLOR_HSL = 'hsl(288, 48%, 60%)';    // --accent (Electric Purple)
+
+
 export async function GET(request: NextRequest) {
   console.log('[API /api/betweenness/node-graph] GET request received.');
   try {
@@ -69,12 +75,8 @@ export async function GET(request: NextRequest) {
         WHERE (source IN UNNEST(@neighborIdsArray) OR destination IN UNNEST(@neighborIdsArray))
           AND type = 'common'
           AND shortest_path_share >= 0.001
-          -- Exclude edges that are only to the central node (already covered by 1st degree)
           AND source != @centralNodeId AND destination != @centralNodeId
       `;
-      // This query will include edges *between* 1st-degree neighbors if they meet the criteria,
-      // and edges from 1st-degree neighbors to new (2nd-degree) neighbors.
-
       const secondDegreeEdgeOptions = {
         query: secondDegreeEdgeQuery,
         params: { neighborIdsArray: neighborIdsArray, centralNodeId: centralNodeId }
@@ -89,7 +91,7 @@ export async function GET(request: NextRequest) {
     const nodesMap = new Map<string, GraphNode>();
     const links: GraphLink[] = [];
     const allNodeIdsInGraph = new Set<string>();
-    allNodeIdsInGraph.add(centralNodeId); // Ensure central node is always in the graph
+    allNodeIdsInGraph.add(centralNodeId); 
 
     allEdgeRows.forEach((row: any) => {
       const sourceId = String(row.source);
@@ -102,7 +104,6 @@ export async function GET(request: NextRequest) {
       links.push({ source: sourceId, target: targetId, value: share });
     });
 
-    // Populate nodesMap with initial structure and determine degree
     allNodeIdsInGraph.forEach(nodeId => {
       let val: number;
       let color: string;
@@ -111,29 +112,28 @@ export async function GET(request: NextRequest) {
 
       if (nodeId === centralNodeId) {
         val = 10;
-        color = 'hsl(var(--primary))'; // Purple
+        color = PRIMARY_COLOR_HSL; 
         namePrefix = "Central: ";
         nodeIsCentral = true;
       } else if (firstDegreeNeighborIds.has(nodeId)) {
         val = 7;
-        color = 'hsl(var(--secondary))'; // Orange
+        color = SECONDARY_COLOR_HSL; 
         namePrefix = "1st: ";
       } else {
-        val = 5; // 2nd degree
-        color = 'hsl(var(--accent))'; // Electric Purple / Lighter Purple
+        val = 5; 
+        color = ACCENT_COLOR_HSL; 
         namePrefix = "2nd: ";
       }
 
       nodesMap.set(nodeId, {
         id: nodeId,
-        name: `${namePrefix}${nodeId.substring(0, 8)}...`, // Initial placeholder name
+        name: `${namePrefix}${nodeId.substring(0, 8)}...`, 
         val: val,
         isCentralNode: nodeIsCentral,
         color: color
       });
     });
 
-    // Fetch aliases for all collected node IDs from the 'nodes' table
     const nodeIdsForAliasLookup = Array.from(allNodeIdsInGraph);
     if (nodeIdsForAliasLookup.length > 0) {
       const aliasQuery = `
@@ -155,14 +155,12 @@ export async function GET(request: NextRequest) {
         const alias = row.alias ? String(row.alias).trim() : null;
         const graphNode = nodesMap.get(nodeId);
         if (graphNode && alias && alias !== "") {
-            // Keep existing prefix from degree determination
             const currentPrefix = graphNode.name.substring(0, graphNode.name.indexOf(':') + 2);
             graphNode.name = `${currentPrefix}${alias}`;
         }
       });
     }
     
-    // Fallback: If central node alias was not in 'nodes' table, try 'betweenness' table (only for central node)
     const centralGraphNode = nodesMap.get(centralNodeId);
     if (centralGraphNode && centralGraphNode.name.startsWith(`Central: ${centralNodeId.substring(0, 8)}...`)) {
       const centralAliasQueryBetweenness = `
@@ -183,9 +181,6 @@ export async function GET(request: NextRequest) {
     }
 
     const finalNodes = Array.from(nodesMap.values());
-    // Deduplicate links: A-B is the same as B-A for rendering purposes in an undirected graph sense.
-    // Keep the one with higher share or just the first encountered if shares are equal.
-    // react-force-graph itself does not automatically deduplicate if link objects are different.
     const linkExistenceMap = new Map<string, GraphLink>();
     links.forEach(link => {
         const key1 = `${link.source}-${link.target}`;
@@ -194,14 +189,13 @@ export async function GET(request: NextRequest) {
             linkExistenceMap.set(key1, link);
         } else {
             const existingLink = linkExistenceMap.get(key1) || linkExistenceMap.get(key2);
-            if (existingLink && link.value > existingLink.value) { // Prefer link with higher share
-                 linkExistenceMap.set(key1, link); // Overwrite if new one is better (or use key1/key2 consistently)
-                 if (linkExistenceMap.has(key2)) linkExistenceMap.delete(key2); // remove the other direction if it existed
+            if (existingLink && link.value > existingLink.value) { 
+                 linkExistenceMap.set(key1, link); 
+                 if (linkExistenceMap.has(key2)) linkExistenceMap.delete(key2); 
             }
         }
     });
     const uniqueLinks = Array.from(linkExistenceMap.values());
-
 
     const responseData: NodeGraphData = {
       nodes: finalNodes,
@@ -216,5 +210,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch node graph data', details: error.message }, { status: 500 });
   }
 }
-// Ensure dynamic rendering for API routes if not default
-// export const dynamic = 'force-dynamic'; // Removed to align with other working routes
+// Removed: export const dynamic = 'force-dynamic'; // App Router API routes are dynamic by default

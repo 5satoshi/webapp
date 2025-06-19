@@ -36,7 +36,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   const [hasMounted, setHasMounted] = useState(false);
   const [hoveredLinkInfo, setHoveredLinkInfo] = useState<HoveredLinkInfo | null>(null);
 
-  const linkColor = 'hsla(var(--muted-foreground), 0.3)';
+  const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)'; // Based on muted-foreground with some transparency
 
   useEffect(() => {
     setHasMounted(true);
@@ -59,7 +59,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   }, [hasMounted, graphData]);
 
   const getNodeColor = useCallback((node: GraphNode) => {
-    return node.color || 'hsl(var(--accent))';
+    return node.color || 'hsl(288, 48%, 60%)'; // Fallback to accent color (Electric Purple HSL string)
   }, []);
 
   const handleNodeHover = useCallback((node: GraphNode | null) => {
@@ -154,9 +154,9 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
         <div
           className="absolute p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-lg pointer-events-none"
           style={{
-            left: `${hoveredLinkInfo.x + 10}px`, // Offset slightly from cursor
+            left: `${hoveredLinkInfo.x + 10}px`, 
             top: `${hoveredLinkInfo.y + 10}px`,
-            transform: 'translate(-50%, -100%)', // Adjust to position above cursor
+            transform: 'translate(-50%, -100%)', 
             maxWidth: '250px',
             wordBreak: 'break-word',
           }}
