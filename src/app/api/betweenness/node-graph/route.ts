@@ -29,9 +29,8 @@ export async function GET(request: NextRequest) {
     }
     console.log('[API /api/betweenness/node-graph] BigQuery client obtained.');
 
-    // Query for edges involving the central node from edge_betweenness table
-    // Filters by type = 'common' and shortest_path_share >= 0.001
-    const edgeQuery = `
+    // Query for 1st-degree edges involving the central node
+    const firstDegreeEdgeQuery = `
       SELECT
         source,
         destination,
@@ -41,44 +40,101 @@ export async function GET(request: NextRequest) {
         AND type = 'common' 
         AND shortest_path_share >= 0.001
     `;
-    const edgeOptions = {
-      query: edgeQuery,
+    const firstDegreeEdgeOptions = {
+      query: firstDegreeEdgeQuery,
       params: { centralNodeId: centralNodeId }
     };
-    console.log(`[API /api/betweenness/node-graph] Executing edge query for node: ${centralNodeId}`);
-    const [edgeJob] = await bigquery.createQueryJob(edgeOptions);
-    const [edgeRows] = await edgeJob.getQueryResults();
-    console.log(`[API /api/betweenness/node-graph] Edge query returned ${edgeRows.length} rows.`);
+    console.log(`[API /api/betweenness/node-graph] Executing 1st-degree edge query for node: ${centralNodeId}`);
+    const [firstDegreeJob] = await bigquery.createQueryJob(firstDegreeEdgeOptions);
+    const [firstDegreeEdgeRows] = await firstDegreeJob.getQueryResults();
+    console.log(`[API /api/betweenness/node-graph] 1st-degree edge query returned ${firstDegreeEdgeRows.length} rows.`);
 
-    const nodes = new Map<string, GraphNode>();
-    const links: GraphLink[] = [];
-
-    // Add the central node first
-    nodes.set(centralNodeId, {
-      id: centralNodeId,
-      name: `Central: ${centralNodeId.substring(0, 8)}...`, // Placeholder name
-      val: 10, // Central node can be larger
-      isCentralNode: true,
-      color: 'hsl(var(--primary))' // Or any distinct color
+    const firstDegreeNeighborIds = new Set<string>();
+    firstDegreeEdgeRows.forEach((row: any) => {
+      if (row.source !== centralNodeId) firstDegreeNeighborIds.add(String(row.source));
+      if (row.destination !== centralNodeId) firstDegreeNeighborIds.add(String(row.destination));
     });
 
-    edgeRows.forEach((row: any) => {
+    let allEdgeRows = [...firstDegreeEdgeRows];
+    let secondDegreeEdgeRows: any[] = [];
+
+    if (firstDegreeNeighborIds.size > 0) {
+      const neighborIdsArray = Array.from(firstDegreeNeighborIds);
+      const secondDegreeEdgeQuery = `
+        SELECT
+          source,
+          destination,
+          shortest_path_share
+        FROM \`${projectId}.${datasetId}.edge_betweenness\`
+        WHERE (source IN UNNEST(@neighborIdsArray) OR destination IN UNNEST(@neighborIdsArray))
+          AND type = 'common'
+          AND shortest_path_share >= 0.001
+          -- Exclude edges that are only to the central node (already covered by 1st degree)
+          AND source != @centralNodeId AND destination != @centralNodeId
+      `;
+      // This query will include edges *between* 1st-degree neighbors if they meet the criteria,
+      // and edges from 1st-degree neighbors to new (2nd-degree) neighbors.
+
+      const secondDegreeEdgeOptions = {
+        query: secondDegreeEdgeQuery,
+        params: { neighborIdsArray: neighborIdsArray, centralNodeId: centralNodeId }
+      };
+      console.log(`[API /api/betweenness/node-graph] Executing 2nd-degree edge query for ${neighborIdsArray.length} neighbors.`);
+      const [secondDegreeJob] = await bigquery.createQueryJob(secondDegreeEdgeOptions);
+      [secondDegreeEdgeRows] = await secondDegreeJob.getQueryResults();
+      console.log(`[API /api/betweenness/node-graph] 2nd-degree edge query returned ${secondDegreeEdgeRows.length} rows.`);
+      allEdgeRows = allEdgeRows.concat(secondDegreeEdgeRows);
+    }
+    
+    const nodesMap = new Map<string, GraphNode>();
+    const links: GraphLink[] = [];
+    const allNodeIdsInGraph = new Set<string>();
+    allNodeIdsInGraph.add(centralNodeId); // Ensure central node is always in the graph
+
+    allEdgeRows.forEach((row: any) => {
       const sourceId = String(row.source);
       const targetId = String(row.destination);
       const share = parseFloat(row.shortest_path_share);
 
-      // Add source and target nodes if they don't exist, only if they are not the central node (already added)
-      if (!nodes.has(sourceId)) {
-        nodes.set(sourceId, { id: sourceId, name: `${sourceId.substring(0, 8)}...`, val: 5, isCentralNode: false, color: 'hsl(var(--secondary))' });
-      }
-      if (!nodes.has(targetId)) {
-        nodes.set(targetId, { id: targetId, name: `${targetId.substring(0, 8)}...`, val: 5, isCentralNode: false, color: 'hsl(var(--secondary))' });
-      }
+      allNodeIdsInGraph.add(sourceId);
+      allNodeIdsInGraph.add(targetId);
+      
       links.push({ source: sourceId, target: targetId, value: share });
     });
 
+    // Populate nodesMap with initial structure and determine degree
+    allNodeIdsInGraph.forEach(nodeId => {
+      let val: number;
+      let color: string;
+      let namePrefix = "";
+      let nodeIsCentral = false;
+
+      if (nodeId === centralNodeId) {
+        val = 10;
+        color = 'hsl(var(--primary))'; // Purple
+        namePrefix = "Central: ";
+        nodeIsCentral = true;
+      } else if (firstDegreeNeighborIds.has(nodeId)) {
+        val = 7;
+        color = 'hsl(var(--secondary))'; // Orange
+        namePrefix = "1st: ";
+      } else {
+        val = 5; // 2nd degree
+        color = 'hsl(var(--accent))'; // Electric Purple / Lighter Purple
+        namePrefix = "2nd: ";
+      }
+
+      nodesMap.set(nodeId, {
+        id: nodeId,
+        name: `${namePrefix}${nodeId.substring(0, 8)}...`, // Initial placeholder name
+        val: val,
+        isCentralNode: nodeIsCentral,
+        color: color
+      });
+    });
+
     // Fetch aliases for all collected node IDs from the 'nodes' table
-    const nodeIdsForAliasLookup = Array.from(nodes.keys());
+    const nodeIdsForAliasLookup = Array.from(allNodeIdsInGraph);
     if (nodeIdsForAliasLookup.length > 0) {
       const aliasQuery = `
         SELECT nodeid, alias
@@ -96,47 +152,60 @@ export async function GET(request: NextRequest) {
 
       aliasRows.forEach((row: any) => {
         const nodeId = String(row.nodeid);
-        const alias = row.alias ? String(row.alias) : null;
-        if (nodes.has(nodeId) && alias) {
-          const node = nodes.get(nodeId)!;
-          node.name = alias;
-           if (node.isCentralNode) { // If it's the central node, append (Central)
-            node.name = `${alias} (Central)`;
-          }
-        } else if (nodes.has(nodeId) && node.isCentralNode && !alias) { // Central node without alias from 'nodes'
-           const node = nodes.get(nodeId)!;
-           node.name = `${nodeId.substring(0,8)}... (Central)`;
+        const alias = row.alias ? String(row.alias).trim() : null;
+        const graphNode = nodesMap.get(nodeId);
+        if (graphNode && alias && alias !== "") {
+            // Keep existing prefix from degree determination
+            const currentPrefix = graphNode.name.substring(0, graphNode.name.indexOf(':') + 2);
+            graphNode.name = `${currentPrefix}${alias}`;
         }
       });
     }
     
-    // Fallback: If central node alias was not in 'nodes' table, try 'betweenness' table
-    const centralGraphNode = nodes.get(centralNodeId);
-    if (centralGraphNode && centralGraphNode.name === `Central: ${centralNodeId.substring(0, 8)}...`) {
-      // This implies its alias wasn't found in the 'nodes' table query above
+    // Fallback: If central node alias was not in 'nodes' table, try 'betweenness' table (only for central node)
+    const centralGraphNode = nodesMap.get(centralNodeId);
+    if (centralGraphNode && centralGraphNode.name.startsWith(`Central: ${centralNodeId.substring(0, 8)}...`)) {
       const centralAliasQueryBetweenness = `
         SELECT alias FROM \`${projectId}.${datasetId}.betweenness\`
         WHERE nodeid = @centralNodeId AND alias IS NOT NULL AND TRIM(alias) != ''
         ORDER BY timestamp DESC
         LIMIT 1
       `;
-      console.log(`[API /api/betweenness/node-graph] Central node alias not found in 'nodes' table. Querying 'betweenness' table for alias.`);
+      console.log(`[API /api/betweenness/node-graph] Central node alias not in 'nodes'. Querying 'betweenness'.`);
       const [centralAliasJobB] = await bigquery.createQueryJob({query: centralAliasQueryBetweenness, params: {centralNodeId}});
       const [centralAliasRowsB] = await centralAliasJobB.getQueryResults();
       if (centralAliasRowsB.length > 0 && centralAliasRowsB[0].alias) {
-        centralGraphNode.name = `${String(centralAliasRowsB[0].alias)} (Central)`;
+        centralGraphNode.name = `Central: ${String(centralAliasRowsB[0].alias)}`;
         console.log(`[API /api/betweenness/node-graph] Found central node alias in 'betweenness': ${centralGraphNode.name}`);
       } else {
-         console.log(`[API /api/betweenness/node-graph] Central node alias not found in 'betweenness' table either.`);
-         // Keep the placeholder like `03fe84... (Central)`
-         centralGraphNode.name = `${centralNodeId.substring(0,8)}... (Central)`;
+         console.log(`[API /api/betweenness/node-graph] Central node alias not in 'betweenness' either.`);
       }
     }
 
+    const finalNodes = Array.from(nodesMap.values());
+    // Deduplicate links: A-B is the same as B-A for rendering purposes in an undirected graph sense.
+    // Keep the one with higher share or just the first encountered if shares are equal.
+    // react-force-graph itself does not automatically deduplicate if link objects are different.
+    const linkExistenceMap = new Map<string, GraphLink>();
+    links.forEach(link => {
+        const key1 = `${link.source}-${link.target}`;
+        const key2 = `${link.target}-${link.source}`;
+        if (!linkExistenceMap.has(key1) && !linkExistenceMap.has(key2)) {
+            linkExistenceMap.set(key1, link);
+        } else {
+            const existingLink = linkExistenceMap.get(key1) || linkExistenceMap.get(key2);
+            if (existingLink && link.value > existingLink.value) { // Prefer link with higher share
+                 linkExistenceMap.set(key1, link); // Overwrite if new one is better (or use key1/key2 consistently)
+                 if (linkExistenceMap.has(key2)) linkExistenceMap.delete(key2); // remove the other direction if it existed
+            }
+        }
+    });
+    const uniqueLinks = Array.from(linkExistenceMap.values());
+
 
     const responseData: NodeGraphData = {
-      nodes: Array.from(nodes.values()),
-      links: links
+      nodes: finalNodes,
+      links: uniqueLinks
     };
     console.log(`[API /api/betweenness/node-graph] Successfully prepared graph data. Nodes: ${responseData.nodes.length}, Links: ${responseData.links.length}. Responding with data.`);
     return NextResponse.json(responseData);
@@ -147,3 +216,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch node graph data', details: error.message }, { status: 500 });
   }
 }
+// Ensure dynamic rendering for API routes if not default
+// export const dynamic = 'force-dynamic'; // Removed to align with other working routes
