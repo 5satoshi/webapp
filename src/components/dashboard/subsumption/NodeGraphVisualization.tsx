@@ -25,8 +25,8 @@ interface HoveredLinkInfo {
   targetId: string;
   targetName: string;
   share: number;
-  x: number; // x position of the hover event
-  y: number; // y position of the hover event
+  x: number;
+  y: number;
 }
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphData, centralNodeId }) => {
@@ -35,15 +35,17 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 });
   const [hasMounted, setHasMounted] = useState(false);
   const [hoveredLinkInfo, setHoveredLinkInfo] = useState<HoveredLinkInfo | null>(null);
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
 
-  const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)'; // Based on muted-foreground with some transparency
+  const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)';
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
   useEffect(() => {
-    if (graphRef.current && hasMounted) {
+    const currentGraphRef = graphRef.current;
+    if (currentGraphRef && hasMounted) {
       const handleResize = () => {
         if (graphRef.current) {
           setDimensions({
@@ -54,12 +56,37 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
       };
       handleResize();
       window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+
+      const handleMouseMove = (event: MouseEvent) => {
+        if (graphRef.current) {
+            const rect = graphRef.current.getBoundingClientRect();
+            setMousePosition({
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top,
+            });
+        }
+      };
+      currentGraphRef.addEventListener('mousemove', handleMouseMove);
+      currentGraphRef.addEventListener('mouseleave', () => {
+        setMousePosition(null);
+        // setHoveredLinkInfo(null); // Also hide tooltip if mouse leaves graph area
+      });
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        if (currentGraphRef) {
+            currentGraphRef.removeEventListener('mousemove', handleMouseMove);
+            currentGraphRef.removeEventListener('mouseleave', () => {
+              setMousePosition(null);
+              // setHoveredLinkInfo(null);
+            });
+        }
+      };
     }
-  }, [hasMounted, graphData]);
+  }, [hasMounted, graphData]); // Re-evaluate if graphData changes dimensions significantly
 
   const getNodeColor = useCallback((node: GraphNode) => {
-    return node.color || 'hsl(288, 48%, 60%)'; // Fallback to accent color (Electric Purple HSL string)
+    return node.color || 'hsl(288, 48%, 60%)'; // Fallback to accent
   }, []);
 
   const handleNodeHover = useCallback((node: GraphNode | null) => {
@@ -76,29 +103,28 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
     console.log("Clicked node:", node.name, "ID:", node.id);
   }, []);
 
-  const handleLinkHover = useCallback((link: GraphLink | null, prevLink: GraphLink | null, event?: MouseEvent) => {
+  const handleLinkHover = useCallback((link: GraphLink | null /*, prevLink: GraphLink | null */) => {
     if (graphRef.current) {
         graphRef.current.style.cursor = link ? 'default' : '';
     }
-    if (link && graphData?.nodes && event) {
+    if (link && graphData?.nodes && mousePosition) {
       const sourceNode = graphData.nodes.find(n => n.id === link.source);
       const targetNode = graphData.nodes.find(n => n.id === link.target);
-      if (sourceNode && targetNode && graphRef.current) {
-        const rect = graphRef.current.getBoundingClientRect();
+      if (sourceNode && targetNode) {
         setHoveredLinkInfo({
           sourceId: String(link.source),
           sourceName: sourceNode.name,
           targetId: String(link.target),
           targetName: targetNode.name,
           share: link.value,
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
+          x: mousePosition.x,
+          y: mousePosition.y,
         });
       }
     } else {
       setHoveredLinkInfo(null);
     }
-  }, [graphData]);
+  }, [graphData, mousePosition]);
 
 
   if (!hasMounted) {
@@ -131,7 +157,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           nodeColor={getNodeColor}
           nodeRelSize={4}
           linkColor={() => linkColor}
-          linkWidth={link => Math.max(0.2, (link as any).value * 5000)}
+          linkWidth={link => Math.max(0.2, (link as GraphLink).value * 5000)}
           linkDirectionalParticles={1}
           linkDirectionalParticleWidth={1.5}
           linkDirectionalParticleSpeed={0.006}
@@ -150,13 +176,13 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           onLinkHover={handleLinkHover}
         />
       )}
-      {hoveredLinkInfo && (
+      {hoveredLinkInfo && mousePosition && ( // Ensure mousePosition is also available
         <div
           className="absolute p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-lg pointer-events-none"
           style={{
-            left: `${hoveredLinkInfo.x + 10}px`, 
-            top: `${hoveredLinkInfo.y + 10}px`,
-            transform: 'translate(-50%, -100%)', 
+            left: `${hoveredLinkInfo.x}px`,
+            top: `${hoveredLinkInfo.y}px`,
+            transform: 'translate(10px, -25px)', // Position tooltip slightly offset from cursor
             maxWidth: '250px',
             wordBreak: 'break-word',
           }}
@@ -168,11 +194,10 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
         </div>
       )}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
-        Scroll to zoom, drag to pan. Node size/color indicates proximity to central. Link thickness reflects path share. Hover over links for details.
+        Scroll to zoom, drag to pan. Node size/color indicates proximity. Link thickness reflects share. Hover links for details.
       </div>
     </div>
   );
 };
 
 export default NodeGraphVisualization;
-
