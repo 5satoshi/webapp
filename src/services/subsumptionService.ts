@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { NetworkSubsumptionData, AllTopNodes, OurNodeRanksForAllCategories, NodeDisplayInfo } from '@/lib/types';
+import type { NetworkSubsumptionData, AllTopNodes, OurNodeRanksForAllCategories, NodeDisplayInfo, NodeGraphData } from '@/lib/types';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 import { siteConfig } from '@/config/site';
@@ -189,5 +189,20 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
   return null; // Not found in either table
 }
 
-
+export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData | null> {
+  if (!nodeId) return null;
+  try {
+    const response = await fetch(`${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`);
+    if (!response.ok) {
+      console.error(`API Error fetchNodeGraphData (nodeId: ${nodeId}): ${response.status} ${response.statusText}`);
+      const errorBody = await response.text();
+      console.error("Error body:", errorBody);
+      return null;
+    }
+    return await response.json() as NodeGraphData;
+  } catch (error) {
+    console.error(`Network Error fetchNodeGraphData (nodeId: ${nodeId}):`, error);
+    return null;
+  }
+}
     

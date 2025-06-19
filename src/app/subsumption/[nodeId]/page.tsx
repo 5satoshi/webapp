@@ -8,17 +8,19 @@ import { NetworkSubsumptionChart } from '@/components/dashboard/analytics/networ
 import { ShortestPathCategoryCard } from '@/components/dashboard/subsumption/ShortestPathCategoryCard';
 import { KeyMetricsCard } from '@/components/dashboard/overview/key-metrics-card';
 import { NodeSelectorForm } from '@/components/dashboard/subsumption/NodeSelectorForm';
+import NodeGraphVisualization from '@/components/dashboard/subsumption/NodeGraphVisualization'; // New import
 import {
   fetchTopNodesBySubsumption,
   fetchNetworkSubsumptionDataForNode,
   fetchNodeRankForCategories,
   fetchNodeDisplayInfo,
-  fetchNodeIdByAlias
+  fetchNodeIdByAlias,
+  fetchNodeGraphData // New import
 } from '@/services/subsumptionService';
 import { specificNodeId } from '@/lib/constants';
-import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric, NodeDisplayInfo } from '@/lib/types';
+import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric, NodeDisplayInfo, NodeGraphData } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info } from 'lucide-react';
+import { Info, Share2 } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
 import { TruncatedText } from '@/components/ui/truncated-text';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -68,6 +70,7 @@ export default async function SubsumptionPage({
   const topNodesData: AllTopNodes = await fetchTopNodesBySubsumption(3);
   const nodeTimelineData: NetworkSubsumptionData[] = await fetchNetworkSubsumptionDataForNode(nodeIdForDataFetching, currentAggregation);
   const nodeRanks: OurNodeRanksForAllCategories = await fetchNodeRankForCategories(nodeIdForDataFetching, currentAggregation);
+  const nodeGraphData: NodeGraphData | null = await fetchNodeGraphData(nodeIdForDataFetching); // Fetch graph data
 
   const introText1 = `How do the activity numbers of a node compare to the overall network? This section brings more light into that by looking at the total network graph, with all its channels and routing fees.`;
   const introText2 = `It’s possible to calculate the share of 'cheapest' (shortest) paths per node a transaction is optimally taking through the network. This calculation is dependent on the size of the transaction. We’re presenting the share for a common transaction (50,000sat), a micro transaction (200sat) and a macro transaction (4,000,000sat). Also we show, how this share changes over time for these payment sizes.`;
@@ -231,6 +234,21 @@ export default async function SubsumptionPage({
         </CardContent>
       </Card>
       
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center">
+            <Share2 className="mr-2 h-6 w-6 text-primary" />
+            Graph Inspection: {displayName}
+          </CardTitle>
+          <CardDescription>
+            Visualizing direct connections (common payment type, share &ge; 0.1%) for the selected node.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NodeGraphVisualization graphData={nodeGraphData} centralNodeId={nodeIdForDataFetching} />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">About Shortest Path Share</CardTitle>

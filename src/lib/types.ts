@@ -164,3 +164,21 @@ export interface NodeDisplayInfo {
   alias?: string | null;
 }
 
+export interface GraphNode {
+  id: string;
+  name: string; // Alias or formatted ID
+  val: number; // for node size
+  isCentralNode: boolean;
+  color?: string; // Optional: for specific node coloring
+}
+
+export interface GraphLink {
+  source: string; // Node ID
+  target: string; // Node ID
+  value: number;  // shortest_path_share, influencing link width or appearance
+}
+
+export interface NodeGraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
