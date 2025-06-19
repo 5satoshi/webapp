@@ -19,22 +19,13 @@ interface NodeGraphVisualizationProps {
   centralNodeId: string;
 }
 
-interface HoveredLinkInfo {
-  sourceId: string;
-  sourceName: string;
-  targetId: string;
-  targetName: string;
-  share: number;
-  x: number;
-  y: number;
-}
-
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphData, centralNodeId }) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<any>();
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 });
   const [hasMounted, setHasMounted] = useState(false);
-  const [hoveredLinkInfo, setHoveredLinkInfo] = useState<HoveredLinkInfo | null>(null);
+  
+  const [hoveredLink, setHoveredLink] = useState<GraphLink | null>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
 
   const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)';
@@ -54,7 +45,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           });
         }
       };
-      handleResize();
+      handleResize(); // Initial size
       window.addEventListener('resize', handleResize);
 
       const handleMouseMove = (event: MouseEvent) => {
@@ -67,26 +58,25 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
         }
       };
       currentGraphRef.addEventListener('mousemove', handleMouseMove);
-      currentGraphRef.addEventListener('mouseleave', () => {
+
+      const handleMouseLeave = () => {
         setMousePosition(null);
-        // setHoveredLinkInfo(null); // Also hide tooltip if mouse leaves graph area
-      });
+        setHoveredLink(null); // Clear hovered link and hide tooltip
+      };
+      currentGraphRef.addEventListener('mouseleave', handleMouseLeave);
 
       return () => {
         window.removeEventListener('resize', handleResize);
         if (currentGraphRef) {
             currentGraphRef.removeEventListener('mousemove', handleMouseMove);
-            currentGraphRef.removeEventListener('mouseleave', () => {
-              setMousePosition(null);
-              // setHoveredLinkInfo(null);
-            });
+            currentGraphRef.removeEventListener('mouseleave', handleMouseLeave);
         }
       };
     }
-  }, [hasMounted, graphData]); // Re-evaluate if graphData changes dimensions significantly
+  }, [hasMounted]); // Effect for listeners depends only on hasMounted
 
   const getNodeColor = useCallback((node: GraphNode) => {
-    return node.color || 'hsl(288, 48%, 60%)'; // Fallback to accent
+    return node.color || 'hsl(288, 48%, 60%)'; // Fallback accent
   }, []);
 
   const handleNodeHover = useCallback((node: GraphNode | null) => {
@@ -103,28 +93,12 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
     console.log("Clicked node:", node.name, "ID:", node.id);
   }, []);
 
-  const handleLinkHover = useCallback((link: GraphLink | null /*, prevLink: GraphLink | null */) => {
+  const handleLinkHover = useCallback((link: GraphLink | null) => {
+    setHoveredLink(link); // Set or clear the hovered link object
     if (graphRef.current) {
-        graphRef.current.style.cursor = link ? 'default' : '';
+      graphRef.current.style.cursor = link ? 'default' : '';
     }
-    if (link && graphData?.nodes && mousePosition) {
-      const sourceNode = graphData.nodes.find(n => n.id === link.source);
-      const targetNode = graphData.nodes.find(n => n.id === link.target);
-      if (sourceNode && targetNode) {
-        setHoveredLinkInfo({
-          sourceId: String(link.source),
-          sourceName: sourceNode.name,
-          targetId: String(link.target),
-          targetName: targetNode.name,
-          share: link.value,
-          x: mousePosition.x,
-          y: mousePosition.y,
-        });
-      }
-    } else {
-      setHoveredLinkInfo(null);
-    }
-  }, [graphData, mousePosition]);
+  }, []);
 
 
   if (!hasMounted) {
@@ -141,6 +115,32 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
         </AlertDescription>
       </Alert>
     );
+  }
+  
+  let tooltipComponent = null;
+  if (hoveredLink && mousePosition && graphData?.nodes) {
+    const sourceNode = graphData.nodes.find(n => n.id === hoveredLink.source);
+    const targetNode = graphData.nodes.find(n => n.id === hoveredLink.target);
+    if (sourceNode && targetNode) {
+      tooltipComponent = (
+        <div
+          className="absolute p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-lg pointer-events-none"
+          style={{
+            left: `${mousePosition.x}px`,
+            top: `${mousePosition.y}px`,
+            transform: 'translate(10px, -25px)', // Position tooltip slightly offset from cursor
+            maxWidth: '250px',
+            wordBreak: 'break-word',
+            zIndex: 100, // Ensure tooltip is on top
+          }}
+        >
+          <div className="font-semibold">Link Details</div>
+          <div><span className="font-medium">From:</span> {sourceNode.name}</div>
+          <div><span className="font-medium">To:</span> {targetNode.name}</div>
+          <div><span className="font-medium">Share:</span> {(hoveredLink.value * 100).toFixed(4)}%</div>
+        </div>
+      );
+    }
   }
 
   return (
@@ -176,23 +176,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           onLinkHover={handleLinkHover}
         />
       )}
-      {hoveredLinkInfo && mousePosition && ( // Ensure mousePosition is also available
-        <div
-          className="absolute p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-lg pointer-events-none"
-          style={{
-            left: `${hoveredLinkInfo.x}px`,
-            top: `${hoveredLinkInfo.y}px`,
-            transform: 'translate(10px, -25px)', // Position tooltip slightly offset from cursor
-            maxWidth: '250px',
-            wordBreak: 'break-word',
-          }}
-        >
-          <div className="font-semibold">Link Details</div>
-          <div><span className="font-medium">From:</span> {hoveredLinkInfo.sourceName}</div>
-          <div><span className="font-medium">To:</span> {hoveredLinkInfo.targetName}</div>
-          <div><span className="font-medium">Share:</span> {(hoveredLinkInfo.share * 100).toFixed(4)}%</div>
-        </div>
-      )}
+      {tooltipComponent}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
         Scroll to zoom, drag to pan. Node size/color indicates proximity. Link thickness reflects share. Hover links for details.
       </div>
@@ -201,3 +185,4 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
 };
 
 export default NodeGraphVisualization;
+
