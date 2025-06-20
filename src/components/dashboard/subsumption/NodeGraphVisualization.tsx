@@ -7,9 +7,16 @@ import type { NodeGraphData, GraphNode, GraphLink as AppGraphLink } from '@/lib/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
-import type { ForceGraphMethods, LinkObject, NodeObject as FGNodeObject } from 'react-force-graph-2d';
+import type { ForceGraphMethods as FG2DMethods, LinkObject as LinkObject2D, NodeObject as FGNodeObject } from 'react-force-graph-2d';
+import type { ForceGraphMethods as FG3DMethods, LinkObject as LinkObject3D } from 'react-force-graph-3d';
+
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[400px] w-full" />,
+});
+
+const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), {
   ssr: false,
   loading: () => <Skeleton className="h-[400px] w-full" />,
 });
@@ -19,19 +26,23 @@ interface NodeGraphVisualizationProps {
   centralNodeId: string;
   linkDisplayMode: 'all' | 'threshold';
   shareThreshold: number;
+  is3D: boolean;
 }
 
 const MIN_VISIBLE_LINK_WIDTH = 0.5;
 const MAX_VISUAL_LINK_WIDTH = 50.0;
+
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
   centralNodeId,
   linkDisplayMode,
   shareThreshold,
+  is3D,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
-  const fgRef = useRef<ForceGraphMethods>();
+  const fgRef2D = useRef<FG2DMethods>();
+  const fgRef3D = useRef<FG3DMethods>();
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 });
   const [hasMounted, setHasMounted] = useState(false);
   const [resolvedLinkTextColor, setResolvedLinkTextColor] = useState('rgba(50, 50, 50, 0.9)');
@@ -81,8 +92,8 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     if (!rawGraphData || !rawGraphData.nodes) {
       return { nodes: [], links: [], maxVisibleShare: 0 };
     }
-
-    // Always use all nodes provided by the API.
+    
+    // Always render all nodes returned by the API
     const currentNodes = rawGraphData.nodes;
 
     // Filter links based on display mode.
@@ -110,23 +121,44 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     return node.color || 'hsl(288, 48%, 60%)'; // Fallback to accent color
   }, []);
 
-  const handleNodeHover = useCallback((node: GraphNode | FGNodeObject | null) => {
+  const handleNodeHover = useCallback((node: object | null) => {
     if (graphRef.current) {
       graphRef.current.style.cursor = node ? 'pointer' : '';
     }
   }, []);
 
-  const handleNodeClick = useCallback((node: GraphNode | FGNodeObject) => {
-    if (fgRef.current) {
-      const fgNode = node as FGNodeObject;
-      if (typeof fgNode.x === 'number' && typeof fgNode.y === 'number') {
-        fgRef.current.centerAt(fgNode.x, fgNode.y, 1000);
-        fgRef.current.zoom(2.5, 1000);
+  const handleNodeClick2D = useCallback((node: FGNodeObject) => {
+    if (fgRef2D.current) {
+      if (typeof node.x === 'number' && typeof node.y === 'number') {
+        fgRef2D.current.centerAt(node.x, node.y, 1000);
+        fgRef2D.current.zoom(2.5, 1000);
       }
     }
     const appNode = node as GraphNode;
     console.log("Clicked node:", appNode.name, "ID:", appNode.id);
   }, []);
+
+  const handleNodeClick3D = useCallback((node: FGNodeObject) => {
+    if (fgRef3D.current) {
+      const distance = 40;
+      const distRatio = 1 + distance / Math.hypot(node.x ?? 0, node.y ?? 0, node.z ?? 0);
+      fgRef3D.current.cameraPosition(
+        { x: (node.x ?? 0) * distRatio, y: (node.y ?? 0) * distRatio, z: (node.z ?? 0) * distRatio }, // new position
+        node, // lookAt target
+        3000  // ms transition duration
+      );
+    }
+    const appNode = node as GraphNode;
+    console.log("Clicked node:", appNode.name, "ID:", appNode.id);
+  }, []);
+
+  const getLinkWidth = useCallback((link: AppGraphLink) => {
+    if (finalLinks.length === 0 || maxVisibleShare === 0) {
+        return MIN_VISIBLE_LINK_WIDTH;
+    }
+    const width = (link.value / maxVisibleShare) * MAX_VISUAL_LINK_WIDTH;
+    return Math.max(MIN_VISIBLE_LINK_WIDTH, width);
+  }, [finalLinks, maxVisibleShare]);
 
 
   if (!hasMounted) {
@@ -161,83 +193,91 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   return (
     <div ref={graphRef} className="w-full h-[400px] rounded-lg border bg-card relative overflow-hidden">
       {dimensions.width > 0 && (
-        <ForceGraph2D
-          ref={fgRef}
-          graphData={{ nodes: finalNodes, links: finalLinks }}
-          width={dimensions.width}
-          height={dimensions.height}
-          nodeId="id"
-          nodeVal="val"
-          nodeLabel="name"
-          nodeColor={getNodeColor}
-          nodeRelSize={4}
-          linkColor={() => linkColor}
-          linkWidth={(linkInput) => {
-            const link = linkInput as AppGraphLink;
-            if (finalLinks.length === 0 || maxVisibleShare === 0) {
-                return MIN_VISIBLE_LINK_WIDTH;
-            }
-            // Scale width: link with maxVisibleShare gets MAX_VISUAL_LINK_WIDTH, others are proportional.
-            // Ensure a minimum width.
-            const width = (link.value / maxVisibleShare) * MAX_VISUAL_LINK_WIDTH;
-            return Math.max(MIN_VISIBLE_LINK_WIDTH, Math.min(MAX_VISUAL_LINK_WIDTH, width));
-          }}
-          linkDirectionalParticles={1}
-          linkDirectionalParticleWidth={3}
-          linkDirectionalParticleSpeed={0.006}
-          linkCurvature={0.1}
-          cooldownTicks={150}
-          onEngineStop={() => {
-            if (fgRef.current && finalNodes.length > 0) { // Check finalNodes length before zoom
-              fgRef.current.zoomToFit(400, 100);
-            }
-          }}
-          backgroundColor="hsl(var(--card))"
-          enableZoomInteraction={true}
-          enablePanInteraction={true}
-          onNodeHover={handleNodeHover}
-          onNodeClick={handleNodeClick}
-          linkCanvasObjectMode={() => 'after'}
-          linkCanvasObject={(linkInput, ctx, globalScale) => {
-            const link = linkInput as AppGraphLink & LinkObject; 
-            const sourceNode = link.source as FGNodeObject | undefined;
-            const targetNode = link.target as FGNodeObject | undefined;
+        <>
+        {is3D ? (
+           <ForceGraph3D
+            ref={fgRef3D}
+            graphData={{ nodes: finalNodes, links: finalLinks }}
+            width={dimensions.width}
+            height={dimensions.height}
+            nodeId="id"
+            nodeVal="val"
+            nodeLabel="name"
+            nodeColor={getNodeColor}
+            linkColor={() => linkColor}
+            linkWidth={getLinkWidth}
+            linkDirectionalParticles={1}
+            linkDirectionalParticleWidth={3}
+            backgroundColor="hsl(var(--card))"
+            onNodeHover={handleNodeHover}
+            onNodeClick={handleNodeClick3D}
+          />
+        ) : (
+          <ForceGraph2D
+            ref={fgRef2D}
+            graphData={{ nodes: finalNodes, links: finalLinks }}
+            width={dimensions.width}
+            height={dimensions.height}
+            nodeId="id"
+            nodeVal="val"
+            nodeLabel="name"
+            nodeColor={getNodeColor}
+            nodeRelSize={4}
+            linkColor={() => linkColor}
+            linkWidth={getLinkWidth}
+            linkDirectionalParticles={1}
+            linkDirectionalParticleWidth={3}
+            linkDirectionalParticleSpeed={0.006}
+            linkCurvature={0.1}
+            cooldownTicks={150}
+            onEngineStop={() => {
+              if (fgRef2D.current && finalNodes.length > 0) {
+                fgRef2D.current.zoomToFit(400, 100);
+              }
+            }}
+            backgroundColor="hsl(var(--card))"
+            enableZoomInteraction={true}
+            enablePanInteraction={true}
+            onNodeHover={handleNodeHover}
+            onNodeClick={handleNodeClick2D}
+            linkCanvasObjectMode={() => 'after'}
+            linkCanvasObject={(linkInput, ctx, globalScale) => {
+              const link = linkInput as AppGraphLink & LinkObject2D; 
+              const sourceNode = link.source as FGNodeObject | undefined;
+              const targetNode = link.target as FGNodeObject | undefined;
 
-            if (!sourceNode || !targetNode || typeof sourceNode.x !== 'number' || typeof sourceNode.y !== 'number' || typeof targetNode.x !== 'number' || typeof targetNode.y !== 'number') {
-              return; 
-            }
+              if (!sourceNode || !targetNode || typeof sourceNode.x !== 'number' || typeof sourceNode.y !== 'number' || typeof targetNode.x !== 'number' || typeof targetNode.y !== 'number') {
+                return; 
+              }
 
-            const label = `${(link.value * 100).toFixed(2)}%`;
-            const fontSizeBase = 6; 
-            const fontSize = Math.max(2.5, fontSizeBase / globalScale); 
-            
-            ctx.font = `${fontSize}px Sans-Serif`;
-            ctx.fillStyle = resolvedLinkTextColor;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+              const label = `${(link.value * 100).toFixed(2)}%`;
+              const fontSizeBase = 6; 
+              const fontSize = Math.max(2.5, fontSizeBase / globalScale); 
+              
+              ctx.font = `${fontSize}px Sans-Serif`;
+              ctx.fillStyle = resolvedLinkTextColor;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
 
-            const midX = sourceNode.x + (targetNode.x - sourceNode.x) / 2;
-            const midY = sourceNode.y + (targetNode.y - sourceNode.y) / 2;
-            
-            const linkAngle = Math.atan2(targetNode.y - sourceNode.y, targetNode.x - sourceNode.x);
-            
-            // Calculate the current width of the link to offset text appropriately
-            let currentLinkWidth = MIN_VISIBLE_LINK_WIDTH;
-            if (maxVisibleShare > 0) {
-                currentLinkWidth = (link.value / maxVisibleShare) * MAX_VISUAL_LINK_WIDTH;
-                currentLinkWidth = Math.max(MIN_VISIBLE_LINK_WIDTH, Math.min(MAX_VISUAL_LINK_WIDTH, currentLinkWidth));
-            }
-            const offsetMagnitude = (5 + currentLinkWidth / 2) / globalScale;
+              const midX = sourceNode.x + (targetNode.x - sourceNode.x) / 2;
+              const midY = sourceNode.y + (targetNode.y - sourceNode.y) / 2;
+              
+              const linkAngle = Math.atan2(targetNode.y - sourceNode.y, targetNode.x - sourceNode.x);
+              
+              let currentLinkWidth = getLinkWidth(link);
+              const offsetMagnitude = (5 + currentLinkWidth / 2) / globalScale;
 
-            const textPosX = midX + offsetMagnitude * Math.sin(linkAngle);
-            const textPosY = midY - offsetMagnitude * Math.cos(linkAngle);
+              const textPosX = midX + offsetMagnitude * Math.sin(linkAngle);
+              const textPosY = midY - offsetMagnitude * Math.cos(linkAngle);
 
-            ctx.fillText(label, textPosX, textPosY);
-          }}
-        />
+              ctx.fillText(label, textPosX, textPosY);
+            }}
+          />
+        )}
+        </>
       )}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
-        Share % shown on links. Scroll to zoom, drag to pan.
+        {is3D ? "Right-click to pan, scroll to zoom" : "Share % shown on links. Scroll to zoom, drag to pan."}
       </div>
     </div>
   );

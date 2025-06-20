@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import NodeGraphVisualization from './NodeGraphVisualization';
 import type { NodeGraphData } from '@/lib/types';
 import { fetchNodeGraphData } from '@/services/subsumptionService';
-import { Share2, Loader2 } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
@@ -25,6 +25,7 @@ const LINK_SHARE_THRESHOLD = 0.001; // 0.1%
 const neighborCountOptions = Array.from({ length: 10 }, (_, i) => i + 1); // 1 to 10
 
 export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspectionCardProps) {
+  const [is3D, setIs3D] = useState(false);
   const [linkMode, setLinkMode] = useState<LinkDisplayMode>('threshold');
   const [numNeighbors, setNumNeighbors] = useState<number>(3);
   const [graphData, setGraphData] = useState<NodeGraphData | null>(null);
@@ -96,6 +97,7 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
         centralNodeId={centralNodeId}
         linkDisplayMode={linkMode}
         shareThreshold={LINK_SHARE_THRESHOLD}
+        is3D={is3D}
       />
     );
   }
@@ -138,6 +140,15 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
                 <Label htmlFor="link-display-mode" className="text-sm whitespace-nowrap">
                 {linkMode === 'all' ? 'All Links' : `Links ≥${(LINK_SHARE_THRESHOLD * 100).toFixed(1)}% Share`}
                 </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="view-mode-switch"
+                checked={is3D}
+                onCheckedChange={setIs3D}
+                aria-label="Toggle 3D view"
+              />
+              <Label htmlFor="view-mode-switch" className="text-sm whitespace-nowrap">3D View</Label>
             </div>
           </div>
         </div>
