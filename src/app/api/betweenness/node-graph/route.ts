@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 import type { NodeGraphData, GraphNode, GraphLink } from '@/lib/types';
 import { fetchNodeDisplayInfo } from '@/services/subsumptionService';
 
-// Colors based on globals.css for direct use in canvas
+// Hardcoded HSL values from globals.css for direct use in canvas
 const PRIMARY_COLOR_HSL = 'hsl(277, 70%, 36%)';   // --primary (Purple)
 const SECONDARY_COLOR_HSL = 'hsl(34, 100%, 50%)'; // --secondary (Orange)
 const ACCENT_COLOR_HSL = 'hsl(288, 48%, 60%)';    // --accent (Electric Purple)
