@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         nodesMap.set(neighbor.nodeId, {
             id: neighbor.nodeId,
             name: `${neighbor.degree === 1 ? '1st: ' : '2nd: '}${neighbor.alias || `${neighbor.nodeId.substring(0, 8)}...`}`,
-            val: neighbor.degree === 1 ? 7 : 5,
+            val: neighbor.degree === 1 ? 3.5 : 2.5,
             isCentralNode: false,
             color: neighbor.degree === 1 ? SECONDARY_COLOR_HSL : ACCENT_COLOR_HSL,
         });
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     nodesMap.set(centralNodeId, {
         id: centralNodeId,
         name: `Central: ${centralNodeInfo?.alias || `${centralNodeId.substring(0, 8)}...`}`,
-        val: 10,
+        val: 5,
         isCentralNode: true,
         color: PRIMARY_COLOR_HSL,
     });
