@@ -24,8 +24,6 @@ const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), {
 interface NodeGraphVisualizationProps {
   rawGraphData: NodeGraphData | null;
   centralNodeId: string;
-  linkDisplayMode: 'all' | 'threshold';
-  shareThreshold: number;
   is3D: boolean;
 }
 
@@ -36,8 +34,6 @@ const MAX_VISUAL_LINK_WIDTH = 50.0;
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
   centralNodeId,
-  linkDisplayMode,
-  shareThreshold,
   is3D,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
@@ -107,12 +103,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     
     // Always render all nodes returned by the API
     const currentNodes = rawGraphData.nodes;
-
-    // Filter links based on display mode.
-    let visibleLinks = rawGraphData.links || [];
-    if (linkDisplayMode === 'threshold') {
-      visibleLinks = visibleLinks.filter(link => link.value >= shareThreshold);
-    }
+    const visibleLinks = rawGraphData.links || [];
     
     let maxS = 0;
     if (visibleLinks.length > 0) {
@@ -126,7 +117,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
       links: visibleLinks,
       maxVisibleShare: maxS,
     };
-  }, [rawGraphData, linkDisplayMode, shareThreshold]);
+  }, [rawGraphData]);
 
 
   const getNodeColor = useCallback((node: GraphNode) => {
@@ -190,7 +181,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   }
 
   if (finalNodes.length === 0) {
-     const modeText = linkDisplayMode === 'threshold' ? `with share >= ${shareThreshold*100}%` : "for all selected nodes";
+     const modeText = "for all selected nodes";
     return (
       <Alert>
         <Info className="h-4 w-4" />

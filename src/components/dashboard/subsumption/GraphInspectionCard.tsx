@@ -19,14 +19,10 @@ interface GraphInspectionCardProps {
   displayName: string;
 }
 
-type LinkDisplayMode = 'all' | 'threshold';
-const LINK_SHARE_THRESHOLD = 0.001; // 0.1%
-
 const neighborCountOptions = Array.from({ length: 10 }, (_, i) => i + 1); // 1 to 10
 
 export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspectionCardProps) {
   const [is3D, setIs3D] = useState(false);
-  const [linkMode, setLinkMode] = useState<LinkDisplayMode>('threshold');
   const [numNeighbors, setNumNeighbors] = useState<number>(3);
   const [graphData, setGraphData] = useState<NodeGraphData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -95,8 +91,6 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
       <NodeGraphVisualization
         rawGraphData={graphData}
         centralNodeId={centralNodeId}
-        linkDisplayMode={linkMode}
-        shareThreshold={LINK_SHARE_THRESHOLD}
         is3D={is3D}
       />
     );
@@ -113,7 +107,7 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
               Graph Inspection: {displayName}
             </CardTitle>
             <CardDescription>
-              Visualizing connections for the selected node. Select number of neighbors and link display mode.
+              Visualizing connections for the selected node. Select number of neighbors and view mode.
             </CardDescription>
           </div>
           <div className="flex flex-col xs:flex-row items-start xs:items-center gap-4 pt-2 sm:pt-0">
@@ -129,17 +123,6 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
-            <div className="flex items-center space-x-2">
-                <Switch
-                id="link-display-mode"
-                checked={linkMode === 'all'}
-                onCheckedChange={(checked) => setLinkMode(checked ? 'all' : 'threshold')}
-                aria-label={`Switch to ${linkMode === 'all' ? `show links above ${LINK_SHARE_THRESHOLD * 100}% share` : 'show all links'}`}
-                />
-                <Label htmlFor="link-display-mode" className="text-sm whitespace-nowrap">
-                {linkMode === 'all' ? 'All Links' : `Links ≥${(LINK_SHARE_THRESHOLD * 100).toFixed(1)}% Share`}
-                </Label>
             </div>
             <div className="flex items-center space-x-2">
               <Switch
