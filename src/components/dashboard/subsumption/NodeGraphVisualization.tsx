@@ -27,9 +27,8 @@ interface NodeGraphVisualizationProps {
   is3D: boolean;
 }
 
-const MIN_VISIBLE_LINK_WIDTH = 0.5;
-const MAX_VISUAL_LINK_WIDTH = 50.0;
-
+const MIN_LINK_WIDTH = 1.0;
+const MAX_VISUAL_LINK_WIDTH = 50.0; // The absolute max width in pixels.
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
@@ -156,12 +155,22 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   }, []);
 
   const getLinkWidth = useCallback((link: AppGraphLink) => {
-    if (finalLinks.length === 0 || maxVisibleShare === 0) {
-        return MIN_VISIBLE_LINK_WIDTH;
+    if (maxVisibleShare === 0) {
+        return MIN_LINK_WIDTH;
     }
     const width = (link.value / maxVisibleShare) * MAX_VISUAL_LINK_WIDTH;
-    return Math.max(MIN_VISIBLE_LINK_WIDTH, width);
-  }, [finalLinks, maxVisibleShare]);
+    return Math.max(MIN_LINK_WIDTH, width);
+  }, [maxVisibleShare]);
+  
+  const getLinkParticles = useCallback((link: AppGraphLink) => {
+    const MAX_PARTICLES = 10;
+    if (maxVisibleShare === 0) {
+        return 1;
+    }
+    const normalized = link.value / maxVisibleShare;
+    // Scale particles from 1 to MAX_PARTICLES
+    return Math.max(1, Math.ceil(normalized * MAX_PARTICLES));
+  }, [maxVisibleShare]);
 
 
   if (!hasMounted) {
@@ -209,7 +218,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             nodeColor={getNodeColor}
             linkColor={() => linkColor}
             linkWidth={getLinkWidth}
-            linkDirectionalParticles={1}
+            linkDirectionalParticles={getLinkParticles}
             linkDirectionalParticleWidth={3}
             backgroundColor={resolvedCardColor}
             onNodeHover={handleNodeHover}
@@ -228,8 +237,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             nodeRelSize={4}
             linkColor={() => linkColor}
             linkWidth={getLinkWidth}
-            linkDirectionalParticles={1}
-            linkDirectionalParticleWidth={3}
+            linkDirectionalParticles={getLinkParticles}
             linkDirectionalParticleSpeed={0.006}
             linkCurvature={0.1}
             cooldownTicks={150}
