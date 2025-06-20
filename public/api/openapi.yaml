@@ -1,160 +1,24 @@
 
-openapi: 3.0.0
+openapi: 3.0.3
 info:
   title: Lightning Stats Dashboard API
-  version: v1.0.0
-  description: API for accessing Lightning Network node statistics and analytics data.
+  description: |-
+    This is the internal API for the Lightning Stats Dashboard.
+    It provides data for network graph analysis, including node rankings, timelines, and topology, primarily by querying a pre-calculated `betweenness` table in BigQuery.
+  version: 1.0.0
 servers:
-  - url: /api # Base path for API routes within the Next.js app
-    description: Development server
-
-components:
-  schemas:
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          description: A human-readable error message.
-        details:
-          type: string
-          description: Optional additional details about the error.
-          nullable: true
-    
-    # === Betweenness Schemas ===
-    SingleCategoryTopNode:
-      type: object
-      properties:
-        nodeid:
-          type: string
-          format: pubkey
-          description: The public key of the Lightning node.
-        alias:
-          type: string
-          nullable: true
-          description: The alias of the node.
-        categoryShare:
-          type: number
-          format: double
-          nullable: true
-          description: Shortest path share for the primary category this node is listed under.
-        categoryRank:
-          type: integer
-          nullable: true
-          description: Rank within the primary category.
-        microShare:
-          type: number
-          format: double
-          nullable: true
-        microRank:
-          type: integer
-          nullable: true
-        commonShare:
-          type: number
-          format: double
-          nullable: true
-        commonRank:
-          type: integer
-          nullable: true
-        macroShare:
-          type: number
-          format: double
-          nullable: true
-        macroRank:
-          type: integer
-          nullable: true
-      required:
-        - nodeid
-
-    AllTopNodes:
-      type: object
-      properties:
-        micro:
-          type: array
-          items:
-            $ref: '#/components/schemas/SingleCategoryTopNode'
-        common:
-          type: array
-          items:
-            $ref: '#/components/schemas/SingleCategoryTopNode'
-        macro:
-          type: array
-          items:
-            $ref: '#/components/schemas/SingleCategoryTopNode'
-      required:
-        - micro
-        - common
-        - macro
-
-    NetworkSubsumptionDataPoint:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-          description: The date for the data point.
-        micro:
-          type: number
-          format: double
-          description: Shortest path share percentage for micro payments.
-        common:
-          type: number
-          format: double
-          description: Shortest path share percentage for common payments.
-        macro:
-          type: number
-          format: double
-          description: Shortest path share percentage for macro payments.
-      required:
-        - date
-        - micro
-        - common
-        - macro
-
-    OurNodeCategoryRank:
-      type: object
-      properties:
-        latestRank:
-          type: integer
-          nullable: true
-        rankChange:
-          type: integer
-          nullable: true
-          description: Change in rank compared to the start of the period (negative is better).
-        latestShare:
-          type: number
-          format: double
-          nullable: true
-        previousShare:
-          type: number
-          format: double
-          nullable: true
-      required:
-        - latestRank
-        - rankChange
-        - latestShare
-        - previousShare
-        
-    OurNodeRanksForAllCategories:
-      type: object
-      properties:
-        micro:
-          $ref: '#/components/schemas/OurNodeCategoryRank'
-        common:
-          $ref: '#/components/schemas/OurNodeCategoryRank'
-        macro:
-          $ref: '#/components/schemas/OurNodeCategoryRank'
-      required:
-        - micro
-        - common
-        - macro
+  - url: /
+tags:
+  - name: Betweenness Analysis
+    description: Endpoints for retrieving network graph statistics.
 
 paths:
-  /betweenness/top-nodes:
+  /api/betweenness/top-nodes:
     get:
-      summary: Get Top Nodes by Shortest Path Share
-      description: Retrieves a list of top nodes ranked by their shortest path share for micro, common, and macro payment sizes.
-      operationId: getTopNodesBySubsumption
+      tags:
+        - Betweenness Analysis
+      summary: Get top N nodes by shortest path share
+      description: Returns a list of the top N nodes for micro, common, and macro payment categories, ranked by their shortest path share.
       parameters:
         - name: limit
           in: query
@@ -163,43 +27,32 @@ paths:
           schema:
             type: integer
             default: 3
-            minimum: 1
       responses:
         '200':
-          description: Successfully retrieved top nodes data.
+          description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AllTopNodes'
-        '400':
-          description: Invalid parameter (e.g., limit).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/AllTopNodesResponse'
         '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Internal server error
 
-  /betweenness/node-timeline:
+  /api/betweenness/node-timeline:
     get:
-      summary: Get Node's Shortest Path Share Timeline
-      description: Retrieves the historical shortest path share for a specific node across micro, common, and macro payment sizes, aggregated by a chosen period.
-      operationId: getNetworkSubsumptionDataForNode
+      tags:
+        - Betweenness Analysis
+      summary: Get historical shortest path share for a node
+      description: Returns a time-series of a specific node's shortest path share for micro, common, and macro payments over a given aggregation period.
       parameters:
         - name: nodeId
           in: query
-          description: The public key of the Lightning node to query.
+          description: The public key of the node to query.
           required: true
           schema:
             type: string
-            format: pubkey
         - name: aggregation
           in: query
-          description: The time period for aggregating data.
+          description: The time period to aggregate data over.
           required: false
           schema:
             type: string
@@ -207,61 +60,317 @@ paths:
             default: week
       responses:
         '200':
-          description: Successfully retrieved node timeline data.
+          description: Successful operation
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NetworkSubsumptionDataPoint'
+                  $ref: '#/components/schemas/NodeTimelineData'
         '400':
-          description: Missing or invalid nodeId parameter.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Invalid input, nodeId is required.
         '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Internal server error
   
-  /betweenness/node-ranks:
+  /api/betweenness/node-ranks:
     get:
-      summary: Get Node's Ranks and Shares for All Categories
-      description: Retrieves the latest rank, rank change, latest share, and previous share for a specific node across micro, common, and macro payment categories, based on the selected aggregation period.
-      operationId: getNodeRanksForCategories
+      tags:
+        - Betweenness Analysis
+      summary: Get current ranks and share for a node
+      description: Returns the latest rank, rank change, and share values for a specific node across all payment categories for a given period.
       parameters:
         - name: nodeId
           in: query
-          description: The public key of the Lightning node.
+          description: The public key of the node to query.
           required: true
           schema:
             type: string
         - name: aggregation
           in: query
-          description: Aggregation period (e.g., 'week', 'month').
+          description: The period over which to calculate the rank change.
           required: false
           schema:
             type: string
-            default: 'week'
+            enum: [day, week, month, quarter]
+            default: week
       responses:
         '200':
-          description: Successfully retrieved node ranks and shares.
+          description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OurNodeRanksForAllCategories'
+                $ref: '#/components/schemas/NodeRanksResponse'
         '400':
-          description: Invalid parameters.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Invalid input, nodeId is required.
         '500':
-          description: Internal server error.
+          description: Internal server error
+
+  /api/betweenness/node-graph:
+    get:
+      tags:
+        - Betweenness Analysis
+      summary: Get graph data for a central node
+      description: Returns the nodes and links for a subgraph centered around a specific node, including its top N 1st and 2nd degree neighbors.
+      parameters:
+        - name: nodeId
+          in: query
+          description: The public key of the central node for the graph.
+          required: true
+          schema:
+            type: string
+        - name: numNeighbors
+          in: query
+          description: The number of 1st and 2nd degree neighbors to include.
+          required: false
+          schema:
+            type: integer
+            default: 3
+      responses:
+        '200':
+          description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/NodeGraphResponse'
+        '400':
+          description: Invalid input, nodeId is required.
+        '500':
+          description: Internal server error
+          
+  /api/betweenness/nearest-neighbors:
+    get:
+      tags:
+        - Betweenness Analysis
+      summary: Get top N nearest neighbors for a node
+      description: For a given node, returns its top N neighbors, ordered by the highest `shortest_path_share` of the connecting edge.
+      parameters:
+        - name: nodeId
+          in: query
+          description: The public key of the node to find neighbors for.
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: The maximum number of neighbors to return.
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NeighborNode'
+        '400':
+          description: Invalid input, nodeId is required.
+        '500':
+          description: Internal server error
+
+  /api/betweenness/top-edges:
+    get:
+      tags:
+        - Betweenness Analysis
+      summary: Get top N edges for a list of nodes
+      description: For a given list of nodes, returns the top N edges with the highest `shortest_path_share` that connect any two nodes within that list.
+      parameters:
+        - name: nodeIds
+          in: query
+          description: A comma-separated string of node public keys.
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: The maximum number of edges to return.
+          required: false
+          schema:
+            type: integer
+            default: 25
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Edge'
+        '400':
+          description: Invalid input, nodeIds is required.
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    Edge:
+      type: object
+      properties:
+        source:
+          type: string
+          description: The source node's public key.
+        destination:
+          type: string
+          description: The destination node's public key.
+        share:
+          type: number
+          format: double
+          description: The shortest_path_share of the edge.
+    NeighborNode:
+      type: object
+      properties:
+        nodeId:
+          type: string
+          description: The neighbor node's public key.
+        alias:
+          type: string
+          nullable: true
+          description: The alias of the neighbor node, if available.
+        share:
+          type: number
+          format: double
+          description: The shortest_path_share of the connecting edge.
+    NodeTimelineData:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        micro:
+          type: number
+        common:
+          type: number
+        macro:
+          type: number
+    SingleCategoryTopNode:
+      type: object
+      properties:
+        nodeid: 
+          type: string
+        alias:
+          type: string
+          nullable: true
+        categoryShare:
+          type: number
+          nullable: true
+        categoryRank:
+          type: integer
+          nullable: true
+        microShare:
+          type: number
+          nullable: true
+        commonShare:
+          type: number
+          nullable: true
+        macroShare:
+          type: number
+          nullable: true
+        microRank:
+          type: integer
+          nullable: true
+        commonRank:
+          type: integer
+          nullable: true
+        macroRank:
+          type: integer
+          nullable: true
+    AllTopNodesResponse:
+      type: object
+      properties:
+        micro:
+          type: array
+          items:
+            $ref: '#/components/schemas/SingleCategoryTopNode'
+        common:
+          type: array
+          items:
+            $ref: '#/components/schemas/SingleCategoryTopNode'
+        macro:
+          type: array
+          items:
+            $ref: '#/components/schemas/SingleCategoryTopNode'
+    NodeRanksResponse:
+      type: object
+      properties:
+        micro:
+          type: object
+          properties:
+            latestRank:
+              type: integer
+              nullable: true
+            rankChange:
+              type: integer
+              nullable: true
+            latestShare:
+              type: number
+              nullable: true
+            previousShare:
+              type: number
+              nullable: true
+        common:
+          type: object
+          properties:
+            latestRank:
+              type: integer
+              nullable: true
+            rankChange:
+              type: integer
+              nullable: true
+            latestShare:
+              type: number
+              nullable: true
+            previousShare:
+              type: number
+              nullable: true
+        macro:
+          type: object
+          properties:
+            latestRank:
+              type: integer
+              nullable: true
+            rankChange:
+              type: integer
+              nullable: true
+            latestShare:
+              type: number
+              nullable: true
+            previousShare:
+              type: number
+              nullable: true
+    GraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        val:
+          type: number
+        isCentralNode:
+          type: boolean
+        color:
+          type: string
+    GraphLink:
+      type: object
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        value:
+          type: number
+    NodeGraphResponse:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphNode'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphLink'
