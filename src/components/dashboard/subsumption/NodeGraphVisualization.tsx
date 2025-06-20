@@ -3,11 +3,11 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import type { NodeGraphData, GraphNode, GraphLink } from '@/lib/types';
+import type { NodeGraphData, GraphNode, GraphLink as AppGraphLink } from '@/lib/types'; // Renamed to avoid conflict
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { ForceGraphMethods, LinkObject, NodeObject as FGNodeObject } from 'react-force-graph-2d';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
   ssr: false,
@@ -21,17 +21,30 @@ interface NodeGraphVisualizationProps {
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphData, centralNodeId }) => {
   const graphRef = useRef<HTMLDivElement>(null);
-  const fgRef = useRef<any>();
+  const fgRef = useRef<ForceGraphMethods>();
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 });
   const [hasMounted, setHasMounted] = useState(false);
-  
-  const [hoveredLink, setHoveredLink] = useState<GraphLink | null>(null);
-  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
+  const [resolvedLinkTextColor, setResolvedLinkTextColor] = useState('rgba(50, 50, 50, 0.9)'); // Default dark gray
 
   const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)';
 
   useEffect(() => {
     setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const style = getComputedStyle(document.documentElement);
+      // Assuming --foreground is defined like "240 10% 3.9%" in globals.css
+      const fgColorParts = style.getPropertyValue('--foreground').trim().split(" ");
+      if (fgColorParts.length === 3) {
+         setResolvedLinkTextColor(`hsl(${fgColorParts[0]}, ${fgColorParts[1]}, ${fgColorParts[2]})`);
+      } else {
+        // Fallback if CSS variable parsing fails
+        const bodyColor = getComputedStyle(document.body).color;
+        setResolvedLinkTextColor(bodyColor || 'rgba(50, 50, 50, 0.9)');
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -48,32 +61,11 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
       handleResize(); // Initial size
       window.addEventListener('resize', handleResize);
 
-      const handleMouseMove = (event: MouseEvent) => {
-        if (graphRef.current) {
-            const rect = graphRef.current.getBoundingClientRect();
-            setMousePosition({
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top,
-            });
-        }
-      };
-      currentGraphRef.addEventListener('mousemove', handleMouseMove);
-
-      const handleMouseLeave = () => {
-        setMousePosition(null);
-        setHoveredLink(null); // Clear hovered link and hide tooltip
-      };
-      currentGraphRef.addEventListener('mouseleave', handleMouseLeave);
-
       return () => {
         window.removeEventListener('resize', handleResize);
-        if (currentGraphRef) {
-            currentGraphRef.removeEventListener('mousemove', handleMouseMove);
-            currentGraphRef.removeEventListener('mouseleave', handleMouseLeave);
-        }
       };
     }
-  }, [hasMounted]); // Effect for listeners depends only on hasMounted
+  }, [hasMounted]);
 
   const getNodeColor = useCallback((node: GraphNode) => {
     return node.color || 'hsl(288, 48%, 60%)'; // Fallback accent
@@ -87,17 +79,15 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     if (fgRef.current) {
-      fgRef.current.centerAt(node.x, node.y, 1000);
-      fgRef.current.zoom(2.5, 1000);
+      // FGNodeObject type is used by react-force-graph, it might have x,y. Our GraphNode might not.
+      // Need to ensure the 'node' object passed here has x and y for centerAt.
+      const fgNode = node as FGNodeObject;
+      if (typeof fgNode.x === 'number' && typeof fgNode.y === 'number') {
+        fgRef.current.centerAt(fgNode.x, fgNode.y, 1000);
+        fgRef.current.zoom(2.5, 1000);
+      }
     }
     console.log("Clicked node:", node.name, "ID:", node.id);
-  }, []);
-
-  const handleLinkHover = useCallback((link: GraphLink | null) => {
-    setHoveredLink(link); // Set or clear the hovered link object
-    if (graphRef.current) {
-      graphRef.current.style.cursor = link ? 'default' : '';
-    }
   }, []);
 
 
@@ -117,32 +107,6 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
     );
   }
   
-  let tooltipComponent = null;
-  if (hoveredLink && mousePosition && graphData?.nodes) {
-    const sourceNode = graphData.nodes.find(n => n.id === hoveredLink.source);
-    const targetNode = graphData.nodes.find(n => n.id === hoveredLink.target);
-    if (sourceNode && targetNode) {
-      tooltipComponent = (
-        <div
-          className="absolute p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-lg pointer-events-none"
-          style={{
-            left: `${mousePosition.x}px`,
-            top: `${mousePosition.y}px`,
-            transform: 'translate(10px, -25px)', // Position tooltip slightly offset from cursor
-            maxWidth: '250px',
-            wordBreak: 'break-word',
-            zIndex: 100, // Ensure tooltip is on top
-          }}
-        >
-          <div className="font-semibold">Link Details</div>
-          <div><span className="font-medium">From:</span> {sourceNode.name}</div>
-          <div><span className="font-medium">To:</span> {targetNode.name}</div>
-          <div><span className="font-medium">Share:</span> {(hoveredLink.value * 100).toFixed(4)}%</div>
-        </div>
-      );
-    }
-  }
-
   return (
     <div ref={graphRef} className="w-full h-[400px] rounded-lg border bg-card relative overflow-hidden">
       {dimensions.width > 0 && (
@@ -157,7 +121,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           nodeColor={getNodeColor}
           nodeRelSize={4}
           linkColor={() => linkColor}
-          linkWidth={link => Math.max(0.2, (link as GraphLink).value * 5000)}
+          linkWidth={link => Math.max(0.2, (link as AppGraphLink).value * 5000)}
           linkDirectionalParticles={1}
           linkDirectionalParticleWidth={3}
           linkDirectionalParticleSpeed={0.006}
@@ -173,16 +137,43 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           enablePanInteraction={true}
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
-          onLinkHover={handleLinkHover}
+          linkCanvasObjectMode={() => 'after'} // Draw after default link elements
+          linkCanvasObject={(linkInput, ctx, globalScale) => {
+            const link = linkInput as AppGraphLink & LinkObject; 
+            const sourceNode = link.source as FGNodeObject | undefined;
+            const targetNode = link.target as FGNodeObject | undefined;
+
+            if (!sourceNode || !targetNode || typeof sourceNode.x !== 'number' || typeof sourceNode.y !== 'number' || typeof targetNode.x !== 'number' || typeof targetNode.y !== 'number') {
+              return; 
+            }
+
+            const label = `${(link.value * 100).toFixed(2)}%`;
+            const fontSize = 6 / globalScale; 
+            
+            ctx.font = `${Math.max(2.5, fontSize)}px Sans-Serif`;
+            ctx.fillStyle = resolvedLinkTextColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const midX = sourceNode.x + (targetNode.x - sourceNode.x) / 2;
+            const midY = sourceNode.y + (targetNode.y - sourceNode.y) / 2;
+            
+            const linkAngle = Math.atan2(targetNode.y - sourceNode.y, targetNode.x - sourceNode.x);
+            const offsetMagnitude = 5 / globalScale; // How far from the line the text should be
+
+            // Calculate offset perpendicular to the link
+            const textPosX = midX + offsetMagnitude * Math.sin(linkAngle);
+            const textPosY = midY - offsetMagnitude * Math.cos(linkAngle);
+
+            ctx.fillText(label, textPosX, textPosY);
+          }}
         />
       )}
-      {tooltipComponent}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
-        Scroll to zoom, drag to pan. Node size/color indicates proximity. Link thickness reflects share. Hover links for details.
+        Scroll to zoom, drag to pan. Node size/color indicates proximity. Link thickness/label reflects share.
       </div>
     </div>
   );
 };
 
 export default NodeGraphVisualization;
-
