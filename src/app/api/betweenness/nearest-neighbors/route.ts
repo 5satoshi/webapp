@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
           params: {
             firstDegreeNodeId: firstDegreeNeighbor.id,
             processedNodes: Array.from(processedNodes),
+            limit,
           },
           types: {
              processedNodes: ['STRING'] // BQ type for array of strings in params
