@@ -27,8 +27,8 @@ interface NodeGraphVisualizationProps {
   is3D: boolean;
 }
 
-const MIN_LINK_WIDTH = 1.0;
-const MAX_VISUAL_LINK_WIDTH = 50.0; // The absolute max width in pixels.
+const MIN_LINK_WIDTH = 0.5;
+const MAX_VISUAL_LINK_WIDTH = 25.0; // The absolute max width in pixels.
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
