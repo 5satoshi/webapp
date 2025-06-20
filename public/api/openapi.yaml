@@ -1,165 +1,85 @@
 
-openapi: 3.0.3
+openapi: 3.0.0
 info:
   title: Lightning Stats Dashboard API
-  description: |-
-    This is the internal API for the Lightning Stats Dashboard.
-    It provides data for network graph analysis, including node rankings, timelines, and topology, primarily by querying a pre-calculated `betweenness` table in BigQuery.
+  description: API for the Lightning Stats Dashboard application, providing access to betweenness centrality, network graph data, and other node statistics.
   version: 1.0.0
 servers:
   - url: /
-tags:
-  - name: Betweenness Analysis
-    description: Endpoints for retrieving network graph statistics.
+    description: Local server
+  - url: https://5sats.com
+    description: Production server
 
 paths:
-  /api/betweenness/top-nodes:
-    get:
-      tags:
-        - Betweenness Analysis
-      summary: Get top N nodes by shortest path share
-      description: Returns a list of the top N nodes for micro, common, and macro payment categories, ranked by their shortest path share.
-      parameters:
-        - name: limit
-          in: query
-          description: The number of top nodes to return for each category.
-          required: false
-          schema:
-            type: integer
-            default: 3
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AllTopNodesResponse'
-        '500':
-          description: Internal server error
-
-  /api/betweenness/node-timeline:
-    get:
-      tags:
-        - Betweenness Analysis
-      summary: Get historical shortest path share for a node
-      description: Returns a time-series of a specific node's shortest path share for micro, common, and macro payments over a given aggregation period.
-      parameters:
-        - name: nodeId
-          in: query
-          description: The public key of the node to query.
-          required: true
-          schema:
-            type: string
-        - name: aggregation
-          in: query
-          description: The time period to aggregate data over.
-          required: false
-          schema:
-            type: string
-            enum: [day, week, month, quarter]
-            default: week
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/NodeTimelineData'
-        '400':
-          description: Invalid input, nodeId is required.
-        '500':
-          description: Internal server error
-  
-  /api/betweenness/node-ranks:
-    get:
-      tags:
-        - Betweenness Analysis
-      summary: Get current ranks and share for a node
-      description: Returns the latest rank, rank change, and share values for a specific node across all payment categories for a given period.
-      parameters:
-        - name: nodeId
-          in: query
-          description: The public key of the node to query.
-          required: true
-          schema:
-            type: string
-        - name: aggregation
-          in: query
-          description: The period over which to calculate the rank change.
-          required: false
-          schema:
-            type: string
-            enum: [day, week, month, quarter]
-            default: week
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NodeRanksResponse'
-        '400':
-          description: Invalid input, nodeId is required.
-        '500':
-          description: Internal server error
-
   /api/betweenness/node-graph:
     get:
-      tags:
-        - Betweenness Analysis
-      summary: Get graph data for a central node
-      description: Returns the nodes and links for a subgraph centered around a specific node, including its top N 1st and 2nd degree neighbors.
+      summary: Get Node Graph Data
+      description: |-
+        Fetches a network subgraph centered around a specific node.
+        - Selects the top N 1st-degree neighbors based on highest share.
+        - For each 1st-degree neighbor, selects their top N 2nd-degree neighbors.
+        - Returns all selected nodes and all edges from the database that connect any two of these nodes.
+      operationId: getNodeGraph
       parameters:
         - name: nodeId
           in: query
-          description: The public key of the central node for the graph.
           required: true
+          description: The node ID to center the graph on.
           schema:
             type: string
         - name: numNeighbors
           in: query
-          description: The number of 1st and 2nd degree neighbors to include.
           required: false
+          description: The number of 1st and 2nd degree neighbors to retrieve per level.
           schema:
             type: integer
             default: 3
+            minimum: 1
+            maximum: 10
       responses:
         '200':
-          description: Successful operation
+          description: A graph structure with nodes and links.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NodeGraphResponse'
+                $ref: '#/components/schemas/NodeGraphData'
         '400':
-          description: Invalid input, nodeId is required.
+          description: Bad request, missing or invalid parameters.
         '500':
-          description: Internal server error
-          
+          description: Internal server error.
+
   /api/betweenness/nearest-neighbors:
     get:
-      tags:
-        - Betweenness Analysis
-      summary: Get top N nearest neighbors for a node
-      description: For a given node, returns its top N neighbors, ordered by the highest `shortest_path_share` of the connecting edge.
+      summary: Get Nearest Neighbors by Share
+      description: |-
+        Returns a list of the top X nearest neighbors to a given node, ordered by shortest_path_share for 'common' payments.
+        Can fetch neighbors of different degrees (1st, 2nd) based on the `degrees` parameter.
+      operationId: getNearestNeighbors
       parameters:
         - name: nodeId
           in: query
-          description: The public key of the node to find neighbors for.
           required: true
+          description: The node ID to get neighbors for.
           schema:
             type: string
         - name: limit
           in: query
-          description: The maximum number of neighbors to return.
           required: false
+          description: The maximum number of neighbors to return per degree level. Defaults to 10.
           schema:
             type: integer
             default: 10
+        - name: degrees
+          in: query
+          required: false
+          description: "Comma-separated list of neighbor degrees to fetch (e.g., '1' for 1st-degree, '1,2' for 1st and 2nd-degree). Defaults to '1'."
+          schema:
+            type: string
+            default: '1'
+          example: '1,2'
       responses:
         '200':
-          description: Successful operation
+          description: A list of neighbor nodes, sorted by degree then by share.
           content:
             application/json:
               schema:
@@ -167,33 +87,33 @@ paths:
                 items:
                   $ref: '#/components/schemas/NeighborNode'
         '400':
-          description: Invalid input, nodeId is required.
+          description: Bad request, missing or invalid parameters.
         '500':
-          description: Internal server error
+          description: Internal server error.
 
   /api/betweenness/top-edges:
     get:
-      tags:
-        - Betweenness Analysis
-      summary: Get top N edges for a list of nodes
-      description: For a given list of nodes, returns the top N edges with the highest `shortest_path_share` that connect any two nodes within that list.
+      summary: Get Top Edges Between a Set of Nodes
+      description: |-
+        Given a list of node IDs, this returns the top N edges with the highest `shortest_path_share` that connect any two nodes within the provided list.
+      operationId: getTopEdges
       parameters:
         - name: nodeIds
           in: query
-          description: A comma-separated string of node public keys.
           required: true
+          description: A comma-separated list of node IDs.
           schema:
             type: string
         - name: limit
           in: query
-          description: The maximum number of edges to return.
           required: false
+          description: The maximum number of edges to return. Defaults to 25.
           schema:
             type: integer
             default: 25
       responses:
         '200':
-          description: Successful operation
+          description: A list of edges with source, destination, and share.
           content:
             application/json:
               schema:
@@ -201,146 +121,12 @@ paths:
                 items:
                   $ref: '#/components/schemas/Edge'
         '400':
-          description: Invalid input, nodeIds is required.
+          description: Bad request, missing or invalid parameters.
         '500':
-          description: Internal server error
+          description: Internal server error.
 
 components:
   schemas:
-    Edge:
-      type: object
-      properties:
-        source:
-          type: string
-          description: The source node's public key.
-        destination:
-          type: string
-          description: The destination node's public key.
-        share:
-          type: number
-          format: double
-          description: The shortest_path_share of the edge.
-    NeighborNode:
-      type: object
-      properties:
-        nodeId:
-          type: string
-          description: The neighbor node's public key.
-        alias:
-          type: string
-          nullable: true
-          description: The alias of the neighbor node, if available.
-        share:
-          type: number
-          format: double
-          description: The shortest_path_share of the connecting edge.
-    NodeTimelineData:
-      type: object
-      properties:
-        date:
-          type: string
-          format: date
-        micro:
-          type: number
-        common:
-          type: number
-        macro:
-          type: number
-    SingleCategoryTopNode:
-      type: object
-      properties:
-        nodeid: 
-          type: string
-        alias:
-          type: string
-          nullable: true
-        categoryShare:
-          type: number
-          nullable: true
-        categoryRank:
-          type: integer
-          nullable: true
-        microShare:
-          type: number
-          nullable: true
-        commonShare:
-          type: number
-          nullable: true
-        macroShare:
-          type: number
-          nullable: true
-        microRank:
-          type: integer
-          nullable: true
-        commonRank:
-          type: integer
-          nullable: true
-        macroRank:
-          type: integer
-          nullable: true
-    AllTopNodesResponse:
-      type: object
-      properties:
-        micro:
-          type: array
-          items:
-            $ref: '#/components/schemas/SingleCategoryTopNode'
-        common:
-          type: array
-          items:
-            $ref: '#/components/schemas/SingleCategoryTopNode'
-        macro:
-          type: array
-          items:
-            $ref: '#/components/schemas/SingleCategoryTopNode'
-    NodeRanksResponse:
-      type: object
-      properties:
-        micro:
-          type: object
-          properties:
-            latestRank:
-              type: integer
-              nullable: true
-            rankChange:
-              type: integer
-              nullable: true
-            latestShare:
-              type: number
-              nullable: true
-            previousShare:
-              type: number
-              nullable: true
-        common:
-          type: object
-          properties:
-            latestRank:
-              type: integer
-              nullable: true
-            rankChange:
-              type: integer
-              nullable: true
-            latestShare:
-              type: number
-              nullable: true
-            previousShare:
-              type: number
-              nullable: true
-        macro:
-          type: object
-          properties:
-            latestRank:
-              type: integer
-              nullable: true
-            rankChange:
-              type: integer
-              nullable: true
-            latestShare:
-              type: number
-              nullable: true
-            previousShare:
-              type: number
-              nullable: true
     GraphNode:
       type: object
       properties:
@@ -354,6 +140,7 @@ components:
           type: boolean
         color:
           type: string
+
     GraphLink:
       type: object
       properties:
@@ -363,7 +150,8 @@ components:
           type: string
         value:
           type: number
-    NodeGraphResponse:
+
+    NodeGraphData:
       type: object
       properties:
         nodes:
@@ -374,3 +162,31 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GraphLink'
+
+    NeighborNode:
+      type: object
+      properties:
+        nodeId:
+          type: string
+        alias:
+          type: string
+          nullable: true
+        share:
+          type: number
+          format: float
+          description: "The shortest_path_share of the edge connecting this neighbor to its parent (1st or central node)."
+        degree:
+          type: integer
+          description: "The degree of separation from the original nodeId (1 or 2)."
+    
+    Edge:
+      type: object
+      properties:
+        source:
+          type: string
+        destination:
+          type: string
+        share:
+          type: number
+          format: float
+          description: "The shortest_path_share of the edge."
