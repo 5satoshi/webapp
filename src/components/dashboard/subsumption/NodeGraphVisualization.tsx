@@ -21,8 +21,8 @@ interface NodeGraphVisualizationProps {
   shareThreshold: number;
 }
 
-const MIN_VISUAL_WIDTH = 0.5;
-const MAX_VISUAL_WIDTH = 6.0;
+const MIN_VISIBLE_LINK_WIDTH = 0.5; // Minimum pixel width for any link
+const MAX_VISUAL_LINK_WIDTH = 50.0; // Pixel width for the link with the maxVisibleShare
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
@@ -46,7 +46,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     if (typeof window !== 'undefined' && hasMounted) {
       const style = getComputedStyle(document.documentElement);
       const fgColorParts = style.getPropertyValue('--foreground').trim().split(" ");
-      if (fgColorParts.length === 3) {
+      if (fgColorParts.length === 3 && !isNaN(parseFloat(fgColorParts[0])) && fgColorParts[1].endsWith('%') && fgColorParts[2].endsWith('%')) {
          setResolvedLinkTextColor(`hsl(${fgColorParts[0]}, ${fgColorParts[1]}, ${fgColorParts[2]})`);
       } else {
         const bodyColor = getComputedStyle(document.body).color;
@@ -75,11 +75,10 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   const {
     nodes: finalNodes,
     links: finalLinks,
-    minVisibleShare,
-    maxVisibleShare,
+    maxVisibleShare, // We need maxVisibleShare for the new scaling
   } = useMemo(() => {
     if (!rawGraphData || !rawGraphData.nodes) {
-      return { nodes: [], links: [], minVisibleShare: 0, maxVisibleShare: 0 };
+      return { nodes: [], links: [], maxVisibleShare: 0 };
     }
 
     let currentLinks = rawGraphData.links || [];
@@ -95,50 +94,38 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
 
     let currentNodes = rawGraphData.nodes.filter(node => participatingNodeIds.has(node.id));
     
-    if (currentNodes.length === 0) {
+    if (currentNodes.length === 0 && rawGraphData.nodes.length > 0) {
         const central = rawGraphData.nodes.find(n => n.id === centralNodeId);
         if (central) {
-            currentNodes = [central];
+            currentNodes = [central]; // Show at least the central node if no links meet criteria
         }
     }
     
-    let minS = Infinity;
-    let maxS = -Infinity;
-
+    let maxS = 0;
     if (currentLinks.length > 0) {
       currentLinks.forEach(link => {
-        minS = Math.min(minS, link.value);
         maxS = Math.max(maxS, link.value);
       });
-    } else {
-      minS = 0; // Default if no links or all filtered out
-      maxS = 0;
     }
-    // If minS/maxS remained at their initial Infinity values (e.g. no valid links)
-    if (minS === Infinity) minS = 0;
-    if (maxS === -Infinity) maxS = 0;
-
 
     return {
       nodes: currentNodes,
       links: currentLinks,
-      minVisibleShare: minS,
       maxVisibleShare: maxS,
     };
   }, [rawGraphData, linkDisplayMode, shareThreshold, centralNodeId]);
 
-
   const getNodeColor = useCallback((node: GraphNode) => {
-    return node.color || 'hsl(288, 48%, 60%)'; // Fallback accent
+    return node.color || 'hsl(288, 48%, 60%)'; // Fallback: Accent (Electric Purple)
   }, []);
 
-  const handleNodeHover = useCallback((node: GraphNode | null) => {
+  const handleNodeHover = useCallback((node: GraphNode | FGNodeObject | null) => {
     if (graphRef.current) {
       graphRef.current.style.cursor = node ? 'pointer' : '';
     }
   }, []);
 
-  const handleNodeClick = useCallback((node: GraphNode) => {
+  const handleNodeClick = useCallback((node: GraphNode | FGNodeObject) => {
     if (fgRef.current) {
       const fgNode = node as FGNodeObject;
       if (typeof fgNode.x === 'number' && typeof fgNode.y === 'number') {
@@ -146,7 +133,8 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
         fgRef.current.zoom(2.5, 1000);
       }
     }
-    console.log("Clicked node:", node.name, "ID:", node.id);
+    const appNode = node as GraphNode;
+    console.log("Clicked node:", appNode.name, "ID:", appNode.id);
   }, []);
 
 
@@ -160,20 +148,20 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
         <Info className="h-4 w-4" />
         <AlertTitle>Graph Data Not Available</AlertTitle>
         <AlertDescription>
-          Could not retrieve initial graph data for {centralNodeId ? `${centralNodeId.substring(0, 10)}...` : 'the selected node'}.
+          Could not retrieve initial graph data.
         </AlertDescription>
       </Alert>
     );
   }
 
   if (finalNodes.length === 0) {
-     const modeText = linkDisplayMode === 'threshold' ? `with share >= ${shareThreshold*100}%` : "for all selected nodes";
+    const modeText = linkDisplayMode === 'threshold' ? `with share >= ${shareThreshold*100}%` : "for all selected nodes";
     return (
       <Alert>
         <Info className="h-4 w-4" />
         <AlertTitle>No Graph Elements to Display</AlertTitle>
         <AlertDescription>
-          No nodes or links match the current criteria ({modeText}) for {centralNodeId ? `${centralNodeId.substring(0, 10)}...` : 'the selected node'}. Try adjusting the filter.
+          No nodes or links match the current criteria ({modeText}). Try adjusting the filter.
         </AlertDescription>
       </Alert>
     );
@@ -195,23 +183,11 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
           linkColor={() => linkColor}
           linkWidth={(linkInput) => {
             const link = linkInput as AppGraphLink;
-            if (finalLinks.length === 0) {
-              return MIN_VISUAL_WIDTH;
+            if (finalLinks.length === 0 || maxVisibleShare === 0) {
+              return MIN_VISIBLE_LINK_WIDTH; // Default for no links or all zero shares
             }
-            // If all shares are the same (or only one link), use a medium width.
-            // maxVisibleShare could be 0 if all shares are 0.
-            if (minVisibleShare === maxVisibleShare) {
-              // If share is 0, use min width, otherwise medium.
-              return maxVisibleShare > 0 ? (MIN_VISUAL_WIDTH + MAX_VISUAL_WIDTH) / 2 : MIN_VISUAL_WIDTH;
-            }
-          
-            // Normalize the link's value within the range of visible shares
-            const range = maxVisibleShare - minVisibleShare;
-            // Handle range being zero to prevent division by zero if not caught above
-            const normalizedValue = range === 0 ? 0.5 : (link.value - minVisibleShare) / range; 
-            const width = MIN_VISUAL_WIDTH + normalizedValue * (MAX_VISUAL_WIDTH - MIN_VISUAL_WIDTH);
-            
-            return Math.max(MIN_VISUAL_WIDTH, Math.min(MAX_VISUAL_WIDTH, width));
+            const width = (link.value / maxVisibleShare) * MAX_VISUAL_LINK_WIDTH;
+            return Math.max(MIN_VISIBLE_LINK_WIDTH, Math.min(MAX_VISUAL_LINK_WIDTH, width));
           }}
           linkDirectionalParticles={1}
           linkDirectionalParticleWidth={3}
@@ -239,9 +215,10 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             }
 
             const label = `${(link.value * 100).toFixed(2)}%`;
-            const fontSize = 6 / globalScale; 
+            const fontSizeBase = 6; // Base font size
+            const fontSize = Math.max(2.5, fontSizeBase / globalScale); // Scale font size, ensure minimum
             
-            ctx.font = `${Math.max(2.5, fontSize)}px Sans-Serif`;
+            ctx.font = `${fontSize}px Sans-Serif`;
             ctx.fillStyle = resolvedLinkTextColor;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -249,8 +226,9 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             const midX = sourceNode.x + (targetNode.x - sourceNode.x) / 2;
             const midY = sourceNode.y + (targetNode.y - sourceNode.y) / 2;
             
+            // Calculate offset perpendicular to the link
             const linkAngle = Math.atan2(targetNode.y - sourceNode.y, targetNode.x - sourceNode.x);
-            const offsetMagnitude = 5 / globalScale; 
+            const offsetMagnitude = (5 + (link.value / maxVisibleShare) * MAX_VISUAL_LINK_WIDTH / 2) / globalScale; // Offset further for wider links
 
             const textPosX = midX + offsetMagnitude * Math.sin(linkAngle);
             const textPosY = midY - offsetMagnitude * Math.cos(linkAngle);
@@ -260,7 +238,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
         />
       )}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
-        Node size/color by proximity. Link width/label by share. Scroll to zoom, drag to pan.
+        Node size/color by proximity. Link width/label by share (%). Scroll to zoom, drag to pan.
       </div>
     </div>
   );
