@@ -6,7 +6,6 @@ import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetI
 import { logBigQueryError } from '@/lib/bigqueryUtils';
 import { siteConfig } from '@/config/site';
 
-// Updated order: process.env.INTERNAL_API_HOST -> localhost:PORT -> siteConfig.apiBaseUrl
 const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || (typeof window === 'undefined' ? `http://localhost:${process.env.PORT || '9002'}` : siteConfig.apiBaseUrl) || siteConfig.apiBaseUrl;
 
 
@@ -23,7 +22,6 @@ export async function fetchTopNodesBySubsumption(limit: number = 3): Promise<All
     return await response.json() as AllTopNodes;
   } catch (error: any) {
     console.error(`[subsumptionService] Network Error fetchTopNodesBySubsumption (URL: ${fetchUrl}):`, error.message, error);
-    // Fallback if localhost fails and siteConfig.apiBaseUrl is different and might work
     if (INTERNAL_API_HOST_URL.startsWith('http://localhost') && siteConfig.apiBaseUrl && !siteConfig.apiBaseUrl.startsWith('http://localhost')) {
       console.log(`[subsumptionService] Retrying fetchTopNodesBySubsumption with ${siteConfig.apiBaseUrl}`);
       const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/top-nodes?limit=${limit}`;
@@ -244,12 +242,12 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
   return null;
 }
 
-export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData | null> {
+export async function fetchNodeGraphData(nodeId: string, numNeighbors: number = 3): Promise<NodeGraphData | null> {
   if (!nodeId) {
     console.log("[subsumptionService] fetchNodeGraphData called with no nodeId.");
     return null;
   }
-  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
+  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}`;
   console.log(`[subsumptionService] INTERNAL_API_HOST_URL: ${INTERNAL_API_HOST_URL}`);
   console.log(`[subsumptionService] Attempting to fetch node graph data for ${nodeId} from primary URL: ${primaryFetchUrl}`);
   
@@ -267,10 +265,9 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
           console.error("Could not retrieve error body text (Primary):", textError.message);
         }
       }
-      // If primary URL (localhost or INTERNAL_API_HOST) fails, and it wasn't already siteConfig.apiBaseUrl, try siteConfig.apiBaseUrl as fallback
       if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
          console.log(`[subsumptionService] Primary fetch failed. Retrying with fallback URL using siteConfig.apiBaseUrl for nodeId: ${nodeId}`);
-         const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
+         const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}`;
          console.log(`[subsumptionService] Attempting fallback fetch from: ${fallbackFetchUrl}`);
          response = await fetch(fallbackFetchUrl, { cache: 'no-store' });
 
@@ -285,11 +282,11 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
                 console.error("Could not retrieve error body text (Fallback):", textError.message);
               }
             }
-            return null; // Fallback also failed
+            return null; 
          }
          console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId} using fallback URL.`);
       } else {
-        return null; // Primary failed, and no different fallback to try or fallback is same as primary
+        return null; 
       }
     } else {
       console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId} using primary URL.`);
@@ -299,12 +296,11 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
     console.log(`[subsumptionService] Parsed graph data. Nodes: ${data.nodes?.length}, Links: ${data.links?.length}`);
     return data;
 
-  } catch (error: any) { // Catches network errors for the primary fetch
+  } catch (error: any) { 
     console.error(`[subsumptionService] Network Error (Primary) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${primaryFetchUrl}):`, error.message, error);
-    // If primary URL (localhost or INTERNAL_API_HOST) fails due to network error, and it wasn't already siteConfig.apiBaseUrl, try siteConfig.apiBaseUrl as fallback
     if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
       console.log(`[subsumptionService] Primary fetch network error. Retrying with fallback URL using siteConfig.apiBaseUrl for nodeId: ${nodeId}`);
-      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}`;
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}`;
       console.log(`[subsumptionService] Attempting fallback fetch from: ${fallbackFetchUrl}`);
       try {
         const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });
@@ -319,18 +315,15 @@ export async function fetchNodeGraphData(nodeId: string): Promise<NodeGraphData 
                 console.error("Could not retrieve error body text (Fallback):", textError.message);
               }
             }
-          return null; // Fallback also failed (API error)
+          return null; 
         }
         console.log(`[subsumptionService] Successfully fetched node graph data for ${nodeId} using fallback URL after primary network error.`);
         return await fallbackResponse.json() as NodeGraphData;
-      } catch (fallbackError: any) { // Catches network errors for the fallback fetch
+      } catch (fallbackError: any) { 
         console.error(`[subsumptionService] Network Error (Fallback) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${fallbackFetchUrl}):`, fallbackError.message, fallbackError);
-        return null; // Fallback also failed (network error)
+        return null; 
       }
     }
-    return null; // Primary failed (network error), and no different fallback to try or fallback is same as primary
+    return null; 
   }
 }
-    
-
-    

@@ -15,10 +15,9 @@ import {
   fetchNodeRankForCategories,
   fetchNodeDisplayInfo,
   fetchNodeIdByAlias,
-  fetchNodeGraphData
 } from '@/services/subsumptionService';
 import { specificNodeId } from '@/lib/constants';
-import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric, NodeDisplayInfo, NodeGraphData } from '@/lib/types';
+import type { AllTopNodes, NetworkSubsumptionData, OurNodeRanksForAllCategories, KeyMetric, NodeDisplayInfo } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 import { getOrdinalSuffix } from '@/lib/utils';
@@ -70,7 +69,7 @@ export default async function SubsumptionPage({
   const topNodesData: AllTopNodes = await fetchTopNodesBySubsumption(3);
   const nodeTimelineData: NetworkSubsumptionData[] = await fetchNetworkSubsumptionDataForNode(nodeIdForDataFetching, currentAggregation);
   const nodeRanks: OurNodeRanksForAllCategories = await fetchNodeRankForCategories(nodeIdForDataFetching, currentAggregation);
-  const nodeGraphData: NodeGraphData | null = await fetchNodeGraphData(nodeIdForDataFetching);
+  // NodeGraphData is now fetched by GraphInspectionCard
 
   const introText1 = `How do the activity numbers of a node compare to the overall network? This section brings more light into that by looking at the total network graph, with all its channels and routing fees.`;
   const introText2 = `It’s possible to calculate the share of 'cheapest' (shortest) paths per node a transaction is optimally taking through the network. This calculation is dependent on the size of the transaction. We’re presenting the share for a common transaction (50,000sat), a micro transaction (200sat) and a macro transaction (4,000,000sat). Also we show, how this share changes over time for these payment sizes.`;
@@ -235,7 +234,6 @@ export default async function SubsumptionPage({
       </Card>
       
       <GraphInspectionCard 
-        initialGraphData={nodeGraphData}
         centralNodeId={nodeIdForDataFetching}
         displayName={displayName}
       />
@@ -253,5 +251,3 @@ export default async function SubsumptionPage({
     </div>
   );
 }
-
-    
