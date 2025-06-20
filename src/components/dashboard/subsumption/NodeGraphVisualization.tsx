@@ -1,9 +1,9 @@
 
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import type { NodeGraphData, GraphNode, GraphLink as AppGraphLink } from '@/lib/types'; // Renamed to avoid conflict
+import type { NodeGraphData, GraphNode, GraphLink as AppGraphLink } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
@@ -15,16 +15,23 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
 });
 
 interface NodeGraphVisualizationProps {
-  graphData: NodeGraphData | null;
+  rawGraphData: NodeGraphData | null;
   centralNodeId: string;
+  linkDisplayMode: 'all' | 'threshold';
+  shareThreshold: number;
 }
 
-const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphData, centralNodeId }) => {
+const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
+  rawGraphData,
+  centralNodeId,
+  linkDisplayMode,
+  shareThreshold,
+}) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods>();
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 });
   const [hasMounted, setHasMounted] = useState(false);
-  const [resolvedLinkTextColor, setResolvedLinkTextColor] = useState('rgba(50, 50, 50, 0.9)'); // Default dark gray
+  const [resolvedLinkTextColor, setResolvedLinkTextColor] = useState('rgba(50, 50, 50, 0.9)');
 
   const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)';
 
@@ -33,19 +40,17 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && hasMounted) {
       const style = getComputedStyle(document.documentElement);
-      // Assuming --foreground is defined like "240 10% 3.9%" in globals.css
       const fgColorParts = style.getPropertyValue('--foreground').trim().split(" ");
       if (fgColorParts.length === 3) {
          setResolvedLinkTextColor(`hsl(${fgColorParts[0]}, ${fgColorParts[1]}, ${fgColorParts[2]})`);
       } else {
-        // Fallback if CSS variable parsing fails
         const bodyColor = getComputedStyle(document.body).color;
         setResolvedLinkTextColor(bodyColor || 'rgba(50, 50, 50, 0.9)');
       }
     }
-  }, []);
+  }, [hasMounted]);
 
   useEffect(() => {
     const currentGraphRef = graphRef.current;
@@ -58,14 +63,45 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           });
         }
       };
-      handleResize(); // Initial size
+      handleResize();
       window.addEventListener('resize', handleResize);
-
-      return () => {
-        window.removeEventListener('resize', handleResize);
-      };
+      return () => window.removeEventListener('resize', handleResize);
     }
   }, [hasMounted]);
+
+  const processedGraphData = useMemo(() => {
+    if (!rawGraphData) return null;
+
+    let filteredLinks = rawGraphData.links;
+    if (linkDisplayMode === 'threshold') {
+      filteredLinks = rawGraphData.links.filter(link => link.value >= shareThreshold);
+    }
+    
+    // Ensure all nodes participating in the filtered links are present, plus the central node.
+    const participatingNodeIds = new Set<string>([centralNodeId]);
+    filteredLinks.forEach(link => {
+      participatingNodeIds.add(link.source);
+      participatingNodeIds.add(link.target);
+    });
+
+    const filteredNodes = rawGraphData.nodes.filter(node => participatingNodeIds.has(node.id));
+    
+    // If no nodes remain after filtering (e.g. threshold too high for any links),
+    // ensure at least the central node is shown if it exists in raw data.
+    if (filteredNodes.length === 0) {
+        const central = rawGraphData.nodes.find(n => n.id === centralNodeId);
+        if (central) {
+            return { nodes: [central], links: [] };
+        }
+        return { nodes: [], links: [] }; // Should not happen if centralNodeId is always in rawGraphData.nodes
+    }
+
+    return {
+      nodes: filteredNodes,
+      links: filteredLinks,
+    };
+  }, [rawGraphData, linkDisplayMode, shareThreshold, centralNodeId]);
+
 
   const getNodeColor = useCallback((node: GraphNode) => {
     return node.color || 'hsl(288, 48%, 60%)'; // Fallback accent
@@ -79,8 +115,6 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     if (fgRef.current) {
-      // FGNodeObject type is used by react-force-graph, it might have x,y. Our GraphNode might not.
-      // Need to ensure the 'node' object passed here has x and y for centerAt.
       const fgNode = node as FGNodeObject;
       if (typeof fgNode.x === 'number' && typeof fgNode.y === 'number') {
         fgRef.current.centerAt(fgNode.x, fgNode.y, 1000);
@@ -94,14 +128,27 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
   if (!hasMounted) {
     return <Skeleton className="h-[400px] w-full" />;
   }
-
-  if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
-    return (
+  
+  if (!rawGraphData) { // Check rawGraphData before processedGraphData
+     return (
       <Alert>
         <Info className="h-4 w-4" />
         <AlertTitle>Graph Data Not Available</AlertTitle>
         <AlertDescription>
-          Could not retrieve graph data for {centralNodeId ? `${centralNodeId.substring(0, 10)}...` : 'the selected node'}, or it has no connections meeting the criteria (common type, shortest path share &ge; 0.1%).
+          Could not retrieve initial graph data for {centralNodeId ? `${centralNodeId.substring(0, 10)}...` : 'the selected node'}.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!processedGraphData || !processedGraphData.nodes || processedGraphData.nodes.length === 0) {
+     const modeText = linkDisplayMode === 'threshold' ? `with share >= ${shareThreshold*100}%` : "for all selected nodes";
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>No Graph Elements to Display</AlertTitle>
+        <AlertDescription>
+          No nodes or links match the current criteria ({modeText}) for {centralNodeId ? `${centralNodeId.substring(0, 10)}...` : 'the selected node'}. Try adjusting the filter.
         </AlertDescription>
       </Alert>
     );
@@ -112,7 +159,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
       {dimensions.width > 0 && (
         <ForceGraph2D
           ref={fgRef}
-          graphData={graphData}
+          graphData={processedGraphData}
           width={dimensions.width}
           height={dimensions.height}
           nodeId="id"
@@ -137,7 +184,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
           enablePanInteraction={true}
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
-          linkCanvasObjectMode={() => 'after'} // Draw after default link elements
+          linkCanvasObjectMode={() => 'after'}
           linkCanvasObject={(linkInput, ctx, globalScale) => {
             const link = linkInput as AppGraphLink & LinkObject; 
             const sourceNode = link.source as FGNodeObject | undefined;
@@ -159,9 +206,8 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
             const midY = sourceNode.y + (targetNode.y - sourceNode.y) / 2;
             
             const linkAngle = Math.atan2(targetNode.y - sourceNode.y, targetNode.x - sourceNode.x);
-            const offsetMagnitude = 5 / globalScale; // How far from the line the text should be
+            const offsetMagnitude = 5 / globalScale; 
 
-            // Calculate offset perpendicular to the link
             const textPosX = midX + offsetMagnitude * Math.sin(linkAngle);
             const textPosY = midY - offsetMagnitude * Math.cos(linkAngle);
 
@@ -170,10 +216,12 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({ graphDa
         />
       )}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
-        Scroll to zoom, drag to pan. Node size/color indicates proximity. Link thickness/label reflects share.
+        Node size/color by proximity. Link thickness/label by share. Scroll to zoom, drag to pan.
       </div>
     </div>
   );
 };
 
 export default NodeGraphVisualization;
+
+    
