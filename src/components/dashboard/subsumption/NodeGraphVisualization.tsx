@@ -21,6 +21,9 @@ interface NodeGraphVisualizationProps {
   shareThreshold: number;
 }
 
+const MIN_VISUAL_WIDTH = 0.5;
+const MAX_VISUAL_WIDTH = 6.0;
+
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
   centralNodeId,
@@ -69,36 +72,58 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     }
   }, [hasMounted]);
 
-  const processedGraphData = useMemo(() => {
-    if (!rawGraphData) return null;
+  const {
+    nodes: finalNodes,
+    links: finalLinks,
+    minVisibleShare,
+    maxVisibleShare,
+  } = useMemo(() => {
+    if (!rawGraphData || !rawGraphData.nodes) {
+      return { nodes: [], links: [], minVisibleShare: 0, maxVisibleShare: 0 };
+    }
 
-    let filteredLinks = rawGraphData.links;
+    let currentLinks = rawGraphData.links || [];
     if (linkDisplayMode === 'threshold') {
-      filteredLinks = rawGraphData.links.filter(link => link.value >= shareThreshold);
+      currentLinks = currentLinks.filter(link => link.value >= shareThreshold);
     }
     
-    // Ensure all nodes participating in the filtered links are present, plus the central node.
     const participatingNodeIds = new Set<string>([centralNodeId]);
-    filteredLinks.forEach(link => {
+    currentLinks.forEach(link => {
       participatingNodeIds.add(link.source);
       participatingNodeIds.add(link.target);
     });
 
-    const filteredNodes = rawGraphData.nodes.filter(node => participatingNodeIds.has(node.id));
+    let currentNodes = rawGraphData.nodes.filter(node => participatingNodeIds.has(node.id));
     
-    // If no nodes remain after filtering (e.g. threshold too high for any links),
-    // ensure at least the central node is shown if it exists in raw data.
-    if (filteredNodes.length === 0) {
+    if (currentNodes.length === 0) {
         const central = rawGraphData.nodes.find(n => n.id === centralNodeId);
         if (central) {
-            return { nodes: [central], links: [] };
+            currentNodes = [central];
         }
-        return { nodes: [], links: [] }; // Should not happen if centralNodeId is always in rawGraphData.nodes
     }
+    
+    let minS = Infinity;
+    let maxS = -Infinity;
+
+    if (currentLinks.length > 0) {
+      currentLinks.forEach(link => {
+        minS = Math.min(minS, link.value);
+        maxS = Math.max(maxS, link.value);
+      });
+    } else {
+      minS = 0; // Default if no links or all filtered out
+      maxS = 0;
+    }
+    // If minS/maxS remained at their initial Infinity values (e.g. no valid links)
+    if (minS === Infinity) minS = 0;
+    if (maxS === -Infinity) maxS = 0;
+
 
     return {
-      nodes: filteredNodes,
-      links: filteredLinks,
+      nodes: currentNodes,
+      links: currentLinks,
+      minVisibleShare: minS,
+      maxVisibleShare: maxS,
     };
   }, [rawGraphData, linkDisplayMode, shareThreshold, centralNodeId]);
 
@@ -129,7 +154,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     return <Skeleton className="h-[400px] w-full" />;
   }
   
-  if (!rawGraphData) { // Check rawGraphData before processedGraphData
+  if (!rawGraphData) {
      return (
       <Alert>
         <Info className="h-4 w-4" />
@@ -141,7 +166,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     );
   }
 
-  if (!processedGraphData || !processedGraphData.nodes || processedGraphData.nodes.length === 0) {
+  if (finalNodes.length === 0) {
      const modeText = linkDisplayMode === 'threshold' ? `with share >= ${shareThreshold*100}%` : "for all selected nodes";
     return (
       <Alert>
@@ -159,7 +184,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
       {dimensions.width > 0 && (
         <ForceGraph2D
           ref={fgRef}
-          graphData={processedGraphData}
+          graphData={{ nodes: finalNodes, links: finalLinks }}
           width={dimensions.width}
           height={dimensions.height}
           nodeId="id"
@@ -168,7 +193,26 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
           nodeColor={getNodeColor}
           nodeRelSize={4}
           linkColor={() => linkColor}
-          linkWidth={link => Math.max(0.2, (link as AppGraphLink).value * 5000)}
+          linkWidth={(linkInput) => {
+            const link = linkInput as AppGraphLink;
+            if (finalLinks.length === 0) {
+              return MIN_VISUAL_WIDTH;
+            }
+            // If all shares are the same (or only one link), use a medium width.
+            // maxVisibleShare could be 0 if all shares are 0.
+            if (minVisibleShare === maxVisibleShare) {
+              // If share is 0, use min width, otherwise medium.
+              return maxVisibleShare > 0 ? (MIN_VISUAL_WIDTH + MAX_VISUAL_WIDTH) / 2 : MIN_VISUAL_WIDTH;
+            }
+          
+            // Normalize the link's value within the range of visible shares
+            const range = maxVisibleShare - minVisibleShare;
+            // Handle range being zero to prevent division by zero if not caught above
+            const normalizedValue = range === 0 ? 0.5 : (link.value - minVisibleShare) / range; 
+            const width = MIN_VISUAL_WIDTH + normalizedValue * (MAX_VISUAL_WIDTH - MIN_VISUAL_WIDTH);
+            
+            return Math.max(MIN_VISUAL_WIDTH, Math.min(MAX_VISUAL_WIDTH, width));
+          }}
           linkDirectionalParticles={1}
           linkDirectionalParticleWidth={3}
           linkDirectionalParticleSpeed={0.006}
@@ -216,7 +260,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
         />
       )}
       <div className="absolute bottom-2 right-2 text-xs text-muted-foreground p-1 bg-background/50 rounded">
-        Node size/color by proximity. Link thickness/label by share. Scroll to zoom, drag to pan.
+        Node size/color by proximity. Link width/label by share. Scroll to zoom, drag to pan.
       </div>
     </div>
   );
@@ -224,4 +268,3 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
 
 export default NodeGraphVisualization;
 
-    
