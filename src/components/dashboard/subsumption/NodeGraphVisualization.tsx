@@ -46,6 +46,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   const [dimensions, setDimensions] = useState({ width: 0, height: 400 });
   const [hasMounted, setHasMounted] = useState(false);
   const [resolvedLinkTextColor, setResolvedLinkTextColor] = useState('rgba(50, 50, 50, 0.9)');
+  const [resolvedCardColor, setResolvedCardColor] = useState('hsl(0, 0%, 100%)'); // Default to white
   
   const linkColor = 'hsla(240, 3.8%, 46.1%, 0.3)';
 
@@ -56,12 +57,23 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   useEffect(() => {
     if (typeof window !== 'undefined' && hasMounted) {
       const style = getComputedStyle(document.documentElement);
+
+      // Resolve foreground for text
       const fgColorParts = style.getPropertyValue('--foreground').trim().split(" ");
       if (fgColorParts.length === 3 && !isNaN(parseFloat(fgColorParts[0])) && fgColorParts[1].endsWith('%') && fgColorParts[2].endsWith('%')) {
          setResolvedLinkTextColor(`hsl(${fgColorParts[0]}, ${fgColorParts[1]}, ${fgColorParts[2]})`);
       } else {
         const bodyColor = getComputedStyle(document.body).color;
         setResolvedLinkTextColor(bodyColor || 'rgba(50, 50, 50, 0.9)');
+      }
+
+      // Resolve card for background
+      const cardColorParts = style.getPropertyValue('--card').trim().split(" ");
+       if (cardColorParts.length === 3 && !isNaN(parseFloat(cardColorParts[0])) && cardColorParts[1].endsWith('%') && cardColorParts[2].endsWith('%')) {
+         setResolvedCardColor(`hsl(${cardColorParts[0]}, ${cardColorParts[1]}, ${cardColorParts[2]})`);
+      } else {
+        // Fallback if --card is not defined as HSL parts
+        setResolvedCardColor('hsl(0, 0%, 100%)');
       }
     }
   }, [hasMounted]);
@@ -208,7 +220,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             linkWidth={getLinkWidth}
             linkDirectionalParticles={1}
             linkDirectionalParticleWidth={3}
-            backgroundColor="hsl(var(--card))"
+            backgroundColor={resolvedCardColor}
             onNodeHover={handleNodeHover}
             onNodeClick={handleNodeClick3D}
           />
@@ -235,7 +247,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
                 fgRef2D.current.zoomToFit(400, 100);
               }
             }}
-            backgroundColor="hsl(var(--card))"
+            backgroundColor={resolvedCardColor}
             enableZoomInteraction={true}
             enablePanInteraction={true}
             onNodeHover={handleNodeHover}
