@@ -20,7 +20,7 @@ interface GraphInspectionCardProps {
 }
 
 const neighborCountOptions = Array.from({ length: 10 }, (_, i) => i + 1); // 1 to 10
-const degreeOptions = [1, 2]; // Degrees to support
+const degreeOptions = [1, 2, 3, 4, 5]; // Degrees to support
 
 export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspectionCardProps) {
   const [is3D, setIs3D] = useState(false);
@@ -147,13 +147,13 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
                 </Select>
             </div>
             <div className="flex items-center space-x-2">
+              <Label htmlFor="view-mode-switch" className="text-sm whitespace-nowrap">3D View</Label>
               <Switch
                 id="view-mode-switch"
                 checked={is3D}
                 onCheckedChange={setIs3D}
                 aria-label="Toggle 3D view"
               />
-              <Label htmlFor="view-mode-switch" className="text-sm whitespace-nowrap">3D View</Label>
             </div>
           </div>
         </div>

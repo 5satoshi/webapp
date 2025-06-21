@@ -8,6 +8,7 @@ import { fetchNodeDisplayInfo } from '@/services/subsumptionService';
 const PRIMARY_COLOR_HSL = 'hsl(277, 70%, 36%)';   // --primary (Purple)
 const SECONDARY_COLOR_HSL = 'hsl(34, 100%, 50%)'; // --secondary (Orange)
 const ACCENT_COLOR_HSL = 'hsl(288, 48%, 60%)';    // --accent (Electric Purple)
+const TERTIARY_COLOR_HSL = 'hsl(210, 40%, 96.1%)'; // A light blue/gray for contrast
 
 
 export async function GET(request: NextRequest) {
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     let maxDegree = 2; // Default degree
     if (degreeParam) {
         const parsedDegree = parseInt(degreeParam, 10);
-        if (!isNaN(parsedDegree) && parsedDegree > 0 && parsedDegree <= 2) { // Capped at 2 for now
+        if (!isNaN(parsedDegree) && parsedDegree > 0 && parsedDegree <= 5) {
             maxDegree = parsedDegree;
         }
     }
@@ -64,19 +65,20 @@ export async function GET(request: NextRequest) {
     neighborsResult.forEach(neighbor => {
         allNodeIds.add(neighbor.nodeId);
         
-        let color = ACCENT_COLOR_HSL; // Default for 2nd degree and beyond
+        let color = TERTIARY_COLOR_HSL; // Default for 3rd degree and beyond
+        let val = 2.5; // Default for 3rd degree and beyond
+        
         if (neighbor.degree === 1) {
             color = SECONDARY_COLOR_HSL;
-        }
-        
-        let val = 2.5; // Default for 2nd degree and beyond
-        if (neighbor.degree === 1) {
             val = 3.5;
+        } else if (neighbor.degree === 2) {
+            color = ACCENT_COLOR_HSL;
+            val = 3.0;
         }
 
         nodesMap.set(neighbor.nodeId, {
             id: neighbor.nodeId,
-            name: `${neighbor.degree === 1 ? '1st: ' : '2nd: '}${neighbor.alias || `${neighbor.nodeId.substring(0, 8)}...`}`,
+            name: `${neighbor.degree}º: ${neighbor.alias || `${neighbor.nodeId.substring(0, 8)}...`}`,
             val: val,
             isCentralNode: false,
             color: color,
