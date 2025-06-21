@@ -242,12 +242,12 @@ export async function fetchNodeIdByAlias(alias: string): Promise<string | null> 
   return null;
 }
 
-export async function fetchNodeGraphData(nodeId: string, numNeighbors: number = 3): Promise<NodeGraphData | null> {
+export async function fetchNodeGraphData(nodeId: string, numNeighbors: number = 3, degree: number = 2): Promise<NodeGraphData | null> {
   if (!nodeId) {
     console.log("[subsumptionService] fetchNodeGraphData called with no nodeId.");
     return null;
   }
-  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}`;
+  const primaryFetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}&degree=${degree}`;
   console.log(`[subsumptionService] INTERNAL_API_HOST_URL: ${INTERNAL_API_HOST_URL}`);
   console.log(`[subsumptionService] Attempting to fetch node graph data for ${nodeId} from primary URL: ${primaryFetchUrl}`);
   
@@ -267,7 +267,7 @@ export async function fetchNodeGraphData(nodeId: string, numNeighbors: number = 
       }
       if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
          console.log(`[subsumptionService] Primary fetch failed. Retrying with fallback URL using siteConfig.apiBaseUrl for nodeId: ${nodeId}`);
-         const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}`;
+         const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}&degree=${degree}`;
          console.log(`[subsumptionService] Attempting fallback fetch from: ${fallbackFetchUrl}`);
          response = await fetch(fallbackFetchUrl, { cache: 'no-store' });
 
@@ -300,7 +300,7 @@ export async function fetchNodeGraphData(nodeId: string, numNeighbors: number = 
     console.error(`[subsumptionService] Network Error (Primary) fetchNodeGraphData (nodeId: ${nodeId}, URL: ${primaryFetchUrl}):`, error.message, error);
     if (INTERNAL_API_HOST_URL !== siteConfig.apiBaseUrl && siteConfig.apiBaseUrl) {
       console.log(`[subsumptionService] Primary fetch network error. Retrying with fallback URL using siteConfig.apiBaseUrl for nodeId: ${nodeId}`);
-      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}`;
+      const fallbackFetchUrl = `${siteConfig.apiBaseUrl}/api/betweenness/node-graph?nodeId=${encodeURIComponent(nodeId)}&numNeighbors=${numNeighbors}&degree=${degree}`;
       console.log(`[subsumptionService] Attempting fallback fetch from: ${fallbackFetchUrl}`);
       try {
         const fallbackResponse = await fetch(fallbackFetchUrl, { cache: 'no-store' });

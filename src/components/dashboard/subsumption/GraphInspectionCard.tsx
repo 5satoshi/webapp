@@ -20,15 +20,17 @@ interface GraphInspectionCardProps {
 }
 
 const neighborCountOptions = Array.from({ length: 10 }, (_, i) => i + 1); // 1 to 10
+const degreeOptions = [1, 2]; // Degrees to support
 
 export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspectionCardProps) {
   const [is3D, setIs3D] = useState(false);
   const [numNeighbors, setNumNeighbors] = useState<number>(3);
+  const [degree, setDegree] = useState<number>(2);
   const [graphData, setGraphData] = useState<NodeGraphData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadGraphData = useCallback(async (nodeId: string, neighbors: number) => {
+  const loadGraphData = useCallback(async (nodeId: string, neighbors: number, degree: number) => {
     if (!nodeId) {
         setGraphData(null);
         setIsLoading(false);
@@ -37,11 +39,11 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
     setIsLoading(true);
     setError(null);
     try {
-      console.log(`GraphInspectionCard: Fetching graph data for ${nodeId} with ${neighbors} neighbors.`);
-      const data = await fetchNodeGraphData(nodeId, neighbors);
+      console.log(`GraphInspectionCard: Fetching graph data for ${nodeId} with ${neighbors} neighbors and degree ${degree}.`);
+      const data = await fetchNodeGraphData(nodeId, neighbors, degree);
       setGraphData(data);
       if (!data) {
-        console.warn(`GraphInspectionCard: No graph data returned for ${nodeId} with ${neighbors} neighbors.`);
+        console.warn(`GraphInspectionCard: No graph data returned for ${nodeId}.`);
       } else {
         console.log(`GraphInspectionCard: Received graph data. Nodes: ${data.nodes?.length}, Links: ${data.links?.length}`);
       }
@@ -55,13 +57,20 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
   }, []);
 
   useEffect(() => {
-    loadGraphData(centralNodeId, numNeighbors);
-  }, [centralNodeId, numNeighbors, loadGraphData]);
+    loadGraphData(centralNodeId, numNeighbors, degree);
+  }, [centralNodeId, numNeighbors, degree, loadGraphData]);
 
   const handleNumNeighborsChange = (value: string) => {
     const newNum = parseInt(value, 10);
     if (!isNaN(newNum) && newNum >= 1 && newNum <= 10) {
       setNumNeighbors(newNum);
+    }
+  };
+
+  const handleDegreeChange = (value: string) => {
+    const newDegree = parseInt(value, 10);
+    if (!isNaN(newDegree) && degreeOptions.includes(newDegree)) {
+      setDegree(newDegree);
     }
   };
   
@@ -82,7 +91,7 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
         <Info className="h-6 w-6 mb-2" />
         <AlertTitle>No Graph Data</AlertTitle>
         <AlertDescription>
-          No graph data could be generated for the selected node with {numNeighbors} neighbors. Try adjusting the number of neighbors or ensure the node has connections.
+          No graph data could be generated for the selected node with the current settings. Try adjusting the number of neighbors or degree.
         </AlertDescription>
       </Alert>
     );
@@ -107,10 +116,23 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
               Graph Inspection: {displayName}
             </CardTitle>
             <CardDescription>
-              Visualizing connections for the selected node. Select number of neighbors and view mode.
+              Visualizing connections for the selected node. Select number of neighbors, degree, and view mode.
             </CardDescription>
           </div>
           <div className="flex flex-col xs:flex-row items-start xs:items-center gap-4 pt-2 sm:pt-0">
+             <div className="flex items-center space-x-2">
+                <Label htmlFor="degree-select" className="text-sm whitespace-nowrap">Degree:</Label>
+                <Select value={String(degree)} onValueChange={handleDegreeChange}>
+                    <SelectTrigger id="degree-select" className="w-[70px] h-9">
+                        <SelectValue placeholder="Degree" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {degreeOptions.map(deg => (
+                            <SelectItem key={deg} value={String(deg)}>{deg}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
             <div className="flex items-center space-x-2">
                 <Label htmlFor="num-neighbors-select" className="text-sm whitespace-nowrap">Neighbors:</Label>
                 <Select value={String(numNeighbors)} onValueChange={handleNumNeighborsChange}>

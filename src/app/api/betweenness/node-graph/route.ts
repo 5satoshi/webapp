@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const centralNodeId = searchParams.get('nodeId');
     const numNeighborsParam = searchParams.get('numNeighbors');
+    const degreeParam = searchParams.get('degree');
 
     let numNeighbors = 3; // Default value
     if (numNeighborsParam) {
@@ -26,13 +27,23 @@ export async function GET(request: NextRequest) {
         numNeighbors = parsedNum;
       }
     }
+    
+    let maxDegree = 2; // Default degree
+    if (degreeParam) {
+        const parsedDegree = parseInt(degreeParam, 10);
+        if (!isNaN(parsedDegree) && parsedDegree > 0 && parsedDegree <= 2) { // Capped at 2 for now
+            maxDegree = parsedDegree;
+        }
+    }
 
     if (!centralNodeId) {
       return NextResponse.json({ error: 'nodeId parameter is required' }, { status: 400 });
     }
+    
+    const degreesToFetch = Array.from({ length: maxDegree }, (_, i) => i + 1).join(',');
 
     // Step 1: Call nearest-neighbors API
-    const neighborsUrl = `${baseUrl}/api/betweenness/nearest-neighbors?nodeId=${encodeURIComponent(centralNodeId)}&limit=${numNeighbors}&degrees=1,2`;
+    const neighborsUrl = `${baseUrl}/api/betweenness/nearest-neighbors?nodeId=${encodeURIComponent(centralNodeId)}&limit=${numNeighbors}&degrees=${degreesToFetch}`;
     console.log(`[API /api/betweenness/node-graph] Calling neighbors API: ${neighborsUrl}`);
     const neighborsResponse = await fetch(neighborsUrl, { cache: 'no-store' });
 
@@ -52,12 +63,23 @@ export async function GET(request: NextRequest) {
     // Add neighbors to the map and ID set
     neighborsResult.forEach(neighbor => {
         allNodeIds.add(neighbor.nodeId);
+        
+        let color = ACCENT_COLOR_HSL; // Default for 2nd degree and beyond
+        if (neighbor.degree === 1) {
+            color = SECONDARY_COLOR_HSL;
+        }
+        
+        let val = 2.5; // Default for 2nd degree and beyond
+        if (neighbor.degree === 1) {
+            val = 3.5;
+        }
+
         nodesMap.set(neighbor.nodeId, {
             id: neighbor.nodeId,
             name: `${neighbor.degree === 1 ? '1st: ' : '2nd: '}${neighbor.alias || `${neighbor.nodeId.substring(0, 8)}...`}`,
-            val: neighbor.degree === 1 ? 3.5 : 2.5,
+            val: val,
             isCentralNode: false,
-            color: neighbor.degree === 1 ? SECONDARY_COLOR_HSL : ACCENT_COLOR_HSL,
+            color: color,
         });
     });
 
