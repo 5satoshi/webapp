@@ -39,7 +39,7 @@ export function formatTimestampFromBQValue(timestampValue: string | null | undef
     }
     return format(date, "yyyy-MM-dd HH:mm:ss");
   } catch (e) {
-    console.warn("Failed to parse timestamp from BQ value:", timestampValue, e);
+    console.warn("Failed to parse timestamp from BQ value:", timestampValue, JSON.stringify(e));
     return null;
   }
 }
