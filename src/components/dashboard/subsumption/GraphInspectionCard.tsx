@@ -24,6 +24,7 @@ const degreeOptions = [1, 2, 3, 4, 5]; // Degrees to support
 
 export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspectionCardProps) {
   const [is3D, setIs3D] = useState(false);
+  const [showZeroShare, setShowZeroShare] = useState(true);
   const [numNeighbors, setNumNeighbors] = useState<number>(3);
   const [degree, setDegree] = useState<number>(2);
   const [graphData, setGraphData] = useState<NodeGraphData | null>(null);
@@ -101,6 +102,7 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
         rawGraphData={graphData}
         centralNodeId={centralNodeId}
         is3D={is3D}
+        showZeroShare={showZeroShare}
       />
     );
   }
@@ -116,10 +118,10 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
               Graph Inspection: {displayName}
             </CardTitle>
             <CardDescription>
-              Visualizing connections for the selected node. Select number of neighbors, degree, and view mode.
+              Visualize connections for the selected node. Adjust degree, neighbors, and view options.
             </CardDescription>
           </div>
-          <div className="flex flex-col xs:flex-row items-start xs:items-center gap-4 pt-2 sm:pt-0">
+          <div className="flex flex-col xs:flex-row items-start xs:items-center gap-4 pt-2 sm:pt-0 flex-wrap">
              <div className="flex items-center space-x-2">
                 <Label htmlFor="degree-select" className="text-sm whitespace-nowrap">Degree:</Label>
                 <Select value={String(degree)} onValueChange={handleDegreeChange}>
@@ -145,6 +147,15 @@ export function GraphInspectionCard({ centralNodeId, displayName }: GraphInspect
                         ))}
                     </SelectContent>
                 </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="zero-share-switch" className="text-sm whitespace-nowrap">Zero Share</Label>
+              <Switch
+                id="zero-share-switch"
+                checked={showZeroShare}
+                onCheckedChange={setShowZeroShare}
+                aria-label="Toggle zero-share links"
+              />
             </div>
             <div className="flex items-center space-x-2">
               <Label htmlFor="view-mode-switch" className="text-sm whitespace-nowrap">3D View</Label>

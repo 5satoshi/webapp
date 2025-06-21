@@ -25,6 +25,7 @@ interface NodeGraphVisualizationProps {
   rawGraphData: NodeGraphData | null;
   centralNodeId: string;
   is3D: boolean;
+  showZeroShare: boolean;
 }
 
 const MIN_LINK_WIDTH = 0.5;
@@ -34,6 +35,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
   centralNodeId,
   is3D,
+  showZeroShare,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const fgRef2D = useRef<FG2DMethods>();
@@ -102,7 +104,11 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     
     // Always render all nodes returned by the API
     const currentNodes = rawGraphData.nodes;
-    const visibleLinks = rawGraphData.links || [];
+    let visibleLinks = rawGraphData.links || [];
+    
+    if (!showZeroShare) {
+        visibleLinks = visibleLinks.filter(link => link.value > 0);
+    }
     
     let maxS = 0;
     if (visibleLinks.length > 0) {
@@ -116,7 +122,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
       links: visibleLinks,
       maxVisibleShare: maxS,
     };
-  }, [rawGraphData]);
+  }, [rawGraphData, showZeroShare]);
 
 
   const getNodeColor = useCallback((node: GraphNode) => {

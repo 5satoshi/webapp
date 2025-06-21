@@ -95,10 +95,9 @@ export async function GET(request: NextRequest) {
         color: PRIMARY_COLOR_HSL,
     });
     
-    // Step 3: Call top-edges API with a dynamic limit
+    // Step 3: Call top-edges API with a high limit to get all links
     const allNodeIdsString = Array.from(allNodeIds).join(',');
-    const edgesLimit = 2 * numNeighbors * (numNeighbors + 1);
-    const edgesUrl = `${baseUrl}/api/betweenness/top-edges?nodeIds=${encodeURIComponent(allNodeIdsString)}&limit=${edgesLimit}`;
+    const edgesUrl = `${baseUrl}/api/betweenness/top-edges?nodeIds=${encodeURIComponent(allNodeIdsString)}&limit=500`;
     console.log(`[API /api/betweenness/node-graph] Calling edges API: ${edgesUrl}`);
     const edgesResponse = await fetch(edgesUrl, { cache: 'no-store' });
 
