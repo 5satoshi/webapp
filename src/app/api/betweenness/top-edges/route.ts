@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     let limit = 25; // Default limit
     if (limitParam) {
       const parsedLimit = parseInt(limitParam, 10);
-      if (!isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 200) {
+      if (!isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 500) {
         limit = parsedLimit;
       }
     }
