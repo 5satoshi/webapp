@@ -10,9 +10,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full bg-muted/40">
         <MainSidebar />
-        <SidebarInset className="flex flex-col flex-1 overflow-hidden">
+        <SidebarInset className="flex flex-col flex-1 overflow-y-auto">
           <MainHeader />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <main className="flex-1 p-4 md:p-6 lg:p-8">
             {children}
           </main>
         </SidebarInset>
