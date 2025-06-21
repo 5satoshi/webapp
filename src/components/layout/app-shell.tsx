@@ -1,4 +1,3 @@
-
 'use client';
 import type React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -10,11 +9,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full bg-muted/40">
         <MainSidebar />
-        <SidebarInset className="flex flex-col flex-1 overflow-y-auto">
+        <SidebarInset className="flex flex-col flex-1">
           <MainHeader />
-          <main className="flex-1 p-4 md:p-6 lg:p-8">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
             {children}
-          </main>
+          </div>
         </SidebarInset>
       </div>
     </SidebarProvider>
