@@ -30,6 +30,8 @@ interface NodeGraphVisualizationProps {
 
 const MIN_LINK_WIDTH = 0.5;
 const MAX_VISUAL_LINK_WIDTH = 25.0; // The absolute max width in pixels.
+const MIN_PARTICLE_SPEED = 0.001;
+const MAX_PARTICLE_SPEED = 0.01;
 
 const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
   rawGraphData,
@@ -178,6 +180,15 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
     return Math.max(1, Math.ceil(normalized * MAX_PARTICLES));
   }, [maxVisibleShare]);
 
+  const getLinkParticleSpeed = useCallback((link: AppGraphLink) => {
+    if (maxVisibleShare === 0 || link.value === 0) {
+      return MIN_PARTICLE_SPEED;
+    }
+    const normalized = link.value / maxVisibleShare;
+    const speed = MIN_PARTICLE_SPEED + normalized * (MAX_PARTICLE_SPEED - MIN_PARTICLE_SPEED);
+    return speed;
+  }, [maxVisibleShare]);
+
 
   if (!hasMounted) {
     return <Skeleton className="h-[400px] w-full" />;
@@ -244,7 +255,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             linkColor={() => linkColor}
             linkWidth={getLinkWidth}
             linkDirectionalParticles={getLinkParticles}
-            linkDirectionalParticleSpeed={0.006}
+            linkDirectionalParticleSpeed={getLinkParticleSpeed}
             linkCurvature={0.1}
             cooldownTicks={150}
             onEngineStop={() => {
