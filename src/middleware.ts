@@ -1,19 +1,22 @@
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const botPatterns = [
-  // Common CMS login pages
-  /wp-login\.php/i,
+  // Comprehensive WordPress probes
   /wp-admin/i,
-  /user\/login/i,
-  /administrator/i,
-  // Common file extensions bots look for
-  /\.php$/i,
-  /\.env$/i,
-  /old-wp/i,
-  /wordpress/i,
-  // Other suspicious paths
+  /wp-content/i,
+  /wp-includes/i,
+  /wp-login\.php/i,
   /xmlrpc\.php/i,
+  
+  // Other CMS / common login paths
+  /administrator/i,
+  /user\/login/i,
+  
+  // Common file/path probes
+  /\.php$/i,
+  /\.env/i,
   /autodiscover\/autodiscover\.xml/i,
   /owa/i,
   /remote/i,
