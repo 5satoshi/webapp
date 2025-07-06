@@ -236,6 +236,7 @@ const NodeGraphVisualization: React.FC<NodeGraphVisualizationProps> = ({
             linkColor={() => linkColor}
             linkWidth={getLinkWidth}
             linkDirectionalParticles={getLinkParticles}
+            linkDirectionalParticleSpeed={getLinkParticleSpeed}
             linkDirectionalParticleWidth={3}
             backgroundColor={resolvedCardColor}
             onNodeHover={handleNodeHover}
