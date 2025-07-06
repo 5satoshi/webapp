@@ -104,24 +104,21 @@ export async function fetchHistoricalForwardingVolume(aggregationPeriod: string 
   }
 
   let dateGroupingExpression = "";
-  let limit = 20;
+  const limit = 20;
+
   switch (aggregationPeriod.toLowerCase()) {
     case 'week':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))";
-      limit = 12; // Approx 3 months
       break;
     case 'month':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
-      limit = 12; // 1 year
       break;
     case 'quarter':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), QUARTER)";
-      limit = 8; // 2 years
       break;
     case 'day':
     default:
       dateGroupingExpression = "DATE(received_time)";
-      limit = 30; // Approx 1 month
       break;
   }
 

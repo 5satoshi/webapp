@@ -2,9 +2,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from '@/services/bigqueryClient';
-import { formatDateFromBQ, getPeriodDateRange, logBigQueryError } from '@/lib/bigqueryUtils';
+import { formatDateFromBQ, logBigQueryError } from '@/lib/bigqueryUtils';
 import type { NetworkSubsumptionData } from '@/lib/types';
-import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, subMonths, subWeeks, subQuarters, startOfDay, endOfDay } from 'date-fns';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,23 +33,23 @@ export async function GET(request: NextRequest) {
     switch (aggregationPeriod.toLowerCase()) {
       case 'day': 
         datePeriodUnit = 'DAY';
-        queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+        queryStartDate = format(startOfDay(subDays(effectiveEndDate, 19)), "yyyy-MM-dd'T'HH:mm:ssXXX");
         break;
       case 'week': 
         datePeriodUnit = 'WEEK(MONDAY)';
-        queryStartDate = format(startOfDay(subDays(effectiveEndDate, (4 * 7) - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+        queryStartDate = format(startOfDay(subWeeks(effectiveEndDate, 19)), "yyyy-MM-dd'T'HH:mm:ssXXX");
         break;
       case 'month': 
         datePeriodUnit = 'MONTH';
-        queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 3 - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+        queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 19)), "yyyy-MM-dd'T'HH:mm:ssXXX");
         break;
       case 'quarter': 
         datePeriodUnit = 'QUARTER';
-        queryStartDate = format(startOfDay(subMonths(effectiveEndDate, 12 - 1)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+        queryStartDate = format(startOfDay(subQuarters(effectiveEndDate, 19)), "yyyy-MM-dd'T'HH:mm:ssXXX");
         break;
       default:
         datePeriodUnit = 'DAY';
-        queryStartDate = format(startOfDay(subDays(effectiveEndDate, 6)), "yyyy-MM-dd'T'HH:mm:ssXXX");
+        queryStartDate = format(startOfDay(subDays(effectiveEndDate, 19)), "yyyy-MM-dd'T'HH:mm:ssXXX");
         break;
     }
 

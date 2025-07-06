@@ -122,25 +122,21 @@ export async function fetchMedianAndMaxForwardingValueOverTime(aggregationPeriod
   }
 
   let dateGroupingExpression = "";
-  let limit = 20; 
+  const limit = 20; 
 
   switch (aggregationPeriod.toLowerCase()) {
     case 'week':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), WEEK(MONDAY))";
-      limit = 12; 
       break;
     case 'month':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), MONTH)";
-      limit = 12; 
       break;
     case 'quarter':
       dateGroupingExpression = "DATE_TRUNC(DATE(received_time), QUARTER)";
-      limit = 8; 
       break;
     case 'day':
     default:
       dateGroupingExpression = "DATE(received_time)";
-      limit = 30; 
       break;
   }
 
