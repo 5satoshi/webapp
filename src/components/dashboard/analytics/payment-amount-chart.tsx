@@ -5,11 +5,13 @@ import type { ForwardingAmountDistributionData, ForwardingValueOverTimeData } fr
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart";
+import { format as formatDateFns, parseISO, getQuarter, getWeek } from 'date-fns';
 
 interface PaymentAmountChartProps {
   distributionData: ForwardingAmountDistributionData[];
   forwardingValueData: ForwardingValueOverTimeData[];
   frequencyChartTitleLabel: string;
+  aggregationPeriod: string;
 }
 
 const distributionConfig = {
@@ -30,7 +32,27 @@ const valueOverTimeConfig = {
   }
 } satisfies ChartConfig;
 
-export function PaymentAmountChart({ distributionData, forwardingValueData, frequencyChartTitleLabel }: PaymentAmountChartProps) {
+const formatXAxisTick = (tickItem: string, aggregationPeriod: string) => {
+    try {
+      const dateObj = parseISO(tickItem);
+      switch (aggregationPeriod.toLowerCase()) {
+        case 'day':
+          return formatDateFns(dateObj, 'MMM d');
+        case 'week':
+          return `W${getWeek(dateObj, { weekStartsOn: 1 })}`;
+        case 'month':
+          return formatDateFns(dateObj, 'MMM');
+        case 'quarter':
+          return `Q${getQuarter(dateObj)}`;
+        default:
+          return formatDateFns(dateObj, 'MMM d');
+      }
+    } catch (e) {
+      return tickItem;
+    }
+};
+
+export function PaymentAmountChart({ distributionData, forwardingValueData, frequencyChartTitleLabel, aggregationPeriod }: PaymentAmountChartProps) {
   
   let yAxisDomainForValueChart: [number, number] = [1, 1000]; // Default fallback
 
@@ -130,7 +152,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
                     tickLine={false} 
                     axisLine={false} 
                     tickMargin={8}
-                    tickFormatter={(value) => new Date(value + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    tickFormatter={(value) => formatXAxisTick(value, aggregationPeriod)}
                     className="text-xs" 
                 />
                 <YAxis
@@ -166,7 +188,7 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
                       )}
                       labelFormatter={(label, payload) => {
                          if (payload && payload.length > 0 && payload[0].payload.date) {
-                           return <div className="font-medium">{new Date(payload[0].payload.date + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>;
+                           return <div className="font-medium">{formatDateFns(parseISO(payload[0].payload.date), 'MMM d, yyyy')}</div>;
                          }
                          return label;
                        }}
@@ -183,4 +205,3 @@ export function PaymentAmountChart({ distributionData, forwardingValueData, freq
     </div>
   );
 }
-

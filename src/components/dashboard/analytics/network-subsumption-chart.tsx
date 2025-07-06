@@ -5,9 +5,11 @@ import type { NetworkSubsumptionData } from '@/lib/types';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart";
+import { format as formatDateFns, parseISO, getQuarter, getWeek } from 'date-fns';
 
 interface NetworkSubsumptionChartProps {
   data: NetworkSubsumptionData[];
+  aggregationPeriod: string;
 }
 
 const chartConfig = {
@@ -16,7 +18,27 @@ const chartConfig = {
   macro: { label: "Macro (4M sats)", color: "hsl(var(--chart-3))" },
 } satisfies ChartConfig;
 
-export function NetworkSubsumptionChart({ data }: NetworkSubsumptionChartProps) {
+const formatXAxisTick = (tickItem: string, aggregationPeriod: string) => {
+  try {
+    const dateObj = parseISO(tickItem);
+    switch (aggregationPeriod.toLowerCase()) {
+      case 'day':
+        return formatDateFns(dateObj, 'MMM d');
+      case 'week':
+        return `W${getWeek(dateObj, { weekStartsOn: 1 })}`;
+      case 'month':
+        return formatDateFns(dateObj, 'MMM');
+      case 'quarter':
+        return `Q${getQuarter(dateObj)}`;
+      default:
+        return formatDateFns(dateObj, 'MMM d');
+    }
+  } catch (e) {
+    return tickItem;
+  }
+};
+
+export function NetworkSubsumptionChart({ data, aggregationPeriod }: NetworkSubsumptionChartProps) {
   if (!data || data.length === 0) {
     return <div className="text-center text-muted-foreground p-4 h-[300px] flex items-center justify-center">No shortest path share data available.</div>;
   }
@@ -31,7 +53,7 @@ export function NetworkSubsumptionChart({ data }: NetworkSubsumptionChartProps) 
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            tickFormatter={(value) => formatXAxisTick(value, aggregationPeriod)}
             className="text-xs"
           />
           <YAxis
@@ -48,7 +70,7 @@ export function NetworkSubsumptionChart({ data }: NetworkSubsumptionChartProps) 
                 indicator="line" 
                 labelFormatter={(_, payload) => {
                   if (payload && payload.length > 0) {
-                    return <div className="font-medium">{new Date(payload[0].payload.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>;
+                    return <div className="font-medium">{formatDateFns(parseISO(payload[0].payload.date), 'PPPP')}</div>;
                   }
                   return null;
                 }}

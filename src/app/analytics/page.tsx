@@ -89,6 +89,7 @@ export default async function AnalyticsPage({
             distributionData={forwardingDistributionData}
             forwardingValueData={forwardingValueData}
             frequencyChartTitleLabel={chartTitlePeriodLabel}
+            aggregationPeriod={currentAggregation}
           />
 
           <Separator />

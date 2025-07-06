@@ -211,7 +211,7 @@ export default async function SubsumptionPage({
             <p className="text-sm text-muted-foreground mb-4">
                 Historical trend of the selected node's shortest path share for micro (200 sats), common (50k sats), and macro (4M sats) payments over the {descriptiveLabel.toLowerCase()}.
             </p>
-            <NetworkSubsumptionChart data={nodeTimelineData} />
+            <NetworkSubsumptionChart data={nodeTimelineData} aggregationPeriod={currentAggregation} />
             <p className="text-xs text-muted-foreground pt-1">
               This chart visualizes the likelihood of the selected node being part of the cheapest path for different payment sizes over the selected period. A higher percentage suggests better positioning and fee competitiveness for those transaction types. Fluctuations can indicate changes in network topology, fee strategies of other nodes, or the node's own channel management.
             </p>

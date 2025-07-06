@@ -5,7 +5,7 @@ import type { TimeSeriesData } from '@/lib/types';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
 import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, ComposedChart } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart"
-import { format as formatDateFns, parseISO, getQuarter } from 'date-fns';
+import { format as formatDateFns, parseISO, getQuarter, getWeek } from 'date-fns';
 
 interface SampleOverviewChartProps {
   data: TimeSeriesData[];
@@ -25,23 +25,21 @@ const chartConfig = {
 
 const formatXAxisTick = (tickItem: string, aggregationPeriod: string) => {
   try {
-    const dateObj = parseISO(tickItem); 
+    const dateObj = parseISO(tickItem);
     switch (aggregationPeriod.toLowerCase()) {
       case 'day':
         return formatDateFns(dateObj, 'MMM d');
       case 'week':
-        return formatDateFns(dateObj, 'MMM d'); 
+        return `W${getWeek(dateObj, { weekStartsOn: 1 })}`;
       case 'month':
-        return formatDateFns(dateObj, 'MMM yy');
+        return formatDateFns(dateObj, 'MMM');
       case 'quarter':
-        const quarter = getQuarter(dateObj);
-        return `Q${quarter} ${formatDateFns(dateObj, 'yy')}`;
+        return `Q${getQuarter(dateObj)}`;
       default:
         return formatDateFns(dateObj, 'MMM d');
     }
   } catch (e) {
-    // console.error("Error formatting date for X-axis:", tickItem, e);
-    return tickItem; 
+    return tickItem;
   }
 };
 
@@ -105,7 +103,7 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
                 }}
                  labelFormatter={(label, payload) => {
                   if (payload && payload.length > 0 && payload[0].payload.date) {
-                    return <div className="font-medium">{formatXAxisTick(payload[0].payload.date, aggregationPeriod)}</div>;
+                    return <div className="font-medium">{formatDateFns(parseISO(payload[0].payload.date), 'MMM d, yyyy')}</div>;
                   }
                   return label;
                 }}
@@ -135,4 +133,3 @@ export function SampleOverviewChart({ data, aggregationPeriod }: SampleOverviewC
     </div>
   );
 }
-
