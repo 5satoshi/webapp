@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useEffect, useRef } from 'react';
 import { PageTitle } from '@/components/ui/page-title';
-import { Card, CardContent } from '@/components/ui/card'; // Added Card and CardContent for consistent styling
+import { Card, CardContent } from '@/components/ui/card';
 
 // SwaggerUIInitializer component updated to handle multiple spec URLs
 const SwaggerUIInitializer = () => {
@@ -12,11 +11,10 @@ const SwaggerUIInitializer = () => {
 
   useEffect(() => {
     // Dynamically import SwaggerUIBundle to ensure it runs client-side
-    import('swagger-ui-dist/swagger-ui-bundle.js').then(module => {
-      const SwaggerUIBundle = module.default || module;
-      if (SwaggerUIBundle && swaggerUIRoot.current && !swaggerUIInstance.current) {
+    import('swagger-ui-dist').then(swaggerUI => {
+      if (swaggerUIRoot.current && !swaggerUIInstance.current) {
         // Initialize with multiple spec URLs
-        swaggerUIInstance.current = SwaggerUIBundle({
+        swaggerUIInstance.current = swaggerUI.SwaggerUIBundle({
           dom_id: '#swagger-ui-container', // Matches the div id
           urls: [
             { url: "/api/openapi.yaml", name: "Local" },
@@ -24,13 +22,13 @@ const SwaggerUIInitializer = () => {
           ],
           "urls.primaryName": "Local", // Default selection
           presets: [
-            SwaggerUIBundle.presets.apis,
-            SwaggerUIBundle.StandalonePreset // This is the preset that provides the layout
+            swaggerUI.SwaggerUIBundle.presets.apis,
+            swaggerUI.SwaggerUIStandalonePreset
           ],
           plugins: [
-            SwaggerUIBundle.plugins.DownloadUrl
+            swaggerUI.SwaggerUIBundle.plugins.DownloadUrl
           ],
-          layout: "StandaloneLayout", // And this specifies to use it
+          layout: "StandaloneLayout",
           deepLinking: true,
         });
       }
