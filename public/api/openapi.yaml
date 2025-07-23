@@ -1,71 +1,62 @@
-openapi: 3.0.1
+openapi: 3.0.3
 info:
   title: Lightning Stats Dashboard API
   description: |-
-    This API provides access to pre-calculated network analysis data for the Lightning Stats Dashboard. The data is primarily sourced from a `betweenness` table in BigQuery, which contains metrics like betweenness centrality, shortest path share, and node rankings.
-
-    The API is designed to be used by the dashboard's frontend to populate various charts and data cards. It allows for querying top nodes, historical data for specific nodes, and network graph structures.
-  version: '1.0'
-servers:
-  - url: /
-    description: Local server
-  - url: https://5sats.com
-    description: Production server
+    This is the internal API for the Lightning Stats Dashboard.
+    It provides data related to network analysis, node statistics, and other metrics that power the frontend visualizations.
+    The API primarily queries a BigQuery backend.
+  version: 1.0.0
 tags:
-  - name: Betweenness Analysis
-    description: Endpoints for querying network graph analysis data like shortest path share and node rankings.
-
+  - name: Betweenness
+    description: APIs related to network betweenness centrality and shortest path analysis.
 paths:
   /api/betweenness/top-nodes:
     get:
-      tags:
-        - Betweenness Analysis
       summary: Get Top Nodes by Shortest Path Share
       description: |-
-        Retrieves a list of top-ranking nodes for 'micro', 'common', and 'macro' payment categories based on their latest shortest path share.
-        The response includes detailed stats (share and rank) for all three categories for each top node, which is useful for tooltips and comparative analysis.
+        Fetches a list of the top nodes based on their shortest path share for different payment size categories (micro, common, macro).
+        The primary data source is the `betweenness` table in BigQuery.
+      tags:
+        - Betweenness
       parameters:
         - name: limit
           in: query
-          description: The number of top nodes to return for each category.
           required: false
+          description: The number of top nodes to return for each category.
           schema:
             type: integer
             default: 3
             minimum: 1
-            maximum: 20
+            maximum: 10
       responses:
         '200':
-          description: A successful response containing the top nodes for each category.
+          description: A successful response with lists of top nodes for each category.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AllTopNodes'
         '500':
-          description: Internal Server Error if data fetching fails.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
+          description: Internal Server Error. Failed to fetch data from the backend.
   /api/betweenness/node-timeline:
     get:
-      tags:
-        - Betweenness Analysis
       summary: Get Node's Historical Shortest Path Share
-      description: Retrieves the historical shortest path share for a specific node over a given time period, aggregated by day, week, month, or quarter.
+      description: |-
+        Retrieves the historical timeline of a specific node's shortest path share across different payment categories.
+        Data is aggregated by the specified period (day, week, month, quarter).
+      tags:
+        - Betweenness
       parameters:
         - name: nodeId
           in: query
-          description: The public key (node ID) of the node to query.
           required: true
+          description: The public key (node ID) of the node to query.
           schema:
             type: string
-            example: '03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69'
+            example: "03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69"
         - name: aggregation
           in: query
-          description: The time period to aggregate the data by.
           required: false
+          description: The time period to aggregate the data by.
           schema:
             type: string
             enum: [day, week, month, quarter]
@@ -80,36 +71,29 @@ paths:
                 items:
                   $ref: '#/components/schemas/NetworkSubsumptionData'
         '400':
-          description: Bad Request if the `nodeId` parameter is missing.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          description: Bad Request. The 'nodeId' parameter is missing.
         '500':
-          description: Internal Server Error if data fetching fails.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
+          description: Internal Server Error.
   /api/betweenness/node-ranks:
     get:
+      summary: Get Node Ranks and Share Changes
+      description: |-
+        Fetches the latest network rank and the change in rank for a specific node over a given aggregation period.
+        It also includes the latest and previous shortest path share values used for comparison.
       tags:
-        - Betweenness Analysis
-      summary: Get Node's Current Ranks and Changes
-      description: Retrieves the latest rank and share for a specific node across all payment categories, along with the change in rank compared to the start of the selected period.
+        - Betweenness
       parameters:
         - name: nodeId
           in: query
-          description: The public key (node ID) of the node to query.
           required: true
+          description: The public key (node ID) of the node to query.
           schema:
             type: string
-            example: '03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69'
+            example: "03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69"
         - name: aggregation
           in: query
-          description: The time period used to determine the start date for rank comparison.
           required: false
+          description: The period over which to calculate the rank change.
           schema:
             type: string
             enum: [day, week, month, quarter]
@@ -122,40 +106,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/OurNodeRanksForAllCategories'
         '400':
-          description: Bad Request if the `nodeId` parameter is missing.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          description: Bad Request. The 'nodeId' parameter is missing.
         '500':
-          description: Internal Server Error if data fetching fails.
+          description: Internal Server Error.
+  /api/betweenness/channel-drain:
+    get:
+      summary: Get In/Out Share and Drain for Channels
+      description: |
+        Calculates and returns the inbound share, outbound share, and liquidity drain for a given list of short channel IDs.
+        Drain is calculated as log((in_share + epsilon) / (out_share + epsilon)), providing insight into liquidity flow.
+      tags:
+        - Betweenness
+      parameters:
+        - name: shortChannelIds
+          in: query
+          required: true
+          description: A comma-separated list of short channel IDs to retrieve drain information for.
+          schema:
+            type: string
+            example: "535050x927x0,545062x30x0"
+      responses:
+        '200':
+          description: A successful response with the drain data for the requested channels. The keys of the object are the short channel IDs.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/betweenness/node-graph:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/ChannelDrain'
+                example:
+                  "535050x927x0":
+                    in_share: 0.0012
+                    out_share: 0.0008
+                    drain: 0.405
+                  "545062x30x0":
+                    in_share: 0.0005
+                    out_share: 0.0015
+                    drain: -1.098
+        '400':
+          description: Bad Request. The 'shortChannelIds' parameter is missing or empty.
+        '500':
+          description: Internal Server Error.
+  /api/betweenness/neighbor-graph:
     get:
-      tags:
-        - Betweenness Analysis
-      summary: Get Node Graph Data (Orchestrator)
+      summary: Discover and Get a Node's Neighbor Graph
       description: |-
-        Orchestrates calls to other APIs to construct a graph of a central node and its neighbors.
-        1. It iteratively calls `/api/betweenness/nearest-neighbors` to discover nodes up to a specified `degree`.
-        2. It then calls `/api/betweenness/top-edges` with all discovered node IDs to get the connections between them.
-        This endpoint is what the frontend's Graph Inspection Card should call.
+        This is a high-level API that orchestrates graph discovery. It starts with a central node and discovers its neighbors based on shortest path share, up to a specified degree of separation.
+        It determines the full list of nodes for the graph and then calls the `/api/betweenness/node-graph` worker API to get the final graph structure.
+      tags:
+        - Betweenness
       parameters:
         - name: nodeId
           in: query
-          description: The public key (node ID) of the central node for the graph.
           required: true
+          description: The public key (node ID) of the central node to start the graph from.
           schema:
             type: string
-            example: '03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69'
+            example: "03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69"
         - name: numNeighbors
           in: query
-          description: The number of nearest neighbors to fetch for each node at each degree level.
           required: false
+          description: The number of top neighbors to fetch for each node at each degree.
           schema:
             type: integer
             default: 3
@@ -163,8 +174,8 @@ paths:
             maximum: 10
         - name: degree
           in: query
-          description: The number of degrees (levels) of neighbors to fetch out from the central node.
           required: false
+          description: The degrees of separation to explore out from the central node.
           schema:
             type: integer
             default: 2
@@ -172,144 +183,63 @@ paths:
             maximum: 5
       responses:
         '200':
-          description: A successful response containing the nodes and links for the graph visualization.
+          description: A successful response containing the nodes and links for the discovered graph.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeGraphData'
         '400':
-          description: Bad Request if `nodeId` is missing.
+          description: Bad Request. The 'nodeId' parameter is missing.
         '500':
-          description: Internal Server Error if data fetching or orchestration fails.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/betweenness/nearest-neighbors:
+          description: Internal Server Error, often due to failures in fetching data from underlying APIs or BigQuery.
+  /api/betweenness/node-graph:
     get:
+      summary: Get Graph Data for a Specific List of Nodes
+      description: |-
+        This is a low-level worker API that takes a specific list of node IDs and constructs the graph data for them.
+        It fetches node details (like aliases) and all links that exist between the provided nodes.
       tags:
-        - Betweenness Analysis
-      summary: Get Nearest Neighbors for a List of Nodes
-      description: Retrieves the top N immediate (1st degree) neighbors for a given list of nodes, based on 'common' shortest path share. This is a utility endpoint called by the `node-graph` orchestrator.
+        - Betweenness
       parameters:
         - name: nodeIds
           in: query
-          description: A comma-separated list of node IDs to find neighbors for.
           required: true
+          description: A comma-separated list of node IDs to include in the graph.
           schema:
             type: string
-            example: '03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69,02f1a8c87607f415c8f22c00593121b2603d15413f283fe43c7d6d8436173f48b4'
-        - name: limit
-          in: query
-          description: The maximum number of neighbors to return for *each* source node in the `nodeIds` list.
-          required: false
-          schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 100
+            example: "03fe8461ebc025880b58021c540e0b7782bb2bcdc99da9822f5c6d2184a59b8f69,02df5ffe895c73522194514755452d3345335e4e943485984949a20ba9652c92c3"
       responses:
         '200':
-          description: A successful response containing an aggregated list of unique neighbors.
+          description: A successful response containing the nodes and links for the specified graph.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    nodeId:
-                      type: string
-                      description: The node ID of the neighbor.
-                    share:
-                      type: number
-                      format: float
-                      description: The highest shortest path share value connecting this neighbor to any of the source nodes.
+                $ref: '#/components/schemas/NodeGraphData'
         '400':
-          description: Bad Request if `nodeIds` parameter is missing or empty.
+          description: Bad Request. The 'nodeIds' parameter is missing or empty.
         '500':
-          description: Internal Server Error if data fetching fails.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/betweenness/top-edges:
-    get:
-      tags:
-        - Betweenness Analysis
-      summary: Get Top Edges Between a Set of Nodes
-      description: Retrieves the connections (edges) that exist between a given set of nodes, ordered by 'common' shortest path share. This is a utility endpoint called by the `node-graph` orchestrator.
-      parameters:
-        - name: nodeIds
-          in: query
-          description: A comma-separated list of node IDs for which to find edges.
-          required: true
-          schema:
-            type: string
-        - name: limit
-          in: query
-          description: The maximum number of edges to return.
-          required: false
-          schema:
-            type: integer
-            default: 500
-            minimum: 1
-            maximum: 500
-      responses:
-        '200':
-          description: A successful response containing a list of edges.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    source:
-                      type: string
-                    destination:
-                      type: string
-                    share:
-                      type: number
-                      format: float
-        '400':
-          description: Bad Request if `nodeIds` is missing or empty.
-        '500':
-          description: Internal Server Error if data fetching fails.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
+          description: Internal Server Error.
 components:
   schemas:
-    Error:
-      type: object
-      properties:
-        error:
-          type: string
-          description: A summary of the error.
-        details:
-          type: string
-          description: Additional details about the error.
-
     SingleCategoryTopNode:
       type: object
       properties:
         nodeid:
           type: string
+          description: The public key of the node.
         alias:
           type: string
           nullable: true
+          description: The advertised alias of the node.
         categoryShare:
           type: number
           format: float
           nullable: true
+          description: The shortest path share for the primary category being ranked.
         categoryRank:
           type: integer
           nullable: true
+          description: The rank for the primary category.
         microShare:
           type: number
           format: float
@@ -331,7 +261,6 @@ components:
         macroRank:
           type: integer
           nullable: true
-
     AllTopNodes:
       type: object
       properties:
@@ -347,26 +276,25 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SingleCategoryTopNode'
-
     NetworkSubsumptionData:
       type: object
       properties:
         date:
           type: string
           format: date
+          description: The start date of the aggregation period.
         micro:
           type: number
           format: float
-          description: Percentage share for micro payments.
+          description: The shortest path share percentage for micro-transactions.
         common:
           type: number
           format: float
-          description: Percentage share for common payments.
+          description: The shortest path share percentage for common-transactions.
         macro:
           type: number
           format: float
-          description: Percentage share for macro payments.
-
+          description: The shortest path share percentage for macro-transactions.
     OurNodeCategoryRank:
       type: object
       properties:
@@ -376,7 +304,7 @@ components:
         rankChange:
           type: integer
           nullable: true
-          description: Change in rank from the start of the period. Negative is better.
+          description: Change in rank compared to the start of the period. Negative is better.
         latestShare:
           type: number
           format: float
@@ -385,7 +313,6 @@ components:
           type: number
           format: float
           nullable: true
-
     OurNodeRanksForAllCategories:
       type: object
       properties:
@@ -395,7 +322,22 @@ components:
           $ref: '#/components/schemas/OurNodeCategoryRank'
         macro:
           $ref: '#/components/schemas/OurNodeCategoryRank'
-
+    ChannelDrain:
+      type: object
+      properties:
+        in_share:
+          type: number
+          format: float
+          description: The inbound shortest path share for the channel.
+        out_share:
+          type: number
+          format: float
+          description: The outbound shortest path share for the channel.
+        drain:
+          type: number
+          format: float
+          nullable: true
+          description: The calculated liquidity drain. Positive values indicate inbound flow, negative values indicate outbound flow.
     GraphNode:
       type: object
       properties:
@@ -404,30 +346,28 @@ components:
           description: The node's public key.
         name:
           type: string
-          description: The node's alias or a formatted, truncated ID.
+          description: The display name (alias or truncated ID).
         val:
           type: number
-          description: A value used to determine the node's size in the visualization.
+          description: A value used for sizing the node in the visualization.
         isCentralNode:
           type: boolean
         color:
           type: string
-          description: The HSL color string for the node.
-    
+          description: A HSL color string for the node.
     GraphLink:
       type: object
       properties:
         source:
           type: string
-          description: The source node ID of the link.
+          description: The node ID of the link's source.
         target:
           type: string
-          description: The target node ID of the link.
+          description: The node ID of the link's target.
         value:
           type: number
           format: float
-          description: The shortest path share value for this link.
-
+          description: The shortest path share value, used for visual weighting.
     NodeGraphData:
       type: object
       properties:
@@ -439,5 +379,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GraphLink'
-
-    
+            
+  x-logo:
+    url: "/logo.svg"
+    altText: "5satoshi Logo"
+```
