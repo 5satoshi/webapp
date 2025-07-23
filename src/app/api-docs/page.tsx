@@ -24,6 +24,7 @@ const SwaggerUIInitializer = () => {
           "urls.primaryName": "Local", // Default selection
           presets: [
             SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.StandalonePreset // Add the Standalone preset
           ],
           deepLinking: true,
           layout: "StandaloneLayout",
