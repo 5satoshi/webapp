@@ -4,26 +4,30 @@
 import { useEffect, useRef } from 'react';
 import { PageTitle } from '@/components/ui/page-title';
 
-// SwaggerUIInitializer component remains the same internally
+// SwaggerUIInitializer component updated to handle multiple spec URLs
 const SwaggerUIInitializer = () => {
   const swaggerUIRoot = useRef<HTMLDivElement>(null);
+  const swaggerUIInstance = useRef<any>(null);
 
   useEffect(() => {
     // Dynamically import SwaggerUIBundle to ensure it runs client-side
     import('swagger-ui-dist/swagger-ui-bundle.js').then(module => {
       const SwaggerUIBundle = module.default || module;
-      if (SwaggerUIBundle && swaggerUIRoot.current) {
-        // Ensure the container is empty before initializing to prevent duplicates
-        if (swaggerUIRoot.current.innerHTML === '') {
-          SwaggerUIBundle({
-            url: "/api/openapi.yaml", // Path to your OpenAPI spec in the public directory
-            dom_id: '#swagger-ui-container', // Matches the div id
-            presets: [
-              SwaggerUIBundle.presets.apis,
-            ],
-            deepLinking: true,
-          });
-        }
+      if (SwaggerUIBundle && swaggerUIRoot.current && !swaggerUIInstance.current) {
+        // Initialize with multiple spec URLs
+        swaggerUIInstance.current = SwaggerUIBundle({
+          dom_id: '#swagger-ui-container', // Matches the div id
+          urls: [
+            { url: "/api/openapi.yaml", name: "Local" },
+            { url: "https://5sats.com/api/openapi.yaml", name: "Production (5sats.com)" }
+          ],
+          "urls.primaryName": "Local", // Default selection
+          presets: [
+            SwaggerUIBundle.presets.apis,
+          ],
+          deepLinking: true,
+          layout: "StandaloneLayout",
+        });
       }
     }).catch(error => {
       console.error("Failed to load Swagger UI Bundle:", error);
@@ -32,17 +36,10 @@ const SwaggerUIInitializer = () => {
       }
     });
 
-    // Cleanup function
-    return () => {
-      if (swaggerUIRoot.current) {
-        // Clear the container's content when the component unmounts or effect re-runs
-        swaggerUIRoot.current.innerHTML = '';
-      }
-    };
-  }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount
+  }, []); // Empty dependency array ensures this runs once on mount
 
   // Added minHeight to ensure the container is not collapsed
-  return <div id="swagger-ui-container" ref={swaggerUIRoot} style={{ minHeight: '600px' }}></div>;
+  return <div id="swagger-ui-container" ref={swaggerUIRoot} style={{ minHeight: '800px' }}></div>;
 };
 
 
@@ -59,7 +56,7 @@ export default function ApiDocsPage() {
       <div className="space-y-6">
         <PageTitle
           title="API Reference"
-          description="Explore the available API endpoints for the Lightning Stats Dashboard."
+          description="Explore the available API endpoints for the Lightning Stats Dashboard. Select a definition to view the local or production API specification."
         />
         <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
           <SwaggerUIInitializer />
