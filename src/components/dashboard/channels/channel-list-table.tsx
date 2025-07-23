@@ -17,16 +17,18 @@ import { useState, useMemo } from 'react';
 import { Progress } from "@/components/ui/progress";
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { ChannelDetailModal } from './channel-detail-modal'; // Import the modal
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface ChannelListTableProps {
   channels: Channel[];
 }
 
-type SortableChannelKeys = 'peerDisplay' | 'capacity' | 'localBalancePercent' | 'historicalPaymentSuccessRate' | 'status';
+type SortableChannelKeys = 'peerDisplay' | 'capacity' | 'localBalancePercent' | 'historicalPaymentSuccessRate' | 'status' | 'drain';
 
 export function ChannelListTable({ channels: initialChannels }: ChannelListTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: SortableChannelKeys; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableChannelKeys; direction: 'ascending' | 'descending' } | null>({ key: 'drain', direction: 'descending' });
 
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -49,8 +51,8 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
     let sortableItems = [...filteredChannels];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
-        let aValue: string | number = '';
-        let bValue: string | number = '';
+        let aValue: string | number | null | undefined = '';
+        let bValue: string | number | null | undefined = '';
 
         switch (sortConfig.key) {
           case 'peerDisplay':
@@ -75,7 +77,14 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
             aValue = a.status.toLowerCase();
             bValue = b.status.toLowerCase();
             break;
+          case 'drain':
+            aValue = a.drain ?? -Infinity;
+            bValue = b.drain ?? -Infinity;
+            break;
         }
+
+        if (aValue === null || aValue === undefined) aValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
+        if (bValue === null || bValue === undefined) bValue = sortConfig.direction === 'ascending' ? Infinity : -Infinity;
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           if (aValue < bValue) {
@@ -178,6 +187,23 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                     </div>
                   </TableHead>
                   <TableHead 
+                    onClick={() => requestSort('drain')} 
+                    className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
+                  >
+                     <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <div className="flex items-center justify-end">
+                            Drain {getSortIcon('drain')}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Positive values indicate inbound flow, negative values indicate outbound flow.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead 
                     onClick={() => requestSort('historicalPaymentSuccessRate')} 
                     className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
                   >
@@ -198,7 +224,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
               <TableBody>
                 {sortedChannels.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       No channels found matching your filter criteria.
                     </TableCell>
                   </TableRow>
@@ -208,6 +234,10 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                     const localBalancePercent = totalBalance > 0 ? (channel.localBalance / totalBalance) * 100 : 0;
                     const displayPeer = getPeerDisplay(channel);
                     const tooltipTitle = channel.peerAlias ? `${channel.peerAlias} (${channel.peerNodeId})` : channel.peerNodeId;
+                    const drainValue = typeof channel.drain === 'number' ? channel.drain.toFixed(2) : 'N/A';
+                    const drainColor = typeof channel.drain === 'number'
+                      ? channel.drain > 0 ? 'text-green-600' : 'text-red-600'
+                      : 'text-muted-foreground';
 
                     return (
                       <TableRow 
@@ -227,6 +257,9 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                           <div className="text-xs text-muted-foreground">
                               {channel.localBalance.toLocaleString('en-US')} / {channel.remoteBalance.toLocaleString('en-US')}
                           </div>
+                        </TableCell>
+                        <TableCell className={cn("text-right font-mono", drainColor)}>
+                          {drainValue}
                         </TableCell>
                         <TableCell className="text-right">{channel.historicalPaymentSuccessRate.toFixed(1)}%</TableCell>
                         <TableCell>
@@ -252,4 +285,3 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
     </>
   );
 }
-

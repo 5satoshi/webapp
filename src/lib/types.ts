@@ -23,6 +23,7 @@ export interface Channel {
   historicalPaymentSuccessRate: number; 
   lastUpdate: string;
   status: 'active' | 'inactive' | 'pending';
+  drain?: number | null; // Calculated as log((in_share + epsilon) / (out_share + epsilon))
 }
 
 export interface AlertSetting {
