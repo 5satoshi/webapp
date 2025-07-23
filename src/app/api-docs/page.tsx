@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import { PageTitle } from '@/components/ui/page-title';
+import { Card, CardContent } from '@/components/ui/card'; // Added Card and CardContent for consistent styling
 
 // SwaggerUIInitializer component updated to handle multiple spec URLs
 const SwaggerUIInitializer = () => {
@@ -24,10 +25,13 @@ const SwaggerUIInitializer = () => {
           "urls.primaryName": "Local", // Default selection
           presets: [
             SwaggerUIBundle.presets.apis,
-            SwaggerUIBundle.StandalonePreset // Add the Standalone preset
+            SwaggerUIBundle.StandalonePreset // This is the preset that provides the layout
           ],
+          plugins: [
+            SwaggerUIBundle.plugins.DownloadUrl
+          ],
+          layout: "StandaloneLayout", // And this specifies to use it
           deepLinking: true,
-          layout: "StandaloneLayout",
         });
       }
     }).catch(error => {
@@ -59,9 +63,11 @@ export default function ApiDocsPage() {
           title="API Reference"
           description="Explore the available API endpoints for the Lightning Stats Dashboard. Select a definition to view the local or production API specification."
         />
-        <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
-          <SwaggerUIInitializer />
-        </div>
+        <Card>
+            <CardContent className="p-4 sm:p-6">
+                 <SwaggerUIInitializer />
+            </CardContent>
+        </Card>
       </div>
     </>
   );
