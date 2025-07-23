@@ -5,6 +5,10 @@ import type { Channel, ChannelDetails } from '@/lib/types';
 import { getBigQueryClient, ensureBigQueryClientInitialized, projectId, datasetId } from './bigqueryClient';
 import { formatTimestampFromBQValue, mapChannelStatus, logBigQueryError } from '@/lib/bigqueryUtils';
 import { specificNodeId } from '@/lib/constants';
+import { siteConfig } from '@/config/site';
+
+const INTERNAL_API_HOST_URL = process.env.INTERNAL_API_HOST || (typeof window === 'undefined' ? `http://localhost:${process.env.PORT || '9002'}` : siteConfig.apiBaseUrl) || siteConfig.apiBaseUrl;
+
 
 export async function fetchChannels(): Promise<Channel[]> {
   try {
@@ -53,15 +57,6 @@ export async function fetchChannels(): Promise<Channel[]> {
       )
       WHERE scid IS NOT NULL
       GROUP BY scid
-    ),
-    EdgeData AS (
-      SELECT
-        short_channel_id,
-        MAX(IF(source = @ourNodeId, shortest_path_share, 0)) AS out_share,
-        MAX(IF(destination = @ourNodeId, shortest_path_share, 0)) AS in_share
-      FROM \`${projectId}.${datasetId}.edge_betweenness\`
-      WHERE (source = @ourNodeId OR destination = @ourNodeId) AND type = 'common'
-      GROUP BY short_channel_id
     )
     SELECT
       p.id as peer_node_id,
@@ -73,18 +68,15 @@ export async function fetchChannels(): Promise<Channel[]> {
       p.state,
       la.alias AS peer_alias,
       COALESCE(cfs.successful_forwards, 0) as successful_forwards_count,
-      COALESCE(cfs.total_forwards, 0) as total_forwards_count,
-      ed.in_share,
-      ed.out_share
+      COALESCE(cfs.total_forwards, 0) as total_forwards_count
     FROM \`${projectId}.${datasetId}.peers\` p
     LEFT JOIN LatestAliases la ON p.id = la.nodeid AND la.rn = 1
     LEFT JOIN ChannelForwardingStats cfs ON p.short_channel_id = cfs.scid
-    LEFT JOIN EdgeData ed ON p.short_channel_id = ed.short_channel_id
     ORDER BY p.state, p.id
   `;
 
   try {
-    const [job] = await bigquery.createQueryJob({ query: query, params: { ourNodeId: specificNodeId } });
+    const [job] = await bigquery.createQueryJob({ query: query });
     const [rows] = await job.getQueryResults();
 
     if (!rows || rows.length === 0) {
@@ -113,15 +105,6 @@ export async function fetchChannels(): Promise<Channel[]> {
       } else {
         successRate = channelStatus === 'active' ? 100 : 0;
       }
-      
-      let drain: number | null = null;
-      const epsilon = 0.0001;
-      const inShare = row.in_share;
-      const outShare = row.out_share;
-      
-      if (typeof inShare === 'number' && typeof outShare === 'number') {
-        drain = Math.log((inShare + epsilon) / (outShare + epsilon));
-      }
 
       return {
         id: channelIdString,
@@ -134,8 +117,7 @@ export async function fetchChannels(): Promise<Channel[]> {
         status: channelStatus,
         historicalPaymentSuccessRate: successRate,
         lastUpdate: new Date().toISOString(), 
-        uptime: 0,
-        drain: drain,
+        drain: null, // Drain will be populated later
       };
     });
 
@@ -144,6 +126,26 @@ export async function fetchChannels(): Promise<Channel[]> {
     return [];
   }
 }
+
+export async function fetchChannelDrains(shortChannelIds: string[]): Promise<Record<string, { drain: number | null }>> {
+  if (shortChannelIds.length === 0) {
+    return {};
+  }
+  const fetchUrl = `${INTERNAL_API_HOST_URL}/api/betweenness/channel-drain?shortChannelIds=${shortChannelIds.join(',')}`;
+  
+  try {
+    const response = await fetch(fetchUrl, { cache: 'no-store' });
+    if (!response.ok) {
+      console.error(`API Error fetchChannelDrains (URL: ${fetchUrl}): ${response.status} ${response.statusText}`);
+      return {};
+    }
+    return await response.json();
+  } catch (error: any) {
+    console.error(`Network Error fetchChannelDrains (URL: ${fetchUrl}):`, error.message);
+    return {};
+  }
+}
+
 
 export async function fetchChannelDetails(shortChannelId: string): Promise<ChannelDetails | null> {
   const defaultReturn: ChannelDetails | null = null; // Or a default structure if preferred
