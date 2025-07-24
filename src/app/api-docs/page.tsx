@@ -18,7 +18,7 @@ const SwaggerUIInitializer = () => {
           dom_id: '#swagger-ui-container', // Matches the div id
           urls: [
             { url: "/api/openapi.yaml", name: "Local" },
-            { url: "/api/production-spec.yaml", name: "Production (5sats.com)" }
+            { url: "https://5sats.com/api/openapi.yaml", name: "Production (5sats.com)" }
           ],
           "urls.primaryName": "Local", // Default selection
           presets: [

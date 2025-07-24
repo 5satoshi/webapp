@@ -4,12 +4,7 @@ import type {NextConfig} from 'next';
 const nextConfig: NextConfig = {
   /* config options here */
   async rewrites() {
-    return [
-      {
-        source: '/api/production-spec.yaml',
-        destination: 'https://5sats.com/api/openapi.yaml',
-      },
-    ]
+    return []
   },
   typescript: {
     ignoreBuildErrors: true,
