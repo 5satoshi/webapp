@@ -47,6 +47,7 @@ nav:
     - 'Channels Page': 'channels.md'
     - 'Network Insights': 'network-insights.md'
     - 'Routing Analysis': 'routing-analysis.md'
+  - 'Releases': 'releases.md'
   # API Reference link removed as it's now internal to the Next.js app
 
 # Optional: Add plugins for more features

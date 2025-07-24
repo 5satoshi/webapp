@@ -17,6 +17,7 @@ This is the primary component of the page, displaying a sortable and filterable 
     - Peer Alias / Node ID
     - Capacity (sats)
     - Balance (Local/Remote %)
+    - Drain
     - Historical Payment Success Rate
     - Status
 - **Columns Displayed**:
@@ -26,6 +27,10 @@ This is the primary component of the page, displaying a sortable and filterable 
         - A progress bar visually represents the local balance percentage.
         - The text shows the local balance percentage (e.g., "60%").
         - Below, it shows the local and remote balance in satoshis (e.g., "600,000 / 400,000").
+    - **Drain**: This value indicates the net liquidity flow for the channel regarding its role in the cheapest paths for common-sized payments. It is calculated as the cubic root of the difference between the outbound and inbound shortest path shares (`cbrt(out_share - in_share)`).
+        - **Positive values** (in primary color, e.g., purple) indicate a net outbound flow, meaning the channel is "draining" liquidity away from your node.
+        - **Negative values** (in secondary color, e.g., orange) indicate a net inbound flow, meaning the channel is "refilling" your node.
+        - Hovering over the info icon in the header provides a definition.
     - **Historical Payment Success Rate**: The overall success rate of payments attempted through this channel (either inbound or outbound for the channel as a whole). This is based on forwarding history involving this channel.
     - **Status**: The current operational status of the channel (e.g., "active", "inactive", "pending"). Displayed as a badge with corresponding colors.
 
@@ -57,6 +62,7 @@ This modal appears when a channel row is clicked, providing more granular statis
 
 ## Data Interpretation
 - **Balance**: Monitor local/remote balance to understand liquidity distribution. Channels heavily skewed one way might be less effective for routing in the opposite direction.
+- **Drain**: Use this metric to understand the natural flow of liquidity. A high positive drain may require a fee adjustment to become less attractive for outbound payments, while a high negative drain might indicate an opportunity to lower fees to encourage more outbound flow.
 - **Success Rate**: A low historical success rate for a channel might indicate issues with the peer or insufficient capacity/liquidity for typical payment sizes.
 - **Status**: Keep an eye on channel statuses. "Inactive" or "pending" channels are not available for routing.
 - **Modal Details**: Use the modal to diagnose issues with specific channels, understand their transaction history, and see if earned fees justify their existence if they are problematic.
