@@ -75,13 +75,10 @@ export function NetworkSubsumptionChart({ data, aggregationPeriod }: NetworkSubs
                   return null;
                 }}
                 formatter={(value, name) => (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color }} />
-                      <span>{chartConfig[name as keyof typeof chartConfig]?.label}: <strong>{value}%</strong></span>
-                    </div>
-                    {name === "micro" && <p className="text-xs text-muted-foreground pt-1">Shortest Path Share: How often this node is part of the cheapest route for a given payment size.</p>}
-                  </>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color }} />
+                    <span>{chartConfig[name as keyof typeof chartConfig]?.label}: <strong>{value}%</strong></span>
+                  </div>
                 )}
               />
             }
