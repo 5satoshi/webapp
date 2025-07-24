@@ -131,7 +131,8 @@ export function NodeSelectorForm({ currentAggregation, initialNodeId }: NodeSele
           type="text"
           value={nodeInput}
           onChange={(e) => setNodeInput(e.target.value)}
-          onFocus={() => {
+          onFocus={(e) => {
+            e.currentTarget.select();
             if (nodeInput.trim().length >= 2) {
               if (suggestions.length > 0) {
                  setShowSuggestions(true);
