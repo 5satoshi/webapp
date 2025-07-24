@@ -56,12 +56,13 @@ export async function GET(request: NextRequest) {
     rows.forEach((row: any) => {
       const inShare = Number(row.in_share || 0);
       const outShare = Number(row.out_share || 0);
-      const drain: number = outShare - inShare;
+      const difference = outShare - inShare;
+      const drain = Math.cbrt(difference);
 
       result[row.short_channel_id] = {
         in_share: inShare,
         out_share: outShare,
-        drain: drain
+        drain: drain,
       };
     });
 
