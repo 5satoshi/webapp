@@ -198,7 +198,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Positive values indicate inbound flow, negative values indicate outbound flow.</p>
+                          <p>out_share - in_share. Positive: net outbound. Negative: net inbound.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -236,7 +236,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                     const tooltipTitle = channel.peerAlias ? `${channel.peerAlias} (${channel.peerNodeId})` : channel.peerNodeId;
                     const drainValue = typeof channel.drain === 'number' ? channel.drain.toFixed(2) : 'N/A';
                     const drainColor = typeof channel.drain === 'number'
-                      ? channel.drain > 0 ? 'text-green-600' : 'text-red-600'
+                      ? channel.drain > 0 ? 'text-red-600' : 'text-green-600'
                       : 'text-muted-foreground';
 
                     return (

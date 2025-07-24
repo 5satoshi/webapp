@@ -51,16 +51,12 @@ export async function GET(request: NextRequest) {
     });
     const [rows] = await job.getQueryResults();
 
-    const epsilon = 0.0001;
     const result: Record<string, { in_share: number; out_share: number; drain: number | null }> = {};
 
     rows.forEach((row: any) => {
       const inShare = Number(row.in_share || 0);
       const outShare = Number(row.out_share || 0);
-      let drain: number | null = null;
-      if (inShare + epsilon > 0 && outShare + epsilon > 0) {
-        drain = Math.log((inShare + epsilon) / (outShare + epsilon));
-      }
+      const drain: number = outShare - inShare;
 
       result[row.short_channel_id] = {
         in_share: inShare,
