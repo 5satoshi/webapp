@@ -54,16 +54,27 @@ export async function GET(request: NextRequest) {
     const result: Record<string, { in_share: number; out_share: number; drain: number | null }> = {};
 
     rows.forEach((row: any) => {
-      const inShare = Number(row.in_share || 0);
-      const outShare = Number(row.out_share || 0);
-      const difference = outShare - inShare;
-      const drain = Math.cbrt(difference);
+      const inShareExists = row.in_share !== null && row.in_share !== undefined;
+      const outShareExists = row.out_share !== null && row.out_share !== undefined;
 
-      result[row.short_channel_id] = {
-        in_share: inShare,
-        out_share: outShare,
-        drain: drain,
-      };
+      if (!inShareExists && !outShareExists) {
+        result[row.short_channel_id] = {
+          in_share: 0,
+          out_share: 0,
+          drain: null, // Both missing, drain is N/A
+        };
+      } else {
+        const inShare = Number(row.in_share || 0);
+        const outShare = Number(row.out_share || 0);
+        const difference = outShare - inShare;
+        const drain = Math.cbrt(difference);
+
+        result[row.short_channel_id] = {
+          in_share: inShare,
+          out_share: outShare,
+          drain: drain,
+        };
+      }
     });
 
     return NextResponse.json(result);
