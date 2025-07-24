@@ -200,7 +200,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                             </div>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
-                            <p>
+                            <p className="text-muted-foreground">
                               The <strong>Drain</strong> value indicates net liquidity flow. It is the cubic root of the difference between outbound and inbound path shares. Positive values are outbound; negative are inbound.
                             </p>
                           </TooltipContent>
