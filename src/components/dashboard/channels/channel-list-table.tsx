@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo } from 'react';
 import { Progress } from "@/components/ui/progress";
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Info } from 'lucide-react';
 import { ChannelDetailModal } from './channel-detail-modal'; // Import the modal
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -190,18 +190,23 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                     onClick={() => requestSort('drain')} 
                     className="text-right cursor-pointer hover:bg-muted/50 transition-colors"
                   >
-                     <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                           <div className="flex items-center justify-end">
-                            Drain {getSortIcon('drain')}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>out_share - in_share. Positive: net outbound. Negative: net inbound.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                     <div className="flex items-center justify-end">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-help">
+                              Drain
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Cubic root of (out_share - in_share).</p>
+                            <p>Positive: net outbound. Negative: net inbound.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {getSortIcon('drain')}
+                    </div>
                   </TableHead>
                   <TableHead 
                     onClick={() => requestSort('historicalPaymentSuccessRate')} 
@@ -236,7 +241,7 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                     const tooltipTitle = channel.peerAlias ? `${channel.peerAlias} (${channel.peerNodeId})` : channel.peerNodeId;
                     const drainValue = typeof channel.drain === 'number' ? channel.drain.toFixed(2) : 'N/A';
                     const drainColor = typeof channel.drain === 'number'
-                      ? channel.drain > 0 ? 'text-red-600' : 'text-green-600'
+                      ? channel.drain > 0 ? 'text-primary' : 'text-secondary'
                       : 'text-muted-foreground';
 
                     return (
