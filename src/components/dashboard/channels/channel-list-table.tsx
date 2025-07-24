@@ -199,9 +199,10 @@ export function ChannelListTable({ channels: initialChannels }: ChannelListTable
                               <Info className="h-3 w-3 text-muted-foreground" />
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Cubic root of (out_share - in_share).</p>
-                            <p>Positive: net outbound. Negative: net inbound.</p>
+                          <TooltipContent className="max-w-xs">
+                            <p>
+                              The <strong>Drain</strong> value indicates net liquidity flow. It is the cubic root of the difference between outbound and inbound path shares. Positive values are outbound; negative are inbound.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
